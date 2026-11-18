@@ -1,0 +1,16 @@
+# 系统生成文件
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# 私密文件：仓库根目录即网站根目录，切勿把凭证放进来
+.env
+.env.*
+*.local
+*_secret*
+credentials*
+
+# 以后接后端 / 构建时会产生的内容
+node_modules/
+dist/
+.wrangler/
