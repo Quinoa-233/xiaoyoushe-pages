@@ -335,6 +335,13 @@
   .modal .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
   .modal-timer { font-size: 26px; font-weight: 600; color: #85B7EB; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
   .modal .timer-hint { font-size: 11px; color: #888780; margin-top: 4px; }
+  .modal.playing { width: min(1040px, 94vw); padding: 18px 20px 20px; }
+  .modal.playing .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .modal.playing .modal-head h3 { margin: 0; }
+  .game-frame { width: 100%; height: min(66vh, 620px); border: none; border-radius: 10px; background: #1A1917; display: block; }
+  .frame-hint { font-size: 11px; color: #888780; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .frame-hint a { color: #85B7EB; text-decoration: none; }
+  .frame-hint a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -483,11 +490,24 @@
 
 <!-- ===== 游玩弹窗（游客模式，无计时） ===== -->
 <div class="modal-mask" id="play-modal">
-  <div class="modal">
-    <h3 id="modal-title">开始游玩</h3>
-    <p>第一版原型还没有接入真正的游戏。正式版这里会内嵌网页游戏画布，点开即玩，全程游客模式、无需登录。</p>
-    <div class="modal-btns" style="margin-top:18px; justify-content:center;">
-      <button class="btn-primary" id="modal-close">知道了</button>
+  <div class="modal" id="play-modal-box">
+    <div class="modal-head" id="modal-head" style="display:none;">
+      <h3 id="modal-title-playing"></h3>
+      <button class="btn-ghost" id="modal-close-top">关闭</button>
+    </div>
+    <div id="modal-placeholder">
+      <h3 id="modal-title">开始游玩</h3>
+      <p>这个游戏还没有接入网页版。正式版会内嵌网页游戏画布，点开即玩，全程游客模式、无需登录。</p>
+      <div class="modal-btns" style="margin-top:18px; justify-content:center;">
+        <button class="btn-primary" id="modal-close">知道了</button>
+      </div>
+    </div>
+    <div id="modal-game" style="display:none;">
+      <iframe class="game-frame" id="game-frame" title="game" allow="fullscreen; autoplay; gamepad"></iframe>
+      <div class="frame-hint">
+        <span>卡顿或按键没反应？点 <a id="game-newtab" href="#" target="_blank" rel="noopener">新窗口打开</a> 体验更佳</span>
+        <span>游客模式 · 无需登录</span>
+      </div>
     </div>
   </div>
 </div>
@@ -501,6 +521,7 @@ const GAMES = [
     views: 8620, weekViews: 1240, flowers: 1723, cleared: 56, myFlower: false,
     coverBg: '#085041', coverFg: '#5DCAA5', featured: true,
     tags: ['解谜', '像素风', '钥匙收集', '时序门'],
+    playUrl: 'https://echoes-demo.app.workbuddy.host/?sharecode=7O7FAGB4JM',
     desc: '一款像素风平台解谜游戏。你要在残影重叠的旧校舍里收集 8 枚钥匙，解开时序门的谜题，找到记忆消失的真相。共 8 关，另有隐藏结局。',
     devlog: '11 月 5 日：手感调优完成，SPEED 从 280 降到 240，多人反馈"一按就窜"的问题解决了。第 6 关两道 0.6 秒时序门放宽到 1.0 秒。\n11 月 1 日：新增钥匙全收集成就。\n10 月 28 日：网页版发布。'
   },
@@ -723,14 +744,34 @@ function renderRankTable() {
 
 /* ================= 游玩弹窗（游客模式，无计时记录） ================= */
 function openPlayModal(g) {
-  document.getElementById('modal-title').textContent = '《' + g.title + '》';
+  const box = document.getElementById('play-modal-box');
+  const ph = document.getElementById('modal-placeholder');
+  const gm = document.getElementById('modal-game');
+  const frame = document.getElementById('game-frame');
+  if (g.playUrl) {
+    document.getElementById('modal-title-playing').textContent = '正在游玩 · 《' + g.title + '》';
+    frame.src = g.playUrl;
+    document.getElementById('game-newtab').href = g.playUrl;
+    ph.style.display = 'none';
+    gm.style.display = 'block';
+    box.classList.add('playing');
+  } else {
+    document.getElementById('modal-title').textContent = '《' + g.title + '》';
+    ph.style.display = 'block';
+    gm.style.display = 'none';
+    frame.src = 'about:blank';
+    box.classList.remove('playing');
+  }
   document.getElementById('play-modal').classList.add('show');
 }
-document.getElementById('modal-close').addEventListener('click', () => {
+function closePlayModal() {
   document.getElementById('play-modal').classList.remove('show');
-});
+  document.getElementById('game-frame').src = 'about:blank'; // 关闭即卸载游戏，停掉后台进程
+}
+document.getElementById('modal-close').addEventListener('click', closePlayModal);
+document.getElementById('modal-close-top').addEventListener('click', closePlayModal);
 document.getElementById('play-modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
+  if (e.target === e.currentTarget) closePlayModal();
 });
 
 /* ================= 初始化 ================= */
