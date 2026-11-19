@@ -505,8 +505,8 @@
     <div id="modal-game" style="display:none;">
       <iframe class="game-frame" id="game-frame" title="game" allow="fullscreen; autoplay; gamepad"></iframe>
       <div class="frame-hint">
-        <span>卡顿或按键没反应？点 <a id="game-newtab" href="#" target="_blank" rel="noopener">新窗口打开</a> 体验更佳</span>
-        <span>游客模式 · 无需登录</span>
+        <span>鼠标被游戏抓住出不来？按一次 <b style="color:#F0997B;">Esc</b> 释放，再点右上角关闭</span>
+        <span><a id="game-newtab" href="#" target="_blank" rel="noopener">新窗口打开</a> · 游客模式</span>
       </div>
     </div>
   </div>
@@ -772,6 +772,9 @@ document.getElementById('modal-close').addEventListener('click', closePlayModal)
 document.getElementById('modal-close-top').addEventListener('click', closePlayModal);
 document.getElementById('play-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closePlayModal();
+});
+document.addEventListener('keydown', e => { // Esc 快捷关闭（鼠标被游戏抓住时按 Esc 先解锁指针，松开后此快捷键生效）
+  if (e.key === 'Escape' && document.getElementById('play-modal').classList.contains('show')) closePlayModal();
 });
 
 /* ================= 初始化 ================= */
