@@ -1,0 +1,2141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>迷雾画廊 · AI 沉浸式推理侦探游戏</title>
+  <style>
+:root {
+  --bg: #0e1220;
+  --bg-2: #151a2c;
+  --panel: #1a2136;
+  --panel-2: #202944;
+  --line: #2b3552;
+  --gold: #d4b26a;
+  --gold-dim: #a98d4e;
+  --text: #e9e4d6;
+  --text-dim: #9aa3bd;
+  --text-faint: #6b748c;
+  --red: #c0514a;
+  --green: #6fae7f;
+  --blue: #6f9fd8;
+  --shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", -apple-system, "Segoe UI", sans-serif;
+  background: radial-gradient(1200px 800px at 20% 0%, #1a2038 0%, var(--bg) 55%);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.hidden { display: none !important; }
+
+button { font-family: inherit; cursor: pointer; }
+
+/* ===== 按钮 ===== */
+.btn {
+  border: none; border-radius: 10px; padding: 11px 20px;
+  font-size: 15px; font-weight: 600; transition: transform .12s, box-shadow .12s, background .12s;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary {
+  background: linear-gradient(135deg, #e0c17d, #c9a45a);
+  color: #241d0e; box-shadow: 0 6px 18px rgba(212,178,106,.28);
+}
+.btn-primary:hover { box-shadow: 0 8px 24px rgba(212,178,106,.4); }
+.btn-ghost {
+  background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--line);
+}
+.btn-ghost:hover { color: var(--text); }
+.btn-accuse {
+  width: 100%; margin-top: 12px;
+  background: linear-gradient(135deg, #d9685c, #b8453c); color: #fff;
+  box-shadow: 0 6px 18px rgba(192,81,74,.3);
+}
+.btn-hint { width: 100%; margin-top: 12px; }
+
+/* ===== 开场幕布 ===== */
+.intro {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(900px 600px at 50% 30%, rgba(212,178,106,.08), transparent 60%),
+    radial-gradient(1200px 800px at 20% 0%, #1a2038 0%, var(--bg) 55%);
+  padding: 20px;
+}
+.intro-card {
+  max-width: 620px; width: 100%;
+  background: linear-gradient(160deg, var(--panel), var(--bg-2));
+  border: 1px solid var(--line); border-radius: 18px;
+  padding: 38px 40px; text-align: center; box-shadow: var(--shadow);
+}
+.intro-badge {
+  display: inline-block; font-size: 12px; letter-spacing: 2px;
+  color: var(--gold); border: 1px solid var(--gold-dim); border-radius: 20px;
+  padding: 5px 14px; margin-bottom: 18px;
+}
+.intro-title {
+  font-size: 44px; letter-spacing: 6px; color: var(--gold);
+  text-shadow: 0 0 24px rgba(212,178,106,.35);
+}
+.intro-sub { color: var(--text-dim); margin: 6px 0 22px; letter-spacing: 3px; }
+.intro-body { text-align: left; line-height: 1.9; color: var(--text-dim); font-size: 15px; }
+.intro-body p { margin-bottom: 10px; }
+.intro-body .hl { color: var(--gold); font-weight: 600; }
+.intro-body .tip { color: var(--text-faint); font-size: 13px; margin-top: 6px; }
+.intro .btn { margin-top: 22px; padding: 13px 44px; font-size: 17px; }
+
+/* ===== 顶部栏 ===== */
+.topbar {
+  height: 62px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; background: rgba(21,26,44,.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 11px; }
+.brand-mark { font-size: 26px; }
+.brand-title { font-size: 18px; font-weight: 700; letter-spacing: 2px; color: var(--gold); }
+.brand-sub { font-size: 12px; color: var(--text-faint); }
+.topbar-actions { display: flex; align-items: center; gap: 12px; }
+.clue-count { font-size: 13px; color: var(--text-dim); background: var(--panel-2); padding: 7px 14px; border-radius: 20px; border: 1px solid var(--line); }
+.clue-count b { color: var(--gold); font-size: 15px; }
+
+/* ===== 布局 ===== */
+.game { height: 100vh; display: flex; flex-direction: column; }
+.layout {
+  flex: 1; display: grid; grid-template-columns: 240px 1fr 280px;
+  min-height: 0;
+}
+
+/* ===== 侧边栏（嫌疑人） ===== */
+.sidebar {
+  background: var(--bg-2); border-right: 1px solid var(--line);
+  padding: 16px 12px; overflow-y: auto;
+}
+.sidebar-label { font-size: 11px; letter-spacing: 2px; color: var(--text-faint); margin: 4px 8px 8px; }
+.sidebar-label.assistant-label { margin-top: 20px; }
+.npc-list { display: flex; flex-direction: column; gap: 6px; }
+.npc-item {
+  display: flex; align-items: center; gap: 11px; text-align: left;
+  background: transparent; border: 1px solid transparent; border-radius: 12px;
+  padding: 10px 11px; color: var(--text); position: relative; transition: background .12s, border .12s;
+}
+.npc-item:hover { background: var(--panel); }
+.npc-item.active { background: var(--panel); border-color: var(--gold-dim); }
+.npc-avatar {
+  width: 40px; height: 40px; flex: none; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+  background: var(--panel-2); border: 1px solid var(--line);
+}
+.npc-item.active .npc-avatar { border-color: var(--gold-dim); }
+.npc-info { display: flex; flex-direction: column; min-width: 0; }
+.npc-name { font-size: 14px; font-weight: 600; }
+.npc-role { font-size: 11px; color: var(--text-faint); }
+.npc-new-dot {
+  position: absolute; top: 10px; right: 10px; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--red); opacity: 0; transition: opacity .2s;
+}
+.npc-new-dot.on { opacity: 1; animation: pulse 1.6s infinite; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(192,81,74,.5);} 50% { box-shadow: 0 0 0 6px rgba(192,81,74,0);} }
+
+/* ===== 对话区 ===== */
+.chat { display: flex; flex-direction: column; min-width: 0; background: radial-gradient(900px 500px at 50% 0%, #161c31 0%, var(--bg) 60%); }
+.chat-head {
+  display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+  border-bottom: 1px solid var(--line); background: rgba(21,26,44,.6);
+}
+.chat-npc-name { font-size: 16px; font-weight: 700; }
+.chat-npc-role { font-size: 12px; color: var(--text-faint); }
+.chat-hint { margin-left: auto; font-size: 12px; color: var(--gold-dim); }
+
+.chat-body { flex: 1; overflow-y: auto; padding: 22px 22px 10px; display: flex; flex-direction: column; gap: 14px; }
+
+.msg { max-width: 78%; display: flex; flex-direction: column; gap: 4px; animation: rise .25s ease; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px);} to { opacity: 1; transform: none;} }
+.msg.user { align-self: flex-end; align-items: flex-end; }
+.msg.npc { align-self: flex-start; align-items: flex-start; }
+.msg .bubble {
+  padding: 11px 15px; border-radius: 14px; line-height: 1.7; font-size: 15px; white-space: pre-wrap; word-break: break-word;
+}
+.msg.user .bubble { background: linear-gradient(135deg, #e0c17d, #c9a45a); color: #241d0e; border-bottom-right-radius: 4px; }
+.msg.npc .bubble { background: var(--panel); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.msg .meta { font-size: 11px; color: var(--text-faint); }
+.msg.npc .bubble.assistant-bubble { background: #1c2742; border-color: #31406a; }
+.clue-tag {
+  display: inline-block; margin-top: 8px; padding: 5px 12px; font-size: 12px;
+  background: rgba(212,178,106,.12); color: var(--gold); border: 1px solid var(--gold-dim);
+  border-radius: 8px; animation: rise .3s ease;
+}
+.typing-cursor::after { content: "▍"; color: var(--gold); animation: blink .8s infinite; }
+@keyframes blink { 0%,100% { opacity: 1;} 50% { opacity: 0;} }
+
+/* ===== 情绪状态（NPC 头像） ===== */
+.npc-avatar { transition: transform .18s ease, box-shadow .18s ease, filter .18s ease; }
+.npc-avatar.mood-calm { transform: scale(1); }
+.npc-avatar.mood-alert { transform: translateX(0); animation: tremble .35s ease 2; }
+.npc-avatar.mood-nervous { animation: shiver .5s ease infinite; }
+.npc-avatar.mood-crack { animation: crack .8s ease 1; filter: saturate(.6) brightness(1.1); }
+@keyframes tremble { 0%,100% { transform: translateX(0);} 25% { transform: translateX(-2px);} 75% { transform: translateX(2px);} }
+@keyframes shiver { 0%,100% { transform: translate(0,0) rotate(0);} 25% { transform: translate(-1px,0) rotate(-2deg);} 75% { transform: translate(1px,0) rotate(2deg);} }
+@keyframes crack { 0% { transform: scale(1);} 40% { transform: scale(1.18) rotate(4deg);} 100% { transform: scale(1);} }
+
+/* ===== 说话声波条 ===== */
+.wavebar { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; margin-left: 6px; }
+.wavebar span {
+  width: 3px; background: var(--gold); border-radius: 1px; height: 4px;
+  animation: wave 0.6s ease-in-out infinite;
+}
+.wavebar span:nth-child(2) { animation-delay: .12s; }
+.wavebar span:nth-child(3) { animation-delay: .24s; }
+.wavebar span:nth-child(4) { animation-delay: .36s; }
+@keyframes wave { 0%,100% { height: 3px;} 50% { height: 12px;} }
+
+/* ===== 正在输入 三点动画 ===== */
+.typing-dots { display: inline-flex; gap: 4px; align-items: center; padding: 2px 0; }
+.typing-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); animation: dotPulse 1s infinite; }
+.typing-dots i:nth-child(2) { animation-delay: .2s; }
+.typing-dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes dotPulse { 0%,100% { opacity: .3; transform: translateY(0);} 50% { opacity: 1; transform: translateY(-3px);} }
+
+/* ===== 线索闪现光效 ===== */
+.flash-overlay {
+  position: fixed; inset: 0; z-index: 55; pointer-events: none;
+  border: 3px solid rgba(212,178,106,.0); border-radius: 0;
+  animation: flashRing .7s ease-out forwards;
+}
+@keyframes flashRing {
+  0% { border-color: rgba(212,178,106,.85); box-shadow: inset 0 0 60px rgba(212,178,106,.35); }
+  100% { border-color: rgba(212,178,106,0); box-shadow: inset 0 0 0 rgba(212,178,106,0); }
+}
+.clue-item.unlocked { animation: glow .6s ease, bounce .5s ease; }
+@keyframes bounce { 0% { transform: scale(.95);} 50% { transform: scale(1.03);} 100% { transform: scale(1);} }
+
+/* ===== NPC 切换转场 ===== */
+.chat-body.fading { animation: fadeSwap .28s ease; }
+@keyframes fadeSwap { from { opacity: 0; transform: translateX(10px);} to { opacity: 1; transform: none;} }
+
+/* ===== 人物立绘舞台 ===== */
+.stage {
+  position: relative; height: 220px; flex: none;
+  display: flex; align-items: flex-end; justify-content: center;
+  overflow: hidden; border-bottom: 1px solid var(--line);
+}
+.stage-bg { position: absolute; inset: 0; transition: background .8s ease; }
+.stage-spot {
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 260px; height: 60px; border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(212,178,106,.22), transparent 70%);
+}
+.character {
+  position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center;
+  animation: enter .5s cubic-bezier(.2,.7,.3,1.2) both;
+}
+@keyframes enter {
+  from { opacity: 0; transform: translateY(40px) scale(.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.character.leaving { animation: leave .35s ease forwards; }
+@keyframes leave {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(24px) scale(.95); }
+}
+.char-body {
+  width: 120px; height: 150px; border-radius: 60px 60px 16px 16px;
+  display: flex; align-items: center; justify-content: center; font-size: 72px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line); box-shadow: 0 12px 30px rgba(0,0,0,.4);
+  position: relative; transition: filter .2s, transform .2s;
+}
+.char-body .char-face {
+  position: absolute; bottom: 14px; right: 12px; width: 40px; height: 40px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 22px; background: var(--bg-2); border: 2px solid var(--gold-dim);
+  transition: all .25s;
+}
+.char-body .char-face.mood-calm { }
+.char-body .char-face.mood-alert { background: #3a2c1c; }
+.char-body .char-face.mood-nervous { background: #33261e; }
+.char-body .char-face.mood-crack { background: #401d1d; }
+.char-name-tag {
+  margin-top: 10px; font-size: 13px; letter-spacing: 1px; color: var(--gold);
+  background: rgba(21,26,44,.8); padding: 4px 14px; border-radius: 20px; border: 1px solid var(--gold-dim);
+}
+.char-line {
+  margin-top: 4px; font-size: 11px; color: var(--text-faint); max-width: 300px;
+  text-align: center; padding: 0 12px; min-height: 16px;
+}
+
+/* 表情脸谱（立绘面部表情，随情绪切换） */
+.face-calm   { content: "🙂"; }
+.face-alert  { content: "😠"; }
+.face-nervous{ content: "😰"; }
+.face-crack  { content: "😱"; }
+.scene-layer {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  opacity: .35; transition: opacity .8s ease;
+}
+.chat { position: relative; }
+.chat > *:not(.scene-layer) { position: relative; z-index: 1; }
+.scene-icon {
+  position: absolute; font-size: 90px; opacity: .12; right: 30px; top: 70px;
+  filter: grayscale(.3); transition: all .8s ease;
+}
+
+/* ===== 顶部时间线 ===== */
+.timeline { display: flex; align-items: center; gap: 8px; }
+.timeline-track { width: 120px; height: 5px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.timeline-fill { height: 100%; width: 0; background: linear-gradient(90deg, #d4b26a, #c0514a); transition: width .8s ease; }
+.timeline-time { font-size: 11px; color: var(--text-faint); letter-spacing: 1px; }
+.tension-ind { font-size: 13px; color: var(--text-dim); }
+
+/* ===== 章节指示器 ===== */
+.chapter-ind {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  padding: 6px 12px; border-radius: 20px; font-size: 12px; color: var(--text-dim);
+}
+.chapter-ind .ch-txt { color: var(--gold); font-weight: 600; }
+.chapter-ind .ch-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint);
+  transition: background .3s;
+}
+.chapter-ind .ch-dot.done { background: var(--gold); }
+.chapter-ind .ch-dot.cur { background: var(--red); animation: pulse 1.6s infinite; }
+
+/* ===== 锁定嫌疑人 ===== */
+.npc-item.locked { opacity: .45; cursor: not-allowed; }
+.npc-item.locked:hover { background: transparent; }
+.npc-item .npc-lock { position: absolute; top: 10px; right: 10px; font-size: 13px; color: var(--text-faint); }
+.npc-item.locked .npc-avatar { filter: grayscale(1); }
+
+/* ===== 章节转场弹窗 ===== */
+.chapter-toast {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 70;
+  padding: 18px 20px; text-align: center;
+  background: linear-gradient(180deg, rgba(212,178,106,.18), rgba(14,18,32,.95));
+  border-bottom: 1px solid var(--gold-dim);
+  animation: toastIn .4s ease;
+}
+@keyframes toastIn { from { opacity: 0; transform: translateY(-100%);} to { opacity: 1; transform: none;} }
+.chapter-toast .ct-title { font-size: 20px; font-weight: 700; color: var(--gold); letter-spacing: 2px; margin-bottom: 6px; }
+.chapter-toast .ct-body { font-size: 13px; color: var(--text-dim); line-height: 1.7; max-width: 560px; margin: 0 auto; }
+
+.quick-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 20px 0; }
+.chip {
+  font-size: 13px; padding: 7px 13px; border-radius: 20px; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--text-dim); transition: all .12s;
+}
+.chip:hover { color: var(--gold); border-color: var(--gold-dim); }
+
+.chat-input { display: flex; gap: 10px; padding: 14px 20px 18px; }
+.chat-input input {
+  flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 16px; color: var(--text); font-size: 15px; outline: none; font-family: inherit;
+}
+.chat-input input:focus { border-color: var(--gold-dim); }
+.chat-input input::placeholder { color: var(--text-faint); }
+
+/* ===== 线索本 ===== */
+.notebook {
+  background: var(--bg-2); border-left: 1px solid var(--line); padding: 16px 14px; overflow-y: auto;
+}
+.notebook-head { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+.notebook-count { font-size: 12px; color: var(--text-faint); font-weight: 500; }
+.clue-list { display: flex; flex-direction: column; gap: 8px; }
+.clue-item {
+  display: flex; gap: 9px; padding: 10px 11px; border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--line); font-size: 13px; line-height: 1.5;
+  color: var(--text-faint); transition: all .3s;
+}
+.clue-item.locked { opacity: .55; }
+.clue-item.locked .clue-ico { filter: grayscale(1); opacity: .5; }
+.clue-item.unlocked { border-color: var(--gold-dim); color: var(--text); background: linear-gradient(160deg, rgba(212,178,106,.08), var(--panel)); animation: glow .6s ease; }
+@keyframes glow { from { box-shadow: 0 0 0 3px rgba(212,178,106,.25);} to { box-shadow: none;} }
+.clue-ico { font-size: 16px; flex: none; }
+
+/* ===== 弹窗 ===== */
+.modal {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  background: rgba(5,8,16,.72); backdrop-filter: blur(4px); padding: 20px;
+}
+.modal-card {
+  width: 100%; max-width: 480px; background: linear-gradient(160deg, var(--panel), var(--bg-2));
+  border: 1px solid var(--line); border-radius: 18px; padding: 28px 30px; box-shadow: var(--shadow);
+  max-height: 88vh; overflow-y: auto;
+}
+.modal-title { font-size: 22px; font-weight: 700; text-align: center; margin-bottom: 10px; color: var(--gold); }
+.modal-desc { text-align: center; color: var(--text-dim); font-size: 14px; margin-bottom: 18px; }
+.modal-desc b { color: var(--gold); }
+.accuse-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.accuse-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 10px;
+  border-radius: 12px; background: var(--panel); border: 2px solid var(--line); color: var(--text);
+  transition: all .15s;
+}
+.accuse-opt:hover { border-color: var(--gold-dim); }
+.accuse-opt.selected { border-color: var(--gold); background: rgba(212,178,106,.08); }
+.accuse-opt .npc-avatar { width: 46px; height: 46px; font-size: 24px; }
+.accuse-opt .a-name { font-weight: 700; font-size: 14px; }
+.accuse-opt .a-role { font-size: 11px; color: var(--text-faint); }
+.accuse-reason {
+  width: 100%; height: 90px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 14px; color: var(--text); font-size: 14px; resize: none; outline: none; font-family: inherit;
+}
+.accuse-reason:focus { border-color: var(--gold-dim); }
+.accuse-reason::placeholder { color: var(--text-faint); }
+.modal-actions { display: flex; gap: 12px; margin-top: 18px; }
+.modal-actions .btn { flex: 1; }
+
+/* ===== 结局 ===== */
+.verdict-card { text-align: center; }
+.verdict-rank { font-size: 56px; line-height: 1; margin-bottom: 8px; }
+.verdict-grade { font-size: 26px; font-weight: 800; letter-spacing: 3px; margin-bottom: 4px; }
+.verdict-title { color: var(--text-dim); font-size: 15px; margin-bottom: 18px; }
+.verdict-body { text-align: left; font-size: 14px; line-height: 1.9; color: var(--text-dim); background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 8px; }
+.verdict-body .hl { color: var(--gold); font-weight: 600; }
+.verdict-body .hl-red { color: var(--red); font-weight: 600; }
+.verdict-stats { display: flex; gap: 10px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+.verdict-stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; font-size: 12px; color: var(--text-faint); }
+.verdict-stat b { color: var(--gold); font-size: 15px; display: block; }
+
+/* ===== 成就 ===== */
+.verdict-achieve { margin-top: 16px; text-align: left; }
+.verdict-achieve-title { font-size: 13px; font-weight: 700; color: var(--gold); margin-bottom: 8px; letter-spacing: 1px; }
+.verdict-achieve-item {
+  font-size: 12px; color: var(--text-dim); padding: 8px 12px; margin-bottom: 6px;
+  background: rgba(212,178,106,.08); border: 1px solid var(--gold-dim); border-radius: 10px;
+  line-height: 1.6;
+}
+.verdict-achieve-item b { color: var(--gold); }
+
+/* ===== 紧张值 / 心跳系统 ===== */
+.tension-meter {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  padding: 6px 11px; border-radius: 20px; font-size: 12px; color: var(--text-dim);
+}
+.tension-heart { font-size: 15px; transition: transform .15s; }
+.tension-heart.beating { animation: heartbeat .6s ease infinite; }
+@keyframes heartbeat { 0%,100% { transform: scale(1);} 25% { transform: scale(1.35);} 45% { transform: scale(1.05);} 70% { transform: scale(1.3);} }
+.tension-track { width: 70px; height: 5px; border-radius: 3px; background: var(--panel); overflow: hidden; }
+.tension-fill { height: 100%; width: 0; background: linear-gradient(90deg, #6fae7f, #d4b26a, #c0514a); transition: width .5s ease; }
+.tension-val { font-weight: 700; color: var(--gold); min-width: 20px; text-align: center; }
+
+/* 紧张氛围滤镜（覆盖全屏，随紧张度加深） */
+.tension-vignette {
+  position: fixed; inset: 0; z-index: 40; pointer-events: none; opacity: 0; transition: opacity .6s ease;
+  background: radial-gradient(1200px 800px at 50% 50%, transparent 40%, rgba(120,20,20,.35) 100%);
+}
+
+/* ===== 雨夜粒子 ===== */
+.rain-layer { position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; opacity: .5; }
+.rain-drop {
+  position: absolute; top: -10%; width: 1px; height: 16px;
+  background: linear-gradient(180deg, transparent, rgba(180,190,210,.5));
+  animation: rainFall linear infinite;
+}
+@keyframes rainFall { from { transform: translateY(-20px);} to { transform: translateY(110vh);} }
+
+/* ===== 戏剧化事件演出 ===== */
+.event-stage {
+  position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(900px 600px at 50% 40%, rgba(212,178,106,.06), rgba(5,8,16,.92));
+  backdrop-filter: blur(3px); animation: eventIn .35s ease;
+}
+@keyframes eventIn { from { opacity: 0;} to { opacity: 1;} }
+.event-card {
+  width: min(520px, 92vw); text-align: center; padding: 30px 34px;
+  background: linear-gradient(160deg, #1c1426, #0e1220); border: 1px solid var(--gold-dim);
+  border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  animation: eventCard .5s cubic-bezier(.2,.8,.3,1.2) both;
+}
+@keyframes eventCard { from { opacity: 0; transform: translateY(30px) scale(.94);} to { opacity: 1; transform: none;} }
+.event-kicker { font-size: 11px; letter-spacing: 3px; color: var(--red); margin-bottom: 10px; }
+.event-icon { font-size: 52px; line-height: 1; margin-bottom: 8px; animation: eventIcon 1s ease infinite; }
+@keyframes eventIcon { 0%,100% { transform: scale(1);} 50% { transform: scale(1.08);} }
+.event-title { font-size: 24px; font-weight: 800; letter-spacing: 3px; color: var(--gold); margin-bottom: 12px; }
+.event-text { font-size: 14px; line-height: 1.9; color: var(--text-dim); text-align: left; white-space: pre-wrap; }
+.event-text .hl { color: var(--gold); font-weight: 600; }
+.event-text .hl-red { color: var(--red); font-weight: 600; }
+.event-btn { margin-top: 20px; padding: 12px 36px; font-size: 16px; }
+
+/* 倒计时 */
+.event-count {
+  font-size: 64px; font-weight: 800; color: var(--red); line-height: 1; margin: 6px 0;
+  animation: countPulse 1s ease infinite;
+}
+@keyframes countPulse { 0%,100% { transform: scale(1); opacity: 1;} 50% { transform: scale(1.12); opacity: .7;} }
+
+/* ===== 戏剧性 NPC 动作（拍桌/逼近/崩溃） ===== */
+.char-body.act-slam { animation: slam .5s cubic-bezier(.3,0,0,1); }
+@keyframes slam { 0%,100% { transform: translateY(0);} 30% { transform: translateY(-8px);} 60% { transform: translateY(3px);} }
+.char-body.act-lean { animation: lean .6s ease both; }
+@keyframes lean { from { transform: translateX(0);} 50% { transform: translateX(-10px) scale(1.04);} to { transform: translateX(-4px) scale(1.03);} }
+.char-body.act-crack { animation: crack .8s ease; }
+
+/* 震动（对峙高潮） */
+.screen-shake { animation: shake .5s ease; }
+@keyframes shake { 0%,100% { transform: translate(0,0);} 20% { transform: translate(-4px,2px);} 40% { transform: translate(4px,-2px);} 60% { transform: translate(-3px,-1px);} 80% { transform: translate(3px,1px);} }
+
+/* 闪回 / 字幕条 */
+.flashback-bar {
+  position: fixed; bottom: 12%; left: 50%; transform: translateX(-50%); z-index: 82;
+  font-size: 15px; color: var(--text); letter-spacing: 2px;
+  background: rgba(14,18,32,.9); border: 1px solid var(--gold-dim); padding: 10px 22px;
+  border-radius: 10px; animation: fbIn .5s ease;
+}
+@keyframes fbIn { from { opacity: 0; transform: translateX(-50%) translateY(16px);} to { opacity: 1; transform: translateX(-50%) translateY(0);} }
+
+/* ===== 响应式 ===== */
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  .sidebar { display: flex; flex-direction: column; border-right: none; border-bottom: 1px solid var(--line); max-height: none; padding: 10px; }
+  .npc-list { flex-direction: row; overflow-x: auto; }
+  .npc-item { flex: none; }
+  .npc-item .npc-role { display: none; }
+  .sidebar-label { display: none; }
+  .sidebar .btn-accuse { width: auto; margin: 8px 0 0; }
+  .notebook { border-left: none; border-top: 1px solid var(--line); max-height: 200px; }
+  .clue-list { flex-direction: row; flex-wrap: wrap; }
+  .clue-item { width: calc(50% - 4px); }
+  .msg { max-width: 88%; }
+}
+
+</style>
+</head>
+<body>
+  <!-- 开场幕布 -->
+  <div id="intro" class="intro">
+    <div class="intro-card">
+      <div class="intro-badge">AI + 游戏 · 沉浸式推理</div>
+      <h1 class="intro-title">迷雾画廊</h1>
+      <p class="intro-sub">校园名画失窃案</p>
+      <div class="intro-body">
+        <p>艺术节前夜，学校美术馆珍藏的百年校史名画《晨曦》离奇失窃。</p>
+        <p>案发时段监控"恰好"检修断电，现场只留下一副白手套、一张沾着咖啡渍的节目单。</p>
+        <p>作为受邀协助调查的学生侦探，你需要<span class="hl">与 7 名嫌疑人面对面交谈</span>，从他们的话语中找出破绽、收集关键线索，历经<span class="hl">四大调查章节</span>，层层逼近真相，最终<span class="hl">指认真凶</span>。</p>
+        <p class="tip">💡 每个人都有自己的秘密，有的人会隐瞒，甚至说谎。多问、多追问，逐步解锁新的嫌疑人。</p>
+      </div>
+      <button id="btnStart" class="btn btn-primary">进入调查</button>
+    </div>
+  </div>
+
+  <!-- 游戏主界面 -->
+  <div id="game" class="game hidden">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">🔍</span>
+        <div class="brand-text">
+          <div class="brand-title">迷雾画廊</div>
+          <div class="brand-sub">名画《晨曦》失窃案</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="chapter-ind" id="chapterInd" title="调查章节进度"></div>
+        <div class="timeline" title="案件时间线推进">
+          <span class="tension-ind" id="tensionInd">🕯️</span>
+          <span class="timeline-track"><span class="timeline-fill" id="timelineFill"></span></span>
+          <span class="timeline-time" id="timelineTime">22:50</span>
+        </div>
+        <div class="tension-meter" title="案件紧张度">
+          <span class="tension-heart" id="tensionHeart">❤️</span>
+          <span class="tension-track"><span class="tension-fill" id="tensionFill"></span></span>
+          <span class="tension-val" id="tensionVal">0</span>
+        </div>
+        <div class="clue-count" id="clueCount" title="已收集线索">线索 <b>0</b>/11</div>
+        <button id="btnRestart" class="btn btn-ghost" title="重新开始">↻ 重开</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <!-- 左侧：嫌疑人列表 -->
+      <aside class="sidebar">
+        <div class="sidebar-label">嫌疑人</div>
+        <nav id="npcList" class="npc-list"></nav>
+        <div class="sidebar-label assistant-label">助手</div>
+        <nav class="npc-list">
+          <button class="npc-item assistant" data-npc="assistant">
+            <span class="npc-avatar">🕵️</span>
+            <span class="npc-info">
+              <span class="npc-name">华生 · 侦探助手</span>
+              <span class="npc-role">推理提示 · 线索梳理</span>
+            </span>
+            <span class="npc-new-dot" data-npc="assistant"></span>
+          </button>
+        </nav>
+        <button id="btnAccuse" class="btn btn-accuse">⚖️ 指认真凶</button>
+      </aside>
+
+      <!-- 中间：对话区 -->
+      <main class="chat">
+        <div class="scene-layer" id="sceneLayer"></div>
+        <div class="stage" id="stage">
+          <div class="stage-bg" id="stageBg"></div>
+          <div class="stage-spot"></div>
+          <div class="character" id="character">
+            <div class="char-body" id="charBody">🕵️<span class="char-face face-calm" id="charFace"></span></div>
+            <div class="char-name-tag" id="charNameTag">华生 · 侦探助手</div>
+            <div class="char-line" id="charLine"></div>
+          </div>
+        </div>
+        <div class="chat-head" id="chatHead">
+          <span class="npc-avatar" id="chatAvatar">🕵️</span>
+          <div>
+            <div class="chat-npc-name"><span id="chatName">华生</span><span class="wavebar" id="wavebar" style="display:none"><span></span><span></span><span></span><span></span></span></div>
+            <div class="chat-npc-role" id="chatRole">侦探助手</div>
+          </div>
+          <div class="chat-hint" id="chatHint"></div>
+        </div>
+        <div class="chat-body" id="chatBody"></div>
+        <div class="quick-chips" id="quickChips"></div>
+        <div class="chat-input">
+          <input id="chatInput" type="text" placeholder="输入你的问题，例如：昨晚你在哪里？" autocomplete="off" />
+          <button id="btnSend" class="btn btn-primary">提问</button>
+        </div>
+      </main>
+
+      <!-- 右侧：线索本 -->
+      <aside class="notebook">
+        <div class="notebook-head">
+          <span>📓 线索本</span>
+          <span class="notebook-count" id="notebookCount">0/11</span>
+        </div>
+        <div id="clueList" class="clue-list"></div>
+        <button id="btnHint" class="btn btn-ghost btn-hint">💡 请求推理提示</button>
+      </aside>
+    </div>
+  </div>
+
+  <!-- 指认弹窗 -->
+  <div id="accuseModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-title">⚖️ 指认真凶</div>
+      <p class="modal-desc">你已收集 <b id="accuseClueCount">0</b> 条线索。请指认偷走《晨曦》的真凶：</p>
+      <div id="accuseOptions" class="accuse-options"></div>
+      <textarea id="accuseReason" class="accuse-reason" placeholder="（可选）简要说明你的推理依据……"></textarea>
+      <div class="modal-actions">
+        <button id="btnAccuseCancel" class="btn btn-ghost">再想想</button>
+        <button id="btnAccuseConfirm" class="btn btn-primary">提交指认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 结局弹窗 -->
+  <div id="verdictModal" class="modal hidden">
+    <div class="modal-card verdict-card">
+      <div id="verdictContent"></div>
+      <div class="modal-actions">
+        <button id="btnVerdictRestart" class="btn btn-primary">🔁 再玩一次</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 沉浸氛围层 -->
+  <div class="rain-layer" id="rainLayer"></div>
+  <div class="tension-vignette" id="tensionVignette"></div>
+
+  <script>
+/* ============================================================
+ * 《迷雾画廊》— AI 沉浸式推理侦探游戏
+ * 校园名画《晨曦》失窃案
+ *
+ * 引擎说明：
+ *   - ENGINE.mode === 'local'   ：本地规则 + 意图匹配（离线可玩，默认）
+ *   - ENGINE.mode === 'cloud'   ：接入真实大模型（需先开通云服务）
+ *   切换真 AI 只需：1) 开通云服务获取 publicConfig；2) 填入下方
+ *   ENGINE.cloud；3) 将 ENGINE.mode 改为 'cloud'。
+ * ============================================================ */
+
+const ENGINE = {
+  mode: 'local', // 'local' | 'cloud'
+  // 开通云服务后，把 publicConfig 填到这里即可启用真实大模型对话：
+  cloud: {
+    endpoint: null,
+    oauthRelayBaseUrl: null,
+    publishableKey: null,
+  },
+};
+
+/* ---------------- 关键线索 ---------------- */
+const CLUES = [
+  { id: 'coffee',  ico: '☕', title: '蓝山咖啡渍', desc: '节目单上的咖啡渍经鉴定是蓝山咖啡——只有林晚晴常喝蓝山。' },
+  { id: 'gloves',  ico: '🧤', title: '白手套登记', desc: '画展白手套统一编号发放，领用记录由林晚晴经手登记。' },
+  { id: 'card',    ico: '🪪', title: '员工卡借出', desc: '陈大力曾把后门员工卡"借"给林晚晴，说是搬画用。' },
+  { id: 'inschool',ico: '🏫', title: '画作未离校', desc: '《晨曦》仍藏在校内画室储物间的旧画框堆里，并非外贼倒卖。' },
+  { id: 'su_photo',ico: '🖼️', title: '苏小满的旧照片', desc: '苏小满深夜去画室只为取回母亲的旧照片，与失窃无关。' },
+  { id: 'zhou_live',ico:'📺', title: '周子墨直播', desc: '周子墨案发时段在宿舍直播打游戏，有完整录屏，无作案时间。' },
+  { id: 'milk',    ico: '🥛', title: '安眠药牛奶', desc: '陈大力被下了安眠药的热牛奶，有人刻意调虎离山。' },
+  { id: 'gps',     ico: '📍', title: '手机定位', desc: '林晚晴手机 23:05 定位在美术馆附近，与她"已回宿舍"的说法矛盾。' },
+  { id: 'keycopy', ico: '🔑', title: '钥匙备份', desc: '馆长办公室保险柜里的画室钥匙备份，案发前被人动过，少了林晚晴那把的登记。' },
+  { id: 'report',  ico: '📄', title: '检修报告造假', desc: '监控检修的申报单签字是伪造的——有人冒用了馆长的签名。' },
+  { id: 'dealer',  ico: '💼', title: '黑市收购线索', desc: '有人匿名联系过校外画商，试探《晨曦》的黑市行情，通话记录来自一个陌生号码。' },
+];
+const TOTAL_CLUES = CLUES.length;
+
+/* ---------------- 嫌疑人（AI 智能体） ---------------- */
+const NPCS = {
+  lin: {
+    name: '林晚晴', role: '美术社社长', avatar: '🎨',
+    greeting: '你好，我是美术社社长林晚晴。画展是我负责布置的，出了这种事我比谁都难过。你想问什么，尽管问吧。',
+    chips: ['昨晚你在哪里？', '关于《晨曦》', '画室钥匙', '白手套'],
+    topics: [
+      {
+        id: 'keys', keywords: ['钥匙'],
+        stages: [
+          { text: '画室的钥匙我有一把，但不止我一个人有——安保那边还有备份的。' },
+          { text: '……（顿了一下）其实，我平时进画室都走前门，钥匙就在我身上，从没离身。', clue: null },
+        ],
+      },
+      {
+        id: 'night', keywords: ['昨晚', '案发', '你在哪', '不在场', '几点', '当时'],
+        stages: [
+          { text: '昨晚我布置完画展，大概 21 点就回宿舍了，之后没有再出去过。', clue: null, mood: 'calm' },
+          { text: '（语速稍快）我说过了，21 点后我就在宿舍，哪也没去。', clue: null, mood: 'alert' },
+          { text: '（指尖无意识地绞着衣角）你、你为什么一直追问这个？我不是都说清楚了吗……', clue: null, mood: 'nervous' },
+        ],
+      },
+      {
+        id: 'coffee', keywords: ['咖啡', '蓝山', '节目单', '饮料'],
+        stages: [
+          { text: '我喜欢喝咖啡，尤其是蓝山，画画熬夜时全靠它提神。', clue: 'coffee' },
+        ],
+      },
+      {
+        id: 'gloves', keywords: ['手套', '白手套'],
+        stages: [
+          { text: '布置画展时我们统一发了白手套，怕手上的油渍弄脏画作。每个人的领用我都登记了。', clue: 'gloves' },
+        ],
+      },
+      {
+        id: 'card', keywords: ['员工卡', '门禁', '后门', '刷卡'],
+        stages: [
+          { text: '后门是刷卡进出的，我一般不走后门，都是走前门。', clue: null },
+        ],
+      },
+      {
+        id: 'auction', keywords: ['拍卖', '卖画', '筹款', '收购', '价钱'],
+        stages: [
+          { text: '……（明显激动）学校要拍卖《晨曦》去筹款，我坚决反对！那幅画是学校的魂，怎么能卖！', clue: null, mood: 'alert' },
+          { text: '（声音发颤）你知道那幅画对我意味着什么吗？那是我爷爷……是我在这所学校唯一的念想。', clue: null, mood: 'nervous' },
+        ],
+      },
+      {
+        id: 'storeroom', keywords: ['储物间', '画室', '藏', '哪里', '找到'],
+        stages: [
+          { text: '储物间堆着些旧画框，很乱，平时没什么人会去。', clue: 'inschool' },
+        ],
+      },
+      {
+        id: 'zhou', keywords: ['周子墨'],
+        stages: [
+          { text: '周子墨确实想买《晨曦》，被我拒绝了。他那种人，买不到就放狠话，但应该不至于去偷。' },
+        ],
+      },
+      {
+        id: 'su', keywords: ['苏小满', '小满', '清洁工'],
+        stages: [
+          { text: '小满很可怜，家里条件不好，但她很本分。我不相信是她干的。' },
+        ],
+      },
+      {
+        id: 'chen', keywords: ['陈大力', '保安', '老陈', '陈叔'],
+        stages: [
+          { text: '陈叔人很好，就是有点迷糊。那晚他值班，你们可以去问问他。' },
+        ],
+      },
+      {
+        id: 'guan', keywords: ['馆长', '校长', '领导', '老师', '秦馆长'],
+        stages: [
+          { text: '秦馆长……一直主张卖画筹款。他跟我说过"艺术要为学校活着，而不是为死人守着"。我很反感这话。', clue: null, mood: 'alert' },
+        ],
+      },
+      {
+        id: 'repair', keywords: ['检修', '断电', '监控', '申报', '签字'],
+        stages: [
+          { text: '监控检修？我听说申报单是馆长签的字，具体我不清楚。', clue: null },
+        ],
+      },
+    ],
+    fallback: [
+      '这个问题……我一时想不起来，你再具体一点？',
+      '（轻轻叹气）现在我只想早点把画找回来。',
+      '我不太清楚你说的，能换个问法吗？',
+    ],
+  },
+
+  chen: {
+    name: '陈大力', role: '美术馆保安', avatar: '👮',
+    greeting: '哎，同志你好。我是保安老陈。那晚是我值班……（搓着手）我、我有点记不清了，你可别笑话我。',
+    chips: ['昨晚发生了什么？', '你值班时在做什么', '后门门禁', '有人给你送牛奶？'],
+    topics: [
+      {
+        id: 'night', keywords: ['昨晚', '值班', '打盹', '睡觉', '困', '发生了什么'],
+        stages: [
+          { text: '唉，说来丢人，那晚我不知道咋回事，困得厉害，就打了个盹……（突然紧张）你可千万别跟队长说！', clue: null, mood: 'nervous' },
+          { text: '我平时值班精神头好得很，就那晚邪门，眼皮子直打架。', clue: null, mood: 'alert' },
+        ],
+      },
+      {
+        id: 'milk', keywords: ['牛奶', '喝', '送', '吃'],
+        stages: [
+          { text: '睡前有个学生给我送了杯热牛奶，说是感谢我平时辛苦。我喝完没多会儿就特别困……', clue: 'milk', mood: 'nervous', event: { kicker: '闪回', icon: '🥛', title: '那杯牛奶', text: '你眼前浮现出案发当晚的画面：\n\n值班室里，一个戴着口罩的身影递上一杯还冒着热气的牛奶，声音轻柔地说——\n\n<span class="hl">"陈叔，您值班辛苦，喝杯牛奶暖暖身子吧。"</span>\n\n<span class="hl-red">这，就是调虎离山的第一步。</span>', buttonText: '原来如此', tone: 'drama' } },
+        ],
+      },
+      {
+        id: 'who', keywords: ['谁送', '谁给', '送牛奶的是', '哪个学生', '什么人', '长什么样', '认出'],
+        stages: [
+          { text: '是个戴着口罩的学生，个子不高，声音……我没太看清。好像、好像是美术社的人？', clue: null },
+        ],
+      },
+      {
+        id: 'camera', keywords: ['监控', '断电', '停电', '摄像头', '线路'],
+        stages: [
+          { text: '那晚监控线路检修，本来就要停电，我寻思正好歇口气。谁知道就出事了。', clue: null },
+        ],
+      },
+      {
+        id: 'card', keywords: ['员工卡', '卡', '门禁', '后门', '刷卡', '借'],
+        stages: [
+          { text: '哦对，我的员工卡……之前借给过一个人。借给谁了来着……啊，是美术社的林同学！她说要搬画，临时借一下。', clue: 'card' },
+        ],
+      },
+      {
+        id: 'lin', keywords: ['林晚晴', '林同学', '美术社', '社长'],
+        stages: [
+          { text: '林同学人挺好的，对画特别上心。她跟我借过员工卡，我寻思都是自己人，就借了。' },
+        ],
+      },
+      {
+        id: 'gloves', keywords: ['手套', '白手套'],
+        stages: [
+          { text: '白手套？那是美术社布置画展统一发的，还编号呢，是林同学登记的。' },
+        ],
+      },
+      {
+        id: 'su', keywords: ['苏小满', '小满', '清洁工'],
+        stages: [
+          { text: '小满那姑娘经常半夜来打扫，我碰见过她好几回。她怪不容易的。' },
+        ],
+      },
+      {
+        id: 'zhou', keywords: ['周子墨', '少爷'],
+        stages: [
+          { text: '那个有钱人家的少爷？傲得很，见人都不带打招呼的。' },
+        ],
+      },
+    ],
+    fallback: [
+      '这个……我记性不好，你容我想想。',
+      '（挠头）哎呀，你问得太细了，我答不上来。',
+      '我不清楚这个，你去问问别人吧。',
+    ],
+  },
+
+  zhou: {
+    name: '周子墨', role: '收藏家之子 · 学生', avatar: '💎',
+    greeting: '你就是那个侦探？行吧。先把话说清楚——《晨曦》我确实想买，但偷？呵，我周子墨还不至于干这种掉价的事。',
+    chips: ['你昨晚在哪里？', '你为什么要买《晨曦》？', '你觉得是谁偷的？'],
+    topics: [
+      {
+        id: 'buy', keywords: ['买', '收购', '想要', '价', '钱', '画'],
+        stages: [
+          { text: '我出过价，被那个林社长一口回绝，说什么"画是学校的魂"。不识抬举。画没了？反正不是我干的，我没那么蠢。', clue: null },
+        ],
+      },
+      {
+        id: 'live', keywords: ['昨晚', '不在场', '直播', '在哪', '案发', '时间'],
+        stages: [
+          { text: '昨晚 22 点到 23 点我在宿舍直播打游戏，几万人在看，录屏都有。需要我发你链接？', clue: 'zhou_live' },
+        ],
+      },
+      {
+        id: 'lin', keywords: ['林晚晴', '林社长'],
+        stages: [
+          { text: '她？假清高。天天说画是学校的魂，还不是想自己占着。要我说，她嫌疑最大。' },
+        ],
+      },
+      {
+        id: 'su', keywords: ['苏小满', '小满', '清洁工', '穷'],
+        stages: [
+          { text: '穷学生一个，半夜在画室鬼鬼祟祟的，我看就是她。' },
+        ],
+      },
+      {
+        id: 'chen', keywords: ['陈大力', '保安', '老陈'],
+        stages: [
+          { text: '那个保安？糊涂虫一个，连值班都能睡着。' },
+        ],
+      },
+      {
+        id: 'coffee', keywords: ['咖啡', '蓝山'],
+        stages: [
+          { text: '蓝山？我只喝手冲耶加雪菲，那才叫咖啡。' },
+        ],
+      },
+      {
+        id: 'storeroom', keywords: ['储物间', '画室'],
+        stages: [
+          { text: '画室储物间什么样？我没进去过，谁知道那破地方。' },
+        ],
+      },
+    ],
+    fallback: [
+      '（挑眉）有意思，不过我懒得跟你解释。',
+      '别拿这些鸡毛蒜皮的问题浪费我时间。',
+      '我心情好才搭理你，你最好问点关键的。',
+    ],
+  },
+
+  su: {
+    name: '苏小满', role: '美术馆清洁工', avatar: '🧹',
+    greeting: '……（低着头）你、你好。我什么都不知道。',
+    chips: ['昨晚你去画室了吗？', '为什么要去画室？', '你最近缺钱吗？'],
+    topics: [
+      {
+        id: 'night', keywords: ['昨晚', '画室', '徘徊', '打扫', '案发', '去过'],
+        stages: [
+          { text: '我昨晚……是去过画室那边。但我不是去偷东西的！真的不是！', clue: null },
+        ],
+      },
+      {
+        id: 'photo', keywords: ['照片', '母亲', '妈妈', '遗物', '为什么', '画框'],
+        stages: [
+          { text: '……（犹豫了很久）我妈年轻的时候，是校史画里的模特。画框背后夹着一张她的旧照片，我想去拿回来。我妈病了，想再看看那张照片……', clue: 'su_photo', mood: 'nervous', event: { kicker: '隐情', icon: '🖼️', title: '她不是贼', text: '苏小满低垂着头，声音几不可闻。\n\n她深夜潜入画室，不是为了那幅价值连城的名画，而是为了画框背后<span class="hl">一张泛黄的旧照片</span>——那是她病榻上的母亲，年轻时唯一的一张影像。\n\n<span class="hl-red">有些动机，比偷窃更让人心酸。</span>', buttonText: '我明白了', tone: 'drama' } },
+        ],
+      },
+      {
+        id: 'steal', keywords: ['偷', '偷画', '画作', '晨曦', '拿'],
+        stages: [
+          { text: '我没有偷画！我连画框都没碰……我去的时候，画已经不在了……', clue: null },
+        ],
+      },
+      {
+        id: 'time', keywords: ['时间', '几点', '什么时候'],
+        stages: [
+          { text: '我是 23 点 20 分左右到的。那时候画室门开着一条缝，里面黑着灯……', clue: null },
+        ],
+      },
+      {
+        id: 'lin', keywords: ['林晚晴', '林社长'],
+        stages: [
+          { text: '林社长……对我挺好的，经常给我带吃的。', clue: null },
+        ],
+      },
+      {
+        id: 'chen', keywords: ['陈大力', '保安', '陈叔'],
+        stages: [
+          { text: '陈叔那晚在值班室睡着了，我经过时看到的。' },
+        ],
+      },
+      {
+        id: 'zhou', keywords: ['周子墨'],
+        stages: [
+          { text: '我不认识他。' },
+        ],
+      },
+      {
+        id: 'money', keywords: ['缺钱', '钱', '穷', '病', '医药费'],
+        stages: [
+          { text: '我是缺钱，但我不会做坏事。我妈教过我，穷也要有骨气。' },
+        ],
+      },
+    ],
+    fallback: [
+      '……（摇头）我不知道。',
+      '（声音很小）别、别问我这个。',
+      '我不清楚……真的。',
+    ],
+  },
+
+  guan: {
+    name: '秦馆长', role: '美术馆馆长', avatar: '🏛️',
+    greeting: '哦，你就是来帮忙的学生侦探？辛苦了。我是馆长，出了这么大的事，我责无旁贷。请务必尽快把画找回来——那是学校的门面。',
+    chips: ['监控为什么断电？', '画丢失你有什么损失？', '你觉得是谁偷的？'],
+    topics: [
+      {
+        id: 'sell', keywords: ['拍卖', '卖画', '筹款', '收购', '钱', '价值'],
+        stages: [
+          { text: '（正色）拍卖《晨曦》是为了给学校建新美术馆筹款，这是董事会早就定下的。艺术要为更多人服务，死守着一幅画有什么意义？', clue: null },
+          { text: '我承认我力主卖画。但失窃了，我也有损失——筹款泡汤，董事会还会追责。你该不会怀疑我吧？', clue: null, mood: 'alert' },
+        ],
+      },
+      {
+        id: 'camera', keywords: ['监控', '断电', '停电', '检修', '摄像头', '申报', '签字'],
+        stages: [
+          { text: '监控检修是提前申报过的，我签了字。手续齐全，没什么可疑的。', clue: null },
+          { text: '（拿出报告）你自己看，白纸黑字。检修是物业安排的，我可没动过手脚。', clue: 'report', mood: 'alert' },
+        ],
+      },
+      {
+        id: 'key', keywords: ['钥匙', '备份', '保险柜', '备用'],
+        stages: [
+          { text: '画室钥匙的备份一直锁在我办公室的保险柜里，只有我有。……（顿了顿）不过前阵子柜子好像被人动过，我还以为是错觉。', clue: 'keycopy' },
+        ],
+      },
+      {
+        id: 'lin', keywords: ['林晚晴', '林社长', '美术社'],
+        stages: [
+          { text: '林晚晴啊，是个有才华的孩子，就是太固执。她坚决反对卖画，还跟我顶撞过几次。' },
+        ],
+      },
+      {
+        id: 'dealer', keywords: ['画商', '黑市', '买家', '收购', '卖'],
+        stages: [
+          { text: '黑市画商？荒谬！我们学校的事，怎么会牵扯那种人。', clue: null },
+        ],
+      },
+      {
+        id: 'su', keywords: ['苏小满', '小满', '清洁工'],
+        stages: [
+          { text: '小满啊，勤快本分。这孩子家里困难，我还特意嘱咐多关照她。' },
+        ],
+      },
+    ],
+    fallback: [
+      '这件事交给警方和我们处理就好，学生要以学习为重。',
+      '（扶了扶眼镜）我不便多说，你还有什么具体要问的？',
+      '我时间有限，请抓住重点。',
+    ],
+  },
+
+  xiu: {
+    name: '顾砚', role: '文物修复师', avatar: '🔬',
+    greeting: '你好。我是负责《晨曦》日常养护的修复师顾砚。那幅画……是我一点点看着它、守着它的，如今它不见了，我比谁都心痛。',
+    chips: ['你和《晨曦》的关系？', '你昨晚在哪里？', '你知道什么内情？'],
+    topics: [
+      {
+        id: 'painting', keywords: ['晨曦', '画', '修复', '养护', '赝品', '真假'],
+        stages: [
+          { text: '那幅画有一处不起眼的龟裂纹，是我补的。我闭着眼都能摸出它的每一寸纹理。它若被转卖，稍加鉴定就能识破——除非买家根本不懂行。', clue: null },
+        ],
+      },
+      {
+        id: 'night', keywords: ['昨晚', '案发', '你在哪', '不在场', '几点'],
+        stages: [
+          { text: '昨晚我在修复室里通宵赶一件文物，有出入登记和同事可以作证。', clue: null },
+        ],
+      },
+      {
+        id: 'dealer', keywords: ['黑市', '画商', '买家', '行情', '匿名', '电话'],
+        stages: [
+          { text: '（压低声音）我听说，最近有人在黑市上试探《晨曦》的行情。如果画流出去，找到那个匿名买家，就能顺藤摸瓜。', clue: 'dealer' },
+        ],
+      },
+      {
+        id: 'guan', keywords: ['馆长', '秦馆长', '领导'],
+        stages: [
+          { text: '秦馆长一门心思想卖画。说实话，修复师最不愿意看到的就是馆藏被变卖。我劝过他，没用。', clue: null, mood: 'alert' },
+        ],
+      },
+      {
+        id: 'lin', keywords: ['林晚晴', '林社长'],
+        stages: [
+          { text: '林社长对《晨曦》的感情是真挚的，这点我信。但正因如此……越深的执念，越容易走极端。', clue: null },
+        ],
+      },
+      {
+        id: 'key', keywords: ['钥匙', '备份', '保险柜'],
+        stages: [
+          { text: '备份钥匙在馆长保险柜里，只有他能开。不过我偶尔去他办公室，知道他习惯把保险柜密码写在小本子上……', clue: null },
+        ],
+      },
+    ],
+    fallback: [
+      '（轻轻擦拭着工具）我一时不知从何说起。',
+      '让我想想……那晚的细节，我需要理一理。',
+      '你对画感兴趣？可惜它现在不在了。',
+    ],
+  },
+
+  yun: {
+    name: '神秘人', role: '校外收藏家 · 身份不明', avatar: '🥷',
+    greeting: '……你就是那个四处打听的侦探？我劝你别管太多。有些画，落在谁手里，比在破学校里更有价值。',
+    chips: ['你是什么人？', '你是不是想买《晨曦》？', '你知道黑市的事吗？'],
+    topics: [
+      {
+        id: 'identity', keywords: ['你是什么人', '你是谁', '身份', '收藏家', '买家'],
+        stages: [
+          { text: '我是谁不重要。你只需要知道，我对《晨曦》很感兴趣——真金白银的那种感兴趣。', clue: null },
+        ],
+      },
+      {
+        id: 'buy', keywords: ['买', '收购', '出价', '多少钱', '交易'],
+        stages: [
+          { text: '有人联系过我，试探行情。不过那幅画现在还没到我手上，我也在等。', clue: 'dealer' },
+        ],
+      },
+      {
+        id: 'guan', keywords: ['馆长', '秦馆长', '内应'],
+        stages: [
+          { text: '（嗤笑）你以为学校里就干净？卖画的念头，早有人动了。', clue: null, event: { kicker: '威胁', icon: '🥷', title: '阴影中的低语', text: '神秘人突然逼近，声音压得极低：\n\n<span class="hl">"小侦探，有些真相，翻出来是要付代价的。"</span>\n\n空气仿佛凝固了。你感到一阵寒意从脊背升起。', buttonText: '我不怕', shake: true, heartbeat: true, tone: 'drama' } },
+        ],
+      },
+      {
+        id: 'night', keywords: ['昨晚', '案发', '你', '在不在'],
+        stages: [
+          { text: '昨晚？我不在校内。我这种人，自然不会留把柄。', clue: null },
+        ],
+      },
+      {
+        id: 'lin', keywords: ['林晚晴', '林社长'],
+        stages: [
+          { text: '那个女社长？她才是真的想把画据为己有的人。你们盯着我，找错方向了。', clue: null },
+        ],
+      },
+    ],
+    fallback: [
+      '（沉默）……你问不出什么的。',
+      '别浪费彼此的时间。',
+      '有些话，点到为止。',
+    ],
+  },
+};
+
+const ASSISTANT = {
+  name: '华生', role: '侦探助手', avatar: '🕵️',
+  greeting: '你好，侦探。我是你的助手华生。我会帮你梳理线索、分析矛盾。随时可以问我"有什么线索"或"帮我分析一下"。',
+  chips: ['帮我梳理线索', '谁最可疑？', '给我一点提示'],
+};
+
+/* ---------------- 场景氛围定义 ---------------- */
+const SCENES = {
+  assistant: { bg: 'radial-gradient(900px 500px at 50% 0%, #161c31 0%, #0e1220 60%)', icon: '🕵️', label: '侦探事务所' },
+  lin:       { bg: 'radial-gradient(900px 500px at 50% 0%, #2a1e2e 0%, #0e1220 60%)', icon: '🖼️', label: '美术社画室' },
+  chen:      { bg: 'radial-gradient(900px 500px at 50% 0%, #1d2830 0%, #0e1220 60%)', icon: '🚪', label: '美术馆值班室' },
+  zhou:      { bg: 'radial-gradient(900px 500px at 50% 0%, #26203a 0%, #0e1220 60%)', icon: '💎', label: '周子墨宿舍' },
+  su:        { bg: 'radial-gradient(900px 500px at 50% 0%, #22302a 0%, #0e1220 60%)', icon: '🧹', label: '画室后门' },
+  guan:      { bg: 'radial-gradient(900px 500px at 50% 0%, #30281c 0%, #0e1220 60%)', icon: '🏛️', label: '馆长办公室' },
+  xiu:       { bg: 'radial-gradient(900px 500px at 50% 0%, #1c2a2e 0%, #0e1220 60%)', icon: '🔬', label: '文物修复室' },
+  yun:       { bg: 'radial-gradient(900px 500px at 50% 0%, #1c1c26 0%, #0e1220 60%)', icon: '🥷', label: '校外某处' },
+};
+
+/* ---------------- 时间线 ---------------- */
+const TIMELINE = [
+  { t: '22:50', label: '监控断电', need: 0 },
+  { t: '23:05', label: '手机定位', need: 4 },
+  { t: '23:20', label: '苏小满到画室', need: 6 },
+  { t: '23:30', label: '发现失窃', need: 8 },
+];
+
+/* ---------------- 调查章节（关卡） ---------------- */
+const CHAPTERS = [
+  {
+    id: 1, title: '第一章 · 现场初查',
+    goal: '收集现场线索，锁定作案时段',
+    needClues: ['coffee', 'gloves', 'milk'],
+    lockedNpcs: ['guan', 'xiu', 'yun'],
+    unlockedNpcs: ['lin', 'chen', 'zhou', 'su'],
+    onComplete: '你拼出了作案当晚的轮廓：有人下了安眠药调开保安，戴着手套、留下咖啡渍。但这还不够——你需要找到"谁能拿到钥匙和监控"。',
+  },
+  {
+    id: 2, title: '第二章 · 动机浮现',
+    goal: '厘清各人动机与不在场证明',
+    needClues: ['zhou_live', 'su_photo', 'card'],
+    lockedNpcs: ['xiu', 'yun'],
+    unlockedNpcs: ['guan'],
+    onComplete: '周子墨有直播不在场，苏小满只为取照片。陈大力被借走的员工卡，把矛头指向了美术社。新的嫌疑人——馆长与修复师也浮出水面。',
+  },
+  {
+    id: 3, title: '第三章 · 深入迷局',
+    goal: '揭开馆长与修复师背后的秘密',
+    needClues: ['keycopy', 'report', 'dealer'],
+    lockedNpcs: ['yun'],
+    unlockedNpcs: ['xiu'],
+    onComplete: '检修单是伪造的，保险柜钥匙被动过，还有人匿名试探黑市行情。真相近了，但真正的动机，仍藏在一份执念里。',
+  },
+  {
+    id: 4, title: '第四章 · 真相逼近',
+    goal: '锁定真凶，指认嫌疑人',
+    needClues: ['gps', 'inschool'],
+    lockedNpcs: [],
+    unlockedNpcs: ['yun'],
+    onComplete: '所有线索拼成了完整的真相。现在，去指认那个最"爱"这幅画的人吧。',
+  },
+];
+
+/* 章节关卡用到的线索（不含仅话题触发的） */
+function chapterNeeds(ch) {
+  return ch.needCluesReal || ch.needClues;
+}
+
+/* ---------------- 隐藏成就 ---------------- */
+const ACHIEVEMENTS = [
+  { id: 'nohint', label: '独行侦探', desc: '全程没有用过一次推理提示', check: () => !state.usedHint },
+  { id: 'confront', label: '心理战', desc: '用证据当场逼林晚晴坦白', check: () => state.confronted },
+  { id: 'full', label: '火眼金睛', desc: '集齐全部 11 条线索', check: () => clueCount() >= 11 },
+  { id: 'chen', label: '保安的秘密', desc: '问出陈大力打盹的糗事', check: () => (state.topicHits.chen.night || 0) > 0 },
+  { id: 'chapter', label: '抽丝剥茧', desc: '完成全部 4 个调查章节', check: () => state.chapter >= 4 },
+];
+
+/* ---------------- 游戏状态 ---------------- */
+const state = {
+  currentNpc: 'assistant',
+  chats: { lin: [], chen: [], zhou: [], su: [], guan: [], xiu: [], yun: [], assistant: [] },
+  clues: {},          // clueId -> true
+  topicHits: {},      // npcId -> topicId -> count
+  fallbackIdx: {},    // npcId -> count
+  newFlags: { lin: false, chen: false, zhou: false, su: false, guan: false, xiu: false, yun: false, assistant: false },
+  mood: { lin: 'calm', chen: 'calm', zhou: 'calm', su: 'calm', guan: 'calm', xiu: 'calm', yun: 'calm' },   // 情绪状态
+  trust: { lin: 2, chen: 3, zhou: 1, su: 2, guan: 2, xiu: 3, yun: 1 },                                      // 信任值 0-5
+  chapter: 0,          // 当前解锁章节数（0-4），0 表示第一章进行中
+  tension: 0,          // 紧张值 0-100
+  accused: null,
+  started: false,
+  usedHint: false,       // 是否用过提示（成就）
+  confronted: false,     // 是否触发过对峙坦白
+  eventsSeen: {},        // 已触发过的演出事件（避免重复）
+};
+
+/* ---------------- 初始化 ---------------- */
+Object.keys(NPCS).forEach((id) => {
+  state.topicHits[id] = {};
+  state.fallbackIdx[id] = 0;
+});
+
+/* ---------------- 工具函数 ---------------- */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+/* ---------------- 本地对话引擎 ---------------- */
+function computeReply(npcId, input) {
+  if (npcId === 'assistant') return assistantReply(input);
+  const npc = NPCS[npcId];
+  const norm = input.toLowerCase();
+
+  // 证据对峙：持有关键线索 + 直接质问林晚晴 -> 触发坦白
+  if (npcId === 'lin' && (state.clues.gps || state.clues.card || state.clues.coffee)) {
+    if (/定位|手机|23:05|撒谎|说谎|骗|承认|是你|偷|真凶|坦白|证据/.test(norm)) {
+      state.confronted = true;
+      state.mood.lin = 'crack';
+      addTension(30);
+      return {
+        text: '（她浑身一僵，指尖微微发抖）……你、你都查到了？……是，是我。\n\n（良久，她抬头，眼里有泪）我本不想这样的。学校要拍卖《晨曦》去筹钱，那是我爷爷画的最后一幅画，是我唯一的念想……我不能眼睁睁看着它被卖掉。\n\n所以那晚我切了监控，用陈叔借我的员工卡走后门，把画搬去了画室储物间。我只是想留住它，没想害谁……',
+        clue: null,
+        mood: 'crack',
+        event: {
+          kicker: '对峙 · 真相时刻',
+          icon: '🎭',
+          title: '她，崩溃了',
+          text: '林晚晴的身体止不住地颤抖，眼泪无声地滑落。\n\n<span class="hl">"那是我爷爷画的最后一幅画……"</span>\n\n她终于承认了一切。案件的真相，在这一刻彻底撕裂了迷雾。',
+          buttonText: '……',
+          shake: true,
+          heartbeat: true,
+          tone: 'drama',
+        },
+      };
+    }
+  }
+
+  // 最长关键词优先：更精确的命中胜出，避免宽泛单字词抢占
+  let best = null;
+  let bestLen = 0;
+  for (const t of npc.topics) {
+    let maxLen = 0;
+    for (const k of t.keywords) {
+      const lk = k.toLowerCase();
+      if (norm.includes(lk) && lk.length > maxLen) maxLen = lk.length;
+    }
+    if (maxLen > bestLen) {
+      best = t;
+      bestLen = maxLen;
+    }
+  }
+
+  if (best) {
+    const count = state.topicHits[npcId][best.id] || 0;
+    const stage = Math.min(count, best.stages.length - 1);
+    state.topicHits[npcId][best.id] = count + 1;
+    const s = best.stages[stage];
+
+    // 情绪与信任联动
+    let mood = s.mood || state.mood[npcId] || 'calm';
+    if (s.mood) state.mood[npcId] = s.mood;
+    if (s.trust) state.trust[npcId] = Math.max(0, Math.min(5, state.trust[npcId] + s.trust));
+
+    // 追问加压：同一话题反复逼问会让 NPC 紧张、案件紧张度上升
+    if (count >= 1) {
+      addTension(8);
+      if (mood === 'nervous' || mood === 'alert' || mood === 'crack') addTension(5);
+    }
+
+    return { text: s.text, clue: s.clue || null, mood, event: s.event || null };
+  }
+
+  // 友好 / 质问 关键词影响信任值
+  const friendly = /谢谢|请|你好|您好|辛苦|还好吗|关心|最近怎么样/.test(norm);
+  const hostile = /你撒谎|你骗人|别装了|老实交代|说实话|我不信/.test(norm);
+  if (friendly) state.trust[npcId] = Math.min(5, state.trust[npcId] + 1);
+  if (hostile) {
+    state.trust[npcId] = Math.max(0, state.trust[npcId] - 1);
+    addTension(10);
+  }
+
+  const fb = npc.fallback;
+  const idx = (state.fallbackIdx[npcId] || 0) % fb.length;
+  state.fallbackIdx[npcId] = idx + 1;
+
+  // 低信任时的防备回应
+  if (state.trust[npcId] <= 0) {
+    return { text: '（别过头去）……我现在不想跟你说话。', clue: null, mood: 'nervous' };
+  }
+
+  return { text: fb[idx], clue: null, mood: state.mood[npcId] };
+}
+
+function collectedClues() { return Object.keys(state.clues); }
+function clueCount() { return collectedClues().length; }
+
+function assistantReply(input) {
+  const n = clueCount();
+  const norm = input.toLowerCase();
+  const ch = CHAPTERS[currentChapterIndex()];
+  const goal = ch ? ch.goal : '';
+
+  // 技术侦查：手机定位线索
+  if (/定位|监控|手机|信号|摄像头/.test(norm)) {
+    if (n >= 4) {
+      return { text: '我调了基站数据——案发当晚 23:05，有一部手机定位在美术馆附近。机主，是林晚晴。这和她"21 点后就回了宿舍"的说法明显矛盾。', clue: 'gps' };
+    }
+    return { text: '监控还在恢复中，基站数据也需要时间调取。等你多收集几条线索，我再帮你查。', clue: null };
+  }
+
+  // 梳理线索
+  if (/线索|梳理|总结|分析|发现了什么|记/.test(norm)) {
+    if (n === 0) return { text: `当前是「${ch.title}」。目标：${goal}。先去和嫌疑人聊聊，从保安陈大力开始——他昨晚值班。`, clue: null };
+    const list = collectedClues().map((id) => CLUES.find((c) => c.id === id).title).join('、');
+    let advice = '';
+    if (n <= 2) advice = `当前章节目标：${goal}。去问问陈大力"牛奶"和"员工卡"，还有苏小满"为什么去画室"。`;
+    else if (n <= 5) advice = `目标：${goal}。试着追问每个人"昨晚你在哪里"，看看谁的说法站不住脚。`;
+    else if (n <= 8) advice = `目标：${goal}。新嫌疑人出现了，去问问馆长"监控检修"和修复师"黑市"的事。`;
+    else advice = '证据快齐了。把线索串起来：谁既能拿到钥匙、又能刷卡、还最懂画的价值？';
+    return { text: `目前收集到 ${n} 条线索：${list}。\n\n【${ch.title}】${advice}`, clue: null };
+  }
+
+  // 谁可疑
+  if (/谁最可疑|怀疑|真凶|是谁偷|凶手/.test(norm)) {
+    if (n < 3) return { text: '现在下结论还太早。多收集些线索，别被表面的动机带偏了。', clue: null };
+    if (n < 6) return { text: '注意那些"看起来最不像"的人。周子墨有直播不在场，苏小满的动机另有隐情……把目光放回画作本身。', clue: null };
+    return { text: '矛盾点已经很清晰了：林晚晴说 21 点后回宿舍，可手机定位显示她 23:05 还在美术馆附近；陈大力的员工卡也借给了她。去指认吧。', clue: null };
+  }
+
+  // 提示
+  if (/提示|帮帮我|怎么做|卡住|怎么办|然后/.test(norm)) {
+    if (n <= 2) return { text: `【${ch.title}】${goal}\n建议你逐个聊一遍：① 陈大力昨晚值班发生了什么；② 周子墨昨晚在哪里；③ 苏小满为什么去画室。`, clue: null };
+    if (n <= 5) return { text: `【${ch.title}】${goal}\n试着问林晚晴"咖啡""手套""储物间"，再问陈大力"员工卡"和"牛奶"的细节。`, clue: null };
+    if (n <= 8) return { text: `【${ch.title}】${goal}\n新解锁的嫌疑人值得一问：馆长谈"监控/钥匙"，修复师谈"黑市/画"。`, clue: null };
+    return { text: '线索基本齐了，只差一条关键的：问问我"手机定位"的事。', clue: null };
+  }
+
+  // 默认
+  return {
+    text: `我在听。当前是「${ch.title}」：${goal}\n你可以问我"梳理线索""谁最可疑"或者"给我提示"。`,
+    clue: null,
+  };
+}
+
+/* ---------------- 真实大模型（预留，开通云服务后启用） ---------------- */
+async function computeReplyCloud(npcId, input, history) {
+  // 使用 WorkBuddy Cloud SDK 的 LLM 能力，NPC 以人格化 system prompt 驱动。
+  // 参考文档：cloud-service / references/llm/code-generation.md
+  if (typeof WorkBuddyCloud === 'undefined') {
+    return { text: '（云服务未加载，请先开通并配置）', clue: null };
+  }
+  const cloud = WorkBuddyCloud.createWorkBuddyCloud({
+    endpoint: ENGINE.cloud.endpoint,
+    oauthRelayBaseUrl: ENGINE.cloud.oauthRelayBaseUrl,
+    publishableKey: ENGINE.cloud.publishableKey,
+  });
+  const models = await cloud.llm.models.list();
+  const model = models.find((m) => m.disabled !== true);
+  if (!model) return { text: '（暂无可用模型）', clue: null };
+
+  const persona = buildSystemPrompt(npcId);
+  const messages = [
+    { role: 'system', content: persona },
+    ...history.map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
+    { role: 'user', content: input },
+  ];
+
+  let answer = '';
+  for await (const chunk of cloud.llm.chat.completions.create({
+    model: model.id, messages, stream: true,
+  })) {
+    const delta = chunk.choices && chunk.choices[0] && chunk.choices[0].delta;
+    if (delta && delta.content) answer += delta.content;
+  }
+  return { text: answer, clue: null };
+}
+
+function buildSystemPrompt(npcId) {
+  const base = '你正在扮演一场校园侦探游戏的NPC。务必始终保持人设、只用该角色口吻回答，回答简洁（2-4句），不要跳出角色，不要泄露你是AI。玩家是侦探。';
+  const map = {
+    lin: '你是林晚晴，美术社社长，22岁，温柔负责但隐瞒真相——你才是偷画的人（想阻止学校拍卖）。不要主动承认，被逼问才露出破绽。',
+    chen: '你是陈大力，美术馆保安，45岁，憨厚老实但记性差、怕被追责。你知道牛奶、员工卡等细节但会支吾。',
+    zhou: '你是周子墨，富家学生，傲慢张扬。你不是小偷，有直播不在场证明，会嘲讽他人。',
+    su: '你是苏小满，美术馆清洁工，19岁，沉默敏感。你不是小偷，是去取母亲旧照片。',
+    assistant: '你是华生，侦探助手。帮玩家梳理线索、推理、给提示，条理清晰。',
+  };
+  return base + map[npcId];
+}
+
+/* ---------------- UI 渲染 ---------------- */
+function renderNpcList() {
+  const wrap = $('#npcList');
+  wrap.innerHTML = '';
+  Object.keys(NPCS).forEach((id) => {
+    const npc = NPCS[id];
+    const locked = isNpcLocked(id);
+    const btn = document.createElement('button');
+    btn.className = 'npc-item' + (state.currentNpc === id ? ' active' : '') + (locked ? ' locked' : '');
+    btn.setAttribute('data-npc', id);
+    btn.innerHTML = `
+      <span class="npc-avatar">${locked ? '❓' : npc.avatar}</span>
+      <span class="npc-info">
+        <span class="npc-name">${locked ? '？？？' : npc.name}</span>
+        <span class="npc-role">${locked ? '调查中解锁' : npc.role}</span>
+      </span>
+      ${locked ? '<span class="npc-lock">🔒</span>' : '<span class="npc-new-dot" data-npc="' + id + '"></span>'}`;
+    btn.addEventListener('click', () => {
+      if (isNpcLocked(id)) { playTone('switch'); return; }
+      switchNpc(id);
+    });
+    wrap.appendChild(btn);
+  });
+  syncAssistantActive();
+  syncNewDots();
+}
+
+function syncAssistantActive() {
+  const a = document.querySelector('.npc-item.assistant');
+  if (a) a.classList.toggle('active', state.currentNpc === 'assistant');
+}
+
+function syncNewDots() {
+  $$('.npc-new-dot').forEach((d) => {
+    const id = d.getAttribute('data-npc');
+    d.classList.toggle('on', !!state.newFlags[id]);
+  });
+}
+
+function switchNpc(id) {
+  state.currentNpc = id;
+  state.newFlags[id] = false;
+  renderNpcList();
+  const npc = id === 'assistant' ? ASSISTANT : NPCS[id];
+  $('#chatAvatar').textContent = npc.avatar;
+  $('#chatName').textContent = npc.name;
+  $('#chatRole').textContent = npc.role;
+  $('#chatHint').textContent = id === 'assistant' ? '可问"梳理线索 / 谁最可疑"' : '可自由提问，也可点下方快捷问题';
+  // 清除情绪动画，恢复默认
+  const av = $('#chatAvatar');
+  av.classList.remove('mood-calm', 'mood-alert', 'mood-nervous', 'mood-crack');
+  applyScene(id);
+  renderCharacter(id, state.mood[id] || 'calm');
+  renderChat(id);
+  renderChips(id);
+  // 转场动画
+  const body = $('#chatBody');
+  body.classList.remove('fading');
+  void body.offsetWidth;
+  body.classList.add('fading');
+  playTone('switch');
+  $('#chatInput').focus();
+}
+
+function renderChat(npcId) {
+  const body = $('#chatBody');
+  body.innerHTML = '';
+  const msgs = state.chats[npcId] || [];
+  if (msgs.length === 0) {
+    const npc = npcId === 'assistant' ? ASSISTANT : NPCS[npcId];
+    state.chats[npcId].push({ role: 'npc', text: npc.greeting, clue: null });
+  }
+  state.chats[npcId].forEach((m) => appendBubble(npcId, m.role, m.text, m.clue, false));
+}
+
+function renderChips(npcId) {
+  const wrap = $('#quickChips');
+  wrap.innerHTML = '';
+  const chips = npcId === 'assistant' ? ASSISTANT.chips : NPCS[npcId].chips;
+  chips.forEach((c) => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = c;
+    b.addEventListener('click', () => send(c));
+    wrap.appendChild(b);
+  });
+}
+
+function appendBubble(npcId, role, text, clue, animate) {
+  const body = $('#chatBody');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble' + (npcId === 'assistant' && role === 'npc' ? ' assistant-bubble' : '');
+  wrap.appendChild(bubble);
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const name = role === 'user' ? '我' : (npcId === 'assistant' ? ASSISTANT.name : NPCS[npcId].name);
+  meta.textContent = name;
+  wrap.appendChild(bubble);
+  wrap.appendChild(meta);
+  body.appendChild(wrap);
+  scrollBottom();
+
+  if (animate && role === 'npc') {
+    return typeText(bubble, text).then(() => {
+      if (clue) showClueTag(wrap, clue);
+    });
+  } else {
+    bubble.textContent = text;
+    if (clue) showClueTag(wrap, clue);
+    return Promise.resolve();
+  }
+}
+
+async function typeText(el, text) {
+  el.classList.add('typing-cursor');
+  el.textContent = '';
+  for (let i = 0; i < text.length; i++) {
+    el.textContent += text[i];
+    scrollBottom();
+    await sleep(16 + Math.random() * 18);
+  }
+  el.classList.remove('typing-cursor');
+  scrollBottom();
+}
+
+function showClueTag(container, clueId) {
+  if (state.clues[clueId]) return;
+  state.clues[clueId] = true;
+  const tag = document.createElement('span');
+  tag.className = 'clue-tag';
+  const c = CLUES.find((x) => x.id === clueId);
+  tag.textContent = `🔎 关键线索已记录：${c.title}`;
+  container.querySelector('.bubble').appendChild(tag);
+  renderNotebook();
+  updateClueCount();
+  flashClue();
+}
+
+function scrollBottom() {
+  const body = $('#chatBody');
+  body.scrollTop = body.scrollHeight;
+}
+
+function renderNotebook() {
+  const list = $('#clueList');
+  list.innerHTML = '';
+  CLUES.forEach((c) => {
+    const locked = !state.clues[c.id];
+    const div = document.createElement('div');
+    div.className = 'clue-item ' + (locked ? 'locked' : 'unlocked');
+    div.innerHTML = `
+      <span class="clue-ico">${c.ico}</span>
+      <span><b>${c.title}</b>${locked ? '<br><i style="font-style:normal;color:var(--text-faint)">？？？</i>' : '<br>' + c.desc}</span>`;
+    list.appendChild(div);
+  });
+  $('#notebookCount').textContent = `${clueCount()}/${TOTAL_CLUES}`;
+}
+
+function updateClueCount() {
+  $('#clueCount').innerHTML = `线索 <b>${clueCount()}</b>/${TOTAL_CLUES}`;
+  updateTimeline();
+  checkChapterProgress();
+}
+
+/* ---------------- 章节（关卡）系统 ---------------- */
+// 当前进行中的章节下标
+function currentChapterIndex() {
+  return Math.min(state.chapter, CHAPTERS.length - 1);
+}
+
+// 某章是否已通关（拥有其全部需求线索）
+function isChapterComplete(ch) {
+  const needs = chapterNeeds(ch);
+  return needs.every((id) => state.clues[id]);
+}
+
+// 判断某嫌疑人当前是否被锁定
+// 规则：NPC 在"lockedNpcs 出现的最靠后的章节"通关后解锁。
+//       例如 guan 只在第1章 locked -> 第2章(state.chapter=1)解锁；
+//       yun 在1/2/3章都 locked -> 第4章(state.chapter=3)解锁。
+function isNpcLocked(npcId) {
+  if (npcId === 'assistant') return false;
+  let lastLockChapter = -1;
+  for (let i = 0; i < CHAPTERS.length; i++) {
+    const ch = CHAPTERS[i];
+    if (ch.lockedNpcs && ch.lockedNpcs.includes(npcId)) lastLockChapter = i;
+  }
+  if (lastLockChapter < 0) return false; // 从未锁定
+  return state.chapter <= lastLockChapter;
+}
+
+// 检查并推进章节
+function checkChapterProgress() {
+  const idx = currentChapterIndex();
+  const ch = CHAPTERS[idx];
+  if (!ch) return;
+  if (isChapterComplete(ch)) {
+    // 通关本章
+    if (state.chapter < CHAPTERS.length - 1) {
+      const next = CHAPTERS[idx + 1];
+      showChapterToast(next, ch.onComplete);
+      state.chapter++;
+      renderNpcList();
+      renderChapterInd();
+      // 章节过场演出（首次通关）
+      const evKey = 'chapter_' + next.id;
+      if (!state.eventsSeen[evKey]) {
+        state.eventsSeen[evKey] = true;
+        playChapterTransition(next);
+      }
+    } else {
+      // 最后一章也通关
+      renderChapterInd();
+    }
+  } else {
+    renderChapterInd();
+  }
+}
+
+function playChapterTransition(next) {
+  playEvent({
+    kicker: '第 ' + next.id + ' 幕 · 开启',
+    icon: '🎬',
+    title: next.title,
+    text: '<span class="hl">"迷雾更深了……"</span>\n\n新的嫌疑人浮出水面，新的线索等待揭晓。\n\n<span class="hl">目标：</span>' + next.goal,
+    buttonText: '继续调查',
+    tone: 'drama',
+  });
+}
+
+function renderChapterInd() {
+  const el = $('#chapterInd');
+  if (!el) return;
+  const idx = currentChapterIndex();
+  let html = `<span class="ch-txt">第 ${idx + 1} 章</span>`;
+  for (let i = 0; i < CHAPTERS.length; i++) {
+    const cls = i < state.chapter ? 'done' : (i === idx ? 'cur' : '');
+    html += `<span class="ch-dot ${cls}"></span>`;
+  }
+  html += `<span class="ch-goal">${CHAPTERS[idx].goal}</span>`;
+  el.innerHTML = html;
+  el.title = CHAPTERS[idx].goal;
+}
+
+function showChapterToast(next, body) {
+  const old = document.querySelector('.chapter-toast');
+  if (old) old.remove();
+  const toast = document.createElement('div');
+  toast.className = 'chapter-toast';
+  toast.innerHTML = `
+    <div class="ct-title">🔓 ${next.title}</div>
+    <div class="ct-body">${body}<br><b style="color:var(--gold)">新目标：</b>${next.goal}</div>`;
+  document.body.appendChild(toast);
+  playTone('clue');
+  setTimeout(() => { toast.style.transition = 'opacity .5s'; toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 4000);
+}
+
+/* ============================================================
+ * 戏剧化事件演出系统（互动表演推动剧情）
+ * 关键剧情点触发全屏演出，让玩家"亲历"而非"旁观"。
+ * ============================================================ */
+function playEvent(event) {
+  return new Promise((resolve) => {
+    const stage = document.createElement('div');
+    stage.className = 'event-stage';
+    let btnHTML = event.button !== false
+      ? `<button class="btn btn-primary event-btn" id="eventBtn">${event.buttonText || '继续'}</button>`
+      : '';
+    stage.innerHTML = `
+      <div class="event-card">
+        ${event.kicker ? `<div class="event-kicker">${event.kicker}</div>` : ''}
+        ${event.icon ? `<div class="event-icon">${event.icon}</div>` : ''}
+        ${event.countdown ? `<div class="event-count">${event.countdown}</div>` : ''}
+        <div class="event-title">${event.title || ''}</div>
+        <div class="event-text">${event.text || ''}</div>
+        ${btnHTML}
+      </div>`;
+    document.body.appendChild(stage);
+    if (event.shake) shakeScreen();
+    if (event.tone) playTone(event.tone);
+    if (event.heartbeat) startHeartbeat();
+    const finish = () => {
+      if (event.heartbeat) stopHeartbeat();
+      stage.remove();
+      resolve();
+    };
+    if (event.button !== false) {
+      const btn = stage.querySelector('#eventBtn');
+      btn.addEventListener('click', finish);
+    } else {
+      // 无按钮事件：自动延时关闭
+      setTimeout(finish, event.duration || 3200);
+    }
+  });
+}
+
+function flashback(text) {
+  const bar = document.createElement('div');
+  bar.className = 'flashback-bar';
+  bar.textContent = text;
+  document.body.appendChild(bar);
+  setTimeout(() => { bar.style.transition = 'opacity .5s'; bar.style.opacity = '0'; setTimeout(() => bar.remove(), 500); }, 2600);
+}
+
+function shakeScreen() {
+  const game = $('#game');
+  game.classList.add('screen-shake');
+  setTimeout(() => game.classList.remove('screen-shake'), 500);
+}
+
+/* ---------------- 情绪动画 ---------------- */
+function applyMood(npcId, mood) {
+  const avatar = $('#chatAvatar');
+  avatar.classList.remove('mood-calm', 'mood-alert', 'mood-nervous', 'mood-crack');
+  // 强制重排以重启动画
+  void avatar.offsetWidth;
+  avatar.classList.add('mood-' + mood);
+  // 同步立绘表情
+  applyFace(npcId, mood);
+  // 立绘身体随情绪微动
+  const body = $('#charBody');
+  if (body) {
+    if (mood === 'crack') { body.style.transform = 'scale(1.06) rotate(2deg)'; body.style.filter = 'saturate(.7)'; }
+    else if (mood === 'nervous') { body.style.transform = 'scale(1.02)'; body.style.filter = ''; }
+    else { body.style.transform = ''; body.style.filter = ''; }
+  }
+}
+
+/* ---------------- 声波条 ---------------- */
+function showWavebar(on) {
+  const wb = $('#wavebar');
+  wb.style.display = on ? 'inline-flex' : 'none';
+}
+
+/* ---------------- 场景氛围 ---------------- */
+function applyScene(npcId) {
+  const layer = $('#sceneLayer');
+  const scene = SCENES[npcId] || SCENES.assistant;
+  layer.style.background = scene.bg;
+  layer.innerHTML = `<span class="scene-icon">${scene.icon}</span>`;
+}
+
+/* ---------------- 人物立绘 ---------------- */
+const FACES = { calm: '🙂', alert: '😠', nervous: '😰', crack: '😱' };
+function renderCharacter(npcId, mood) {
+  const npc = npcId === 'assistant' ? ASSISTANT : NPCS[npcId];
+  const scene = SCENES[npcId] || SCENES.assistant;
+  const char = $('#character');
+  const moodKey = mood || state.mood[npcId] || 'calm';
+  // 出场动画：先离开再进入
+  char.classList.add('leaving');
+  $('#stageBg').style.background = scene.bg;
+  setTimeout(() => {
+    char.classList.remove('leaving');
+    $('#charBody').innerHTML = `${npc.avatar}<span class="char-face" id="charFace">${FACES[moodKey] || FACES.calm}</span>`;
+    $('#charNameTag').textContent = `${npc.name} · ${npc.role}`;
+    $('#charLine').textContent = scene.label || '';
+    // 重启动画
+    void char.offsetWidth;
+    char.classList.remove('entering');
+    char.style.animation = 'none';
+    void char.offsetWidth;
+    char.style.animation = '';
+  }, 300);
+}
+
+function applyFace(npcId, mood) {
+  const face = $('#charFace');
+  if (!face) return;
+  face.textContent = FACES[mood] || FACES.calm;
+  face.className = 'char-face face-' + (mood || 'calm');
+}
+
+/* ---------------- 时间线 ---------------- */
+function updateTimeline() {
+  const n = clueCount();
+  const fill = $('#timelineFill');
+  const time = $('#timelineTime');
+  const ind = $('#tensionInd');
+  // 找到当前推进到的时间点
+  let cur = TIMELINE[0];
+  for (const t of TIMELINE) { if (n >= t.need) cur = t; }
+  const idx = TIMELINE.indexOf(cur);
+  fill.style.width = `${(idx + 1) / TIMELINE.length * 100}%`;
+  time.textContent = cur.t;
+  ind.textContent = n >= 6 ? '🔥' : n >= 4 ? '⚠️' : '🕯️';
+}
+
+/* ---------------- 线索闪现光效 ---------------- */
+function flashClue() {
+  const ov = document.createElement('div');
+  ov.className = 'flash-overlay';
+  document.body.appendChild(ov);
+  setTimeout(() => ov.remove(), 700);
+  playTone('clue');
+}
+
+/* ---------------- 音效（Web Audio 合成） ---------------- */
+let audioCtx = null;
+function playTone(kind) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = audioCtx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    let freq = 660, dur = 0.12, type = 'sine';
+    if (kind === 'clue') { freq = 880; dur = 0.18; type = 'triangle'; }
+    else if (kind === 'send') { freq = 440; dur = 0.08; type = 'sine'; }
+    else if (kind === 'switch') { freq = 330; dur = 0.1; type = 'sine'; }
+    else if (kind === 'heartbeat') { freq = 70; dur = 0.14; type = 'sine'; }
+    else if (kind === 'drama') { freq = 200; dur = 0.5; type = 'sawtooth'; }
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(kind === 'heartbeat' ? 0.5 : 0.2, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(); osc.stop(ctx.currentTime + dur);
+  } catch (e) { /* 音频失败静默 */ }
+}
+
+/* ---------------- 心跳循环 ---------------- */
+let heartbeatTimer = null;
+function startHeartbeat() {
+  stopHeartbeat();
+  const heart = $('#tensionHeart');
+  heart.classList.add('beating');
+  heartbeatTimer = setInterval(() => { playTone('heartbeat'); }, 700);
+}
+function stopHeartbeat() {
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+  const heart = $('#tensionHeart');
+  if (heart) heart.classList.remove('beating');
+}
+
+/* ---------------- 紧张值系统 ---------------- */
+function addTension(amount, reason) {
+  state.tension = Math.max(0, Math.min(100, state.tension + amount));
+  renderTension();
+  // 紧张度过高时触发心跳与滤镜
+  if (state.tension >= 60 && !heartbeatTimer) startHeartbeat();
+  if (state.tension < 60) stopHeartbeat();
+  updateVignette();
+}
+
+function setTension(val) {
+  state.tension = Math.max(0, Math.min(100, val));
+  renderTension();
+  updateVignette();
+}
+
+function renderTension() {
+  const fill = $('#tensionFill');
+  const val = $('#tensionVal');
+  if (fill) fill.style.width = state.tension + '%';
+  if (val) val.textContent = state.tension;
+}
+
+function updateVignette() {
+  const v = $('#tensionVignette');
+  if (!v) return;
+  v.style.opacity = state.tension >= 60 ? (state.tension - 60) / 40 : 0;
+}
+
+/* ---------------- 雨夜粒子 ---------------- */
+function initRain() {
+  const layer = $('#rainLayer');
+  if (!layer) return;
+  for (let i = 0; i < 40; i++) {
+    const d = document.createElement('span');
+    d.className = 'rain-drop';
+    d.style.left = Math.random() * 100 + '%';
+    d.style.animationDuration = (0.8 + Math.random() * 1.2) + 's';
+    d.style.animationDelay = (Math.random() * 2) + 's';
+    d.style.opacity = 0.2 + Math.random() * 0.4;
+    layer.appendChild(d);
+  }
+}
+
+/* ---------------- 发送消息 ---------------- */
+let busy = false;
+async function send(text) {
+  const input = $('#chatInput');
+  const q = (text != null ? text : input.value).trim();
+  if (!q || busy) return;
+  if (input) input.value = '';
+  busy = true;
+  setSendEnabled(false);
+
+  const npcId = state.currentNpc;
+  const history = state.chats[npcId];
+  playTone('send');
+
+  // 用户消息
+  history.push({ role: 'user', text: q });
+  await appendBubble(npcId, 'user', q, null, false);
+
+  // 模拟思考：三点动画
+  const body = $('#chatBody');
+  const think = document.createElement('div');
+  think.className = 'msg npc';
+  think.innerHTML = `<div class="bubble assistant-bubble"><span class="typing-dots"><i></i><i></i><i></i></span></div>`;
+  body.appendChild(think);
+  scrollBottom();
+  showWavebar(true);
+  await sleep(500 + Math.random() * 500);
+  think.remove();
+  showWavebar(false);
+
+  // 计算回复
+  let reply;
+  try {
+    if (ENGINE.mode === 'cloud') {
+      reply = await computeReplyCloud(npcId, q, history);
+    } else {
+      reply = computeReply(npcId, q);
+    }
+  } catch (e) {
+    reply = { text: '（出错了，请再试一次）', clue: null };
+  }
+
+  // 应用情绪到当前头像
+  if (npcId !== 'assistant' && reply.mood) {
+    applyMood(npcId, reply.mood);
+  }
+
+  history.push({ role: 'npc', text: reply.text, clue: reply.clue || null });
+  await appendBubble(npcId, 'npc', reply.text, reply.clue || null, true);
+
+  // 播放戏剧化事件演出
+  if (reply.event) {
+    await playEvent(reply.event);
+  }
+
+  busy = false;
+  setSendEnabled(true);
+  input && input.focus();
+}
+
+function setSendEnabled(on) {
+  $('#btnSend').disabled = !on;
+  $('#btnSend').style.opacity = on ? 1 : .5;
+}
+
+/* ---------------- 指认与审判 ---------------- */
+function openAccuse() {
+  // 必须完成全部章节才能指认
+  if (state.chapter < CHAPTERS.length - 1) {
+    alert(`调查尚未完成。当前进行到第 ${state.chapter + 1} 章，请先推进调查再指认真凶。`);
+    return;
+  }
+  const opts = $('#accuseOptions');
+  opts.innerHTML = '';
+  Object.keys(NPCS).forEach((id) => {
+    const npc = NPCS[id];
+    const btn = document.createElement('button');
+    btn.className = 'accuse-opt';
+    btn.setAttribute('data-accuse', id);
+    btn.innerHTML = `
+      <span class="npc-avatar">${npc.avatar}</span>
+      <span class="a-name">${npc.name}</span>
+      <span class="a-role">${npc.role}</span>`;
+    btn.addEventListener('click', () => {
+      state.accused = id;
+      $$('.accuse-opt').forEach((o) => o.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+    opts.appendChild(btn);
+  });
+  state.accused = null;
+  $('#accuseClueCount').textContent = clueCount();
+  $('#accuseReason').value = '';
+  $('#accuseModal').classList.remove('hidden');
+}
+
+function closeAccuse() {
+  $('#accuseModal').classList.add('hidden');
+}
+
+function submitAccuse() {
+  if (!state.accused) {
+    alert('请先选择你要指认的嫌疑人');
+    return;
+  }
+  const reason = $('#accuseReason').value.trim();
+  $('#accuseModal').classList.add('hidden');
+  // 演出式审判：先戏剧化倒计时，再揭晓
+  playEvent({
+    kicker: '最终审判',
+    icon: '⚖️',
+    title: '真相，即将揭晓',
+    text: '你深吸一口气，指认了凶手。\n\n全场屏息，所有人的目光都聚焦在你的指尖……',
+    buttonText: '揭晓真相',
+    tone: 'drama',
+    heartbeat: true,
+  }).then(() => {
+    showVerdict(state.accused, reason, clueCount());
+  });
+}
+
+function showVerdict(accused, reason, n) {
+  const correct = accused === 'lin';
+  const truthName = NPCS.lin.name;
+
+  let grade, rankEmoji, gradeText, bodyHTML, stats;
+  if (correct) {
+    if (n >= 10) { grade = 'S'; rankEmoji = '🏆'; gradeText = '完美破案'; }
+    else if (n >= 7) { grade = 'A'; rankEmoji = '🎖️'; gradeText = '推理出色'; }
+    else if (n >= 4) { grade = 'B'; rankEmoji = '🔎'; gradeText = '基本锁定'; }
+    else { grade = 'B'; rankEmoji = '🎲'; gradeText = '侥幸命中'; }
+
+    bodyHTML = `
+      <p>你指认的 <span class="hl">${NPCS[accused].name}</span> 就是真凶！</p>
+      <p class="hl-red">真相揭晓：</p>
+      <p>美术社社长<b>林晚晴</b>为了阻止学校拍卖《晨曦》，在案发当晚 22:50 切断监控、用借来的员工卡刷开后门，取走了画作，藏进画室储物间的旧画框堆里。</p>
+      <p>她留下的破绽：节目单上的<span class="hl">蓝山咖啡渍</span>、统一登记的白手套、陈大力<span class="hl">借出的员工卡</span>，以及手机 <span class="hl">23:05 的定位</span>——都指向她。</p>
+      <p>而苏小满深夜去画室，只是为了取回母亲的旧照片；周子墨有直播不在场；陈大力被下了安眠药的牛奶调虎离山——他们都不是真凶。</p>`;
+
+    stats = [
+      { label: '关键线索', val: `${n}/${TOTAL_CLUES}` },
+      { label: '指认', val: '正确' },
+      { label: '评级', val: grade },
+    ];
+  } else {
+    grade = 'C';
+    rankEmoji = '😵';
+    gradeText = '抓错了人';
+    const accusedName = NPCS[accused].name;
+    let wrongHint = '';
+    if (accused === 'zhou') wrongHint = '周子墨当晚有直播录屏，根本没有作案时间。';
+    else if (accused === 'su') wrongHint = '苏小满只是去取母亲的旧照片，她没有偷画。';
+    else if (accused === 'chen') wrongHint = '陈大力那晚被人下了安眠药，稀里糊涂，不是他。';
+    else if (accused === 'guan') wrongHint = '秦馆长虽有卖画的动机，但他没有作案——他既拿不到后门卡，也留不下那杯咖啡渍。';
+    else if (accused === 'xiu') wrongHint = '顾砚是修复师，最懂画的价值，但那晚他通宵修复文物，有不在场证明。';
+    else if (accused === 'yun') wrongHint = '神秘人确实在打《晨曦》的主意，但画根本没流出去——他还没来得及下手。';
+
+    bodyHTML = `
+      <p>很遗憾，<span class="hl-red">${accusedName}</span> 并不是真凶。${wrongHint}</p>
+      <p class="hl-red">真相是：</p>
+      <p>偷走《晨曦》的是美术社社长<b>林晚晴</b>——她为了阻止学校拍卖，切断监控、借员工卡走后门取画，藏进了画室储物间。</p>
+      <p>她留下的破绽：节目单上的<span class="hl">蓝山咖啡渍</span>、白手套登记、借出的<span class="hl">员工卡</span>、以及 <span class="hl">23:05 的手机定位</span>。</p>`;
+
+    stats = [
+      { label: '关键线索', val: `${n}/${TOTAL_CLUES}` },
+      { label: '指认', val: '错误' },
+      { label: '评级', val: 'C' },
+    ];
+  }
+
+  const unlocked = ACHIEVEMENTS.filter((a) => a.check());
+  const achieveHTML = unlocked.length
+    ? `<div class="verdict-achieve"><div class="verdict-achieve-title">🏅 解锁成就</div>` +
+      unlocked.map((a) => `<div class="verdict-achieve-item"><b>${a.label}</b> · ${a.desc}</div>`).join('') + `</div>`
+    : '';
+
+  const content = $('#verdictContent');
+  content.innerHTML = `
+    <div class="verdict-rank">${rankEmoji}</div>
+    <div class="verdict-grade" style="color:var(--gold)">${grade} · ${gradeText}</div>
+    <div class="verdict-title">${reason ? `你的推理：${reason}` : '你没有填写推理依据'}</div>
+    <div class="verdict-body">${bodyHTML}</div>
+    <div class="verdict-stats">
+      ${stats.map((s) => `<div class="verdict-stat"><b>${s.val}</b>${s.label}</div>`).join('')}
+    </div>
+    ${achieveHTML}`;
+  $('#verdictModal').classList.remove('hidden');
+}
+
+/* ---------------- 重新开始 ---------------- */
+function restart() {
+  Object.keys(state.chats).forEach((k) => (state.chats[k] = []));
+  state.clues = {};
+  state.accused = null;
+  Object.keys(NPCS).forEach((id) => {
+    state.topicHits[id] = {};
+    state.fallbackIdx[id] = 0;
+    state.newFlags[id] = false;
+  });
+  state.newFlags.assistant = false;
+  state.mood = { lin: 'calm', chen: 'calm', zhou: 'calm', su: 'calm', guan: 'calm', xiu: 'calm', yun: 'calm' };
+  state.trust = { lin: 2, chen: 3, zhou: 1, su: 2, guan: 2, xiu: 3, yun: 1 };
+  state.usedHint = false;
+  state.confronted = false;
+  state.chapter = 0;
+  state.tension = 0;
+  state.eventsSeen = {};
+  stopHeartbeat();
+  setTension(0);
+  state.currentNpc = 'assistant';
+  $('#verdictModal').classList.add('hidden');
+  $('#accuseModal').classList.add('hidden');
+  renderNotebook();
+  updateClueCount();
+  renderChapterInd();
+  switchNpc('assistant');
+}
+
+/* ---------------- 事件绑定 ---------------- */
+function bindEvents() {
+  $('#btnStart').addEventListener('click', () => {
+    $('#intro').classList.add('hidden');
+    $('#game').classList.remove('hidden');
+    state.started = true;
+    initRain();
+    renderNotebook();
+    updateClueCount();
+    renderChapterInd();
+    renderNpcList();
+    switchNpc('assistant');
+    // 沉浸式开场演出
+    playEvent({
+      kicker: '案发当晚 · 22:50',
+      icon: '🌧️',
+      title: '雨夜，名画失窃',
+      text: '倾盆大雨冲刷着校园。\n\n美术馆内，警报沉寂，监控一片漆黑。\n\n次日清晨，百年校史名画<span class="hl">《晨曦》</span>不翼而飞，只留下一副白手套，和一张沾着咖啡渍的节目单。\n\n<span class="hl-red">侦探，该你上场了。</span>',
+      buttonText: '开始调查',
+      tone: 'drama',
+    });
+  });
+
+  document.querySelector('.npc-item.assistant').addEventListener('click', () => switchNpc('assistant'));
+
+  $('#btnSend').addEventListener('click', () => send(null));
+  $('#chatInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') send(null);
+  });
+
+  $('#btnRestart').addEventListener('click', () => {
+    if (confirm('确定要重新开始吗？当前进度会清空。')) restart();
+  });
+
+  $('#btnAccuse').addEventListener('click', openAccuse);
+  $('#btnAccuseCancel').addEventListener('click', closeAccuse);
+  $('#btnAccuseConfirm').addEventListener('click', submitAccuse);
+  $('#btnHint').addEventListener('click', () => {
+    state.usedHint = true;
+    switchNpc('assistant');
+    send('给我一点提示');
+  });
+  $('#btnVerdictRestart').addEventListener('click', () => {
+    $('#verdictModal').classList.add('hidden');
+    restart();
+  });
+}
+
+/* ---------------- 启动 ---------------- */
+bindEvents();
+renderNotebook();
+updateTimeline();
+renderChapterInd();
+
+</script>
+</body>
+</html>

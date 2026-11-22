@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>雪岭速降 SNOWLINE RUSH · AI 自适应滑雪跑酷</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#d9ecfa;color:#143c60;
+  font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",-apple-system,BlinkMacSystemFont,sans-serif;
+  user-select:none;-webkit-user-select:none}
+body{background:
+  radial-gradient(900px 700px at 15% 10%,rgba(255,255,255,.9),transparent 60%),
+  radial-gradient(800px 700px at 85% 90%,rgba(168,214,247,.65),transparent 60%),
+  linear-gradient(160deg,#e8f5ff 0%,#cfe6f8 55%,#b9d9f2 100%)}
+#stage{position:absolute;left:50%;top:50%;width:540px;height:960px;transform-origin:center center;
+  transform:translate(-50%,-50%);overflow:hidden;border-radius:28px;background:#eaf6ff;
+  box-shadow:0 34px 90px rgba(20,70,120,.38),0 0 0 1px rgba(255,255,255,.7) inset}
+canvas{position:absolute;left:0;top:0;width:540px;height:960px;display:block}
+.layer{position:absolute;inset:0;pointer-events:none}
+
+/* ---------- HUD ---------- */
+#hud{padding:22px 24px;opacity:0;transition:opacity .25s}
+#hud.on{opacity:1}
+.hud-row{display:flex;justify-content:space-between;align-items:flex-start}
+.stat{background:rgba(255,255,255,.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.9);
+  border-radius:16px;padding:8px 16px;min-width:132px;box-shadow:0 6px 18px rgba(35,95,150,.14)}
+.stat.right{text-align:right}
+.label{display:block;font-size:13px;letter-spacing:2px;color:#5b87ad;font-weight:600}
+.stat b{display:block;font-size:30px;line-height:1.15;font-weight:900;color:#123f6b;font-variant-numeric:tabular-nums}
+.hud-sub{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:10px}
+#lives{font-size:22px;letter-spacing:4px;filter:drop-shadow(0 2px 3px rgba(20,80,140,.3))}
+#speedBox{background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);border-radius:14px;
+  padding:7px 14px;font-size:13px;color:#4a7aa5;font-weight:700;min-width:150px}
+#speedVal{font-size:17px;color:#123f6b}
+#speedTrack{height:5px;border-radius:4px;background:rgba(30,90,150,.16);margin-top:6px;overflow:hidden}
+#speedBar{height:100%;width:20%;border-radius:4px;background:linear-gradient(90deg,#54b6e8,#ff8a4c);transition:width .15s}
+#combo{position:absolute;top:132px;left:24px;background:linear-gradient(135deg,#ff9a52,#ff5f4a);color:#fff;
+  padding:7px 16px;border-radius:999px;font-size:15px;font-weight:800;box-shadow:0 8px 20px rgba(255,110,70,.4);
+  opacity:0;transform:translateY(-8px);transition:.2s}
+#combo.on{opacity:1;transform:none}
+#buffs{position:absolute;top:180px;left:24px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.chip{background:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.95);border-radius:999px;
+  padding:5px 12px;font-size:13px;font-weight:800;color:#1b5a91;box-shadow:0 4px 12px rgba(30,90,150,.18)}
+.chip.shield{color:#8a52c8}.chip.magnet{color:#d0557f}.chip.boost{color:#e8732a}.chip.slow{color:#2c8f87}
+
+#coach{position:absolute;top:180px;right:24px;width:242px;background:rgba(255,255,255,.88);
+  border:1px solid rgba(255,255,255,.95);border-left:5px solid #3d97dc;border-radius:16px;
+  padding:14px 16px;box-shadow:0 10px 28px rgba(25,80,135,.2);opacity:0;transform:translateX(16px);
+  transition:opacity .3s,transform .3s}
+#coach.on{opacity:1;transform:none}
+#coach .tag{display:inline-block;background:linear-gradient(135deg,#3d97dc,#1b5f9e);color:#fff;
+  font-size:11px;font-weight:800;letter-spacing:1px;padding:3px 9px;border-radius:999px;margin-bottom:8px}
+#coach p{font-size:15px;line-height:1.6;color:#1b476e;font-weight:600}
+#toast{position:absolute;top:44%;left:0;right:0;text-align:center;font-size:30px;font-weight:900;
+  color:#fff;text-shadow:0 3px 0 rgba(20,80,140,.35),0 8px 22px rgba(10,50,100,.45);opacity:0}
+#toast.go{animation:toastPop 1.05s ease-out forwards}
+@keyframes toastPop{0%{opacity:0;transform:translateY(18px) scale(.8)}
+  18%{opacity:1;transform:translateY(0) scale(1.06)}70%{opacity:1;transform:translateY(-6px) scale(1)}
+  100%{opacity:0;transform:translateY(-26px) scale(.95)}}
+#demoBadge{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);
+  background:linear-gradient(135deg,#7b5cd6,#4a35a8);color:#fff;font-size:13px;font-weight:800;
+  letter-spacing:1px;padding:8px 18px;border-radius:999px;box-shadow:0 6px 18px rgba(80,50,170,.4);display:none;z-index:2}
+#demoBadge.on{display:block}
+
+/* ---------- 控制按钮 ---------- */
+#ctrl{position:absolute;right:20px;bottom:22px;display:none;gap:10px;pointer-events:auto}
+#ctrl.on{display:flex}
+.iconbtn{width:52px;height:52px;border-radius:50%;border:1px solid rgba(255,255,255,.9);
+  background:rgba(255,255,255,.8);backdrop-filter:blur(8px);color:#1b5a91;font-size:20px;font-weight:800;
+  box-shadow:0 6px 18px rgba(30,90,150,.22);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.iconbtn:active{transform:scale(.92)}
+#jumpBtn{position:absolute;left:22px;bottom:24px;width:96px;height:96px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.95);background:linear-gradient(135deg,rgba(255,154,82,.92),rgba(255,95,74,.92));
+  color:#fff;font-size:22px;font-weight:900;letter-spacing:2px;box-shadow:0 10px 26px rgba(255,100,70,.45);
+  display:none;pointer-events:auto;cursor:pointer;text-shadow:0 2px 4px rgba(150,50,20,.4)}
+#jumpBtn.on{display:block}
+#jumpBtn:active{transform:scale(.93)}
+#hint{position:absolute;left:0;right:0;bottom:26px;text-align:center;font-size:13px;color:#3a6d99;
+  font-weight:600;text-shadow:0 1px 3px rgba(255,255,255,.9);display:none}
+#hint.on{display:block}
+
+/* ---------- 覆盖层 ---------- */
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(226,242,253,.55);backdrop-filter:blur(7px);pointer-events:auto;padding:34px;
+  opacity:0;visibility:hidden;transition:opacity .28s,visibility .28s}
+#overlay.on{opacity:1;visibility:visible}
+.card{width:100%;max-height:860px;overflow:auto;background:rgba(255,255,255,.9);
+  border:1px solid rgba(255,255,255,.98);border-radius:26px;padding:36px 34px;
+  box-shadow:0 24px 60px rgba(25,80,135,.24);text-align:center}
+.card::-webkit-scrollbar{width:6px}.card::-webkit-scrollbar-thumb{background:#a9cce8;border-radius:6px}
+.logo{font-size:44px;font-weight:900;letter-spacing:4px;line-height:1.15;
+  background:linear-gradient(135deg,#1b6ca8,#3fa9e0 55%,#ff8a4c);-webkit-background-clip:text;
+  background-clip:text;color:transparent;filter:drop-shadow(0 3px 0 rgba(255,255,255,.9))}
+.en{font-size:13px;letter-spacing:7px;color:#6b9bc2;font-weight:800;margin-top:6px}
+.slogan{font-size:16px;color:#2b6798;font-weight:700;margin-top:16px}
+.badge-line{display:inline-block;margin-top:14px;background:#eaf5fd;border:1px solid #cbe6f8;
+  color:#2b6798;font-size:12px;font-weight:700;padding:6px 14px;border-radius:999px;letter-spacing:1px}
+.best{margin:20px 0 6px;font-size:14px;color:#5b87ad;font-weight:700}
+.best b{color:#e8732a;font-size:19px}
+.btns{display:flex;flex-direction:column;gap:11px;margin-top:22px}
+.btn{border:0;border-radius:15px;padding:15px 20px;font-size:17px;font-weight:800;cursor:pointer;
+  transition:transform .12s,box-shadow .12s;font-family:inherit;letter-spacing:1px}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:linear-gradient(135deg,#2b86cf,#17539a);color:#fff;
+  box-shadow:0 10px 24px rgba(23,83,154,.32)}
+.btn.warm{background:linear-gradient(135deg,#ff9f5a,#ff6247);color:#fff;
+  box-shadow:0 10px 24px rgba(255,98,71,.3)}
+.btn.ghost{background:#eef7fe;color:#1f6199;border:1px solid #cfe6f8}
+.btn.small{padding:11px 16px;font-size:15px}
+.row2{display:flex;gap:10px}.row2 .btn{flex:1}
+.foot{margin-top:20px;font-size:12px;color:#7ba2c2;line-height:1.7}
+h2{font-size:26px;color:#154a7c;margin-bottom:14px;font-weight:900}
+h3{font-size:17px;color:#1f6199;margin:20px 0 8px;text-align:left;font-weight:800}
+.ptxt{font-size:14.5px;line-height:1.85;color:#33628c;text-align:left;margin-bottom:8px}
+.ptxt b{color:#e8732a}
+.kv{display:flex;gap:10px;align-items:flex-start;background:#f2f9ff;border-radius:12px;
+  padding:11px 13px;margin-bottom:8px;text-align:left;font-size:14px;line-height:1.6;color:#33628c}
+.kv i{font-style:normal;font-size:18px;flex-shrink:0}
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}
+.res{background:#f2f9ff;border:1px solid #dceefa;border-radius:14px;padding:12px}
+.res span{display:block;font-size:12px;color:#6b9bc2;font-weight:700;letter-spacing:1px}
+.res b{display:block;font-size:24px;color:#154a7c;font-weight:900;margin-top:3px}
+.verdict{background:linear-gradient(135deg,#eef7ff,#e2f1fd);border-left:5px solid #3d97dc;
+  border-radius:14px;padding:16px;text-align:left;margin:14px 0}
+.verdict .vtag{display:inline-block;background:linear-gradient(135deg,#7b5cd6,#4a35a8);color:#fff;
+  font-size:12px;font-weight:800;padding:4px 12px;border-radius:999px;margin-bottom:9px}
+.verdict p{font-size:14px;line-height:1.8;color:#2b5680}
+.newrec{display:inline-block;background:linear-gradient(135deg,#ffc94a,#ff8a3c);color:#fff;
+  font-size:13px;font-weight:900;padding:7px 16px;border-radius:999px;margin-top:4px;
+  box-shadow:0 6px 16px rgba(255,150,50,.4)}
+
+/* ---------- 雪具工坊 / 道具升级 ---------- */
+.up-coin{display:inline-block;background:linear-gradient(135deg,#fff3d0,#ffe2a8);
+  border:1px solid #ffd88a;color:#a9671b;font-size:15px;font-weight:800;
+  padding:8px 18px;border-radius:999px;margin:4px 0 8px}
+.up-coin b{font-size:20px;color:#e8732a}
+.up-note{font-size:12.5px;line-height:1.7;color:#6b9bc2;text-align:center;margin:0 0 14px}
+.up-card{background:#f3f9ff;border:1px solid #dceafa;border-radius:16px;
+  padding:13px 14px;margin-bottom:10px;text-align:left}
+.up-head{display:flex;align-items:center;gap:10px}
+.up-icon{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;
+  justify-content:center;font-size:23px;flex-shrink:0}
+.up-title{flex:1;min-width:0}
+.up-title b{display:block;font-size:16px;color:#154a7c;font-weight:900}
+.up-title small{font-size:12px;color:#6b9bc2;font-weight:700}
+.up-dots{display:flex;gap:4px;flex-shrink:0}
+.up-dots i{width:9px;height:9px;border-radius:50%;background:#d5e6f5;display:block}
+.up-dots i.on{background:linear-gradient(135deg,#ffc94a,#ff8a3c);
+  box-shadow:0 1px 3px rgba(255,150,50,.5)}
+.up-desc{font-size:13px;line-height:1.75;color:#33628c;margin:10px 0 9px}
+.up-desc em{display:inline-block;font-style:normal;background:#dceafa;color:#1f6199;
+  font-size:11px;font-weight:800;padding:1px 7px;border-radius:6px;margin-right:6px}
+.up-desc .arrow{color:#e8732a;font-weight:900}
+.btn.up-buy{width:100%;padding:10px 14px;font-size:14px;border-radius:11px;
+  background:linear-gradient(135deg,#2b86cf,#17539a);color:#fff;box-shadow:none}
+.btn.up-buy.disabled{background:#dce9f5;color:#93aec4;box-shadow:none}
+.up-max{text-align:center;font-size:13px;font-weight:800;color:#e8732a;
+  padding:8px;background:#fff4e8;border-radius:10px}
+.up-msg{background:#e9f8ef;border:1px solid #bde6ce;color:#1f7a52;border-radius:12px;
+  padding:10px 12px;font-size:13px;font-weight:700;margin-bottom:12px}
+.coin-line{font-size:13px;color:#5b87ad;font-weight:700;margin:10px 0}
+.coin-line b{color:#e8732a;font-size:17px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <div class="layer">
+    <div id="hud">
+      <div class="hud-row">
+        <div class="stat"><span class="label">分数 SCORE</span><b id="scoreVal">0</b></div>
+        <div class="stat right"><span class="label">距离 DISTANCE</span><b id="distVal">0 m</b></div>
+      </div>
+      <div class="hud-sub">
+        <div id="lives">❄ ❄ ❄</div>
+        <div id="speedBox">速度 <b id="speedVal">0</b> km/h
+          <div id="speedTrack"><div id="speedBar"></div></div>
+        </div>
+      </div>
+      <div id="combo">连击 ×<b id="comboVal">1</b></div>
+      <div id="buffs"></div>
+    </div>
+    <div id="coach"><span class="tag">AI 教练</span><p id="coachText"></p></div>
+    <div id="toast"></div>
+    <div id="demoBadge">AI 自动演示中 · 点右上角退出</div>
+    <div id="hint">← → / A D 转向　空格 跳跃　S 加速　P 暂停</div>
+    <div id="ctrl">
+      <button class="iconbtn" id="btnSound" title="静音">♪</button>
+      <button class="iconbtn" id="btnPause" title="暂停">Ⅱ</button>
+    </div>
+    <button id="jumpBtn">跳跃</button>
+  </div>
+
+  <div id="overlay"><div class="card" id="card"></div></div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   雪岭速降 SNOWLINE RUSH
+   单文件 HTML5 · Canvas 2D + Web Audio · 零外部依赖
+   AI 应用：自适应难度教练 / 程序化赛道 / AI 自动演示
+   ========================================================= */
+const W = 540, H = 960, HORIZON = 270, GROUND = H - HORIZON, PT = 0.78;
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const $ = id => document.getElementById(id);
+const stage = $('stage');
+const ui = {
+  hud:$('hud'), score:$('scoreVal'), dist:$('distVal'), lives:$('lives'),
+  speed:$('speedVal'), speedBar:$('speedBar'), combo:$('combo'), comboVal:$('comboVal'),
+  buffs:$('buffs'), coach:$('coach'), coachText:$('coachText'), toast:$('toast'),
+  demo:$('demoBadge'), hint:$('hint'), ctrl:$('ctrl'), jump:$('jumpBtn'),
+  overlay:$('overlay'), card:$('card'), btnSound:$('btnSound'), btnPause:$('btnPause')
+};
+
+/* ---------------- 工具 ---------------- */
+const clamp = (v,a,b) => v<a?a:(v>b?b:v);
+const rand = (a,b) => a + Math.random()*(b-a);
+const lerp = (a,b,t) => a+(b-a)*t;
+const scaleF = t => 0.24 + 1.05 * Math.pow(Math.max(t,0), 1.25);
+function project(lane, t){
+  const s = scaleF(t);
+  const cx = W/2 + S.curve * (PT - t) * 260;
+  const half = W * 0.42 * s;
+  return { x: cx + lane*half, y: HORIZON + t*GROUND, s, half, cx };
+}
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+
+/* ---------------- 存档 ---------------- */
+function loadBest(){
+  try{
+    const v = JSON.parse(localStorage.getItem('snowline_best') || '{}');
+    return { score:v.score||0, distance:v.distance||0, combo:v.combo||0 };
+  }catch(e){ return {score:0,distance:0,combo:0}; }
+}
+function saveBest(){
+  const b = S.best;
+  let fresh = false;
+  if(S.score > b.score){ b.score = Math.floor(S.score); fresh = true; }
+  if(S.distance > b.distance) b.distance = Math.floor(S.distance);
+  if(S.maxCombo > b.combo) b.combo = S.maxCombo;
+  try{ localStorage.setItem('snowline_best', JSON.stringify(b)); }catch(e){}
+  return fresh;
+}
+
+/* ---------------- 道具升级系统 ---------------- */
+const UP_KEYS = ['shield','magnet','boost','slow','board'];
+const UP_PRICE = [120, 280, 500, 800, 1200]; // 升到 Lv1..Lv5 的价格
+const UP_INFO = {
+  shield:{ name:'轻韧护盾', icon:'🛡', color:'#8a52c8',
+    cur:  lv => '拾取 +' + (1+lv) + ' 层抵挡，开局自带 ' + Math.floor(lv/2) + ' 层',
+    next: lv => '拾取 +' + (2+lv) + ' 层抵挡' + (Math.floor((lv+1)/2) > Math.floor(lv/2) ? '，开局多 1 层' : '') },
+  magnet:{ name:'引力磁铁', icon:'🧲', color:'#d0557f',
+    cur:  lv => '持续 ' + (4+lv*1.4).toFixed(1) + 's，吸附范围 ' + (0.42+lv*0.055).toFixed(2),
+    next: lv => '持续 ' + (4+(lv+1)*1.4).toFixed(1) + 's，范围 ' + (0.42+(lv+1)*0.055).toFixed(2) },
+  boost:{ name:'疾风冲刺', icon:'⚡', color:'#e8732a',
+    cur:  lv => '持续 ' + (4+lv*0.9).toFixed(1) + 's，速度 ×' + (1.28+lv*0.035).toFixed(2),
+    next: lv => '持续 ' + (4+(lv+1)*0.9).toFixed(1) + 's，速度 ×' + (1.28+(lv+1)*0.035).toFixed(2) },
+  slow:{ name:'静雪缓行', icon:'🌀', color:'#2c8f87',
+    cur:  lv => '持续 ' + (4+lv*0.9).toFixed(1) + 's，速度 ×' + (0.76-lv*0.025).toFixed(2),
+    next: lv => '持续 ' + (4+(lv+1)*0.9).toFixed(1) + 's，速度 ×' + (0.76-(lv+1)*0.025).toFixed(2) },
+  board:{ name:'碳纤维雪板', icon:'🎿', color:'#1b6ca8',
+    cur:  lv => '转向 ' + (1.55+lv*0.12).toFixed(2) + '/s，开局 +' + (lv*120) + ' 分' + (lv>=3 ? '，额外 1 点生命' : ''),
+    next: lv => '转向 ' + (1.55+(lv+1)*0.12).toFixed(2) + '/s，开局 +' + ((lv+1)*120) + ' 分' + (lv+1>=3 ? '，额外 1 点生命' : '') }
+};
+function loadUpgrade(){
+  const zero = {shield:0,magnet:0,boost:0,slow:0,board:0};
+  try{
+    const v = JSON.parse(localStorage.getItem('snowline_up') || '{}');
+    const up = Object.assign({}, zero);
+    for(const k of UP_KEYS){
+      if(v.up && typeof v.up[k] === 'number') up[k] = clamp(Math.floor(v.up[k]), 0, 5);
+    }
+    return { coins: Math.max(0, Math.floor(v.coins||0)), up };
+  }catch(e){ return {coins:0, up:Object.assign({},zero)}; }
+}
+function saveUpgrade(){
+  try{ localStorage.setItem('snowline_up', JSON.stringify({coins:S.coins, up:S.up})); }catch(e){}
+}
+// 有效等级 = 永久等级 + 本局临时强化
+function effLv(k){ return clamp((S.up[k]||0) + (S.temp[k]||0), 0, 7); }
+function awardCoins(){
+  if(S.demo) return 0;
+  const n = Math.floor(S.stats.flakes*2 + S.stats.gates*10 + S.distance/60 + S.score/200);
+  S.earned = n; S.coins += n; saveUpgrade(); return n;
+}
+function doUpgrade(k){
+  initAudio();
+  if(!UP_INFO[k]) return;
+  const lv = S.up[k];
+  if(lv >= 5){ S.upMsg = '这件雪具已经满级啦，去滑一局试试效果吧。'; }
+  else{
+    const price = UP_PRICE[lv];
+    if(S.coins < price){
+      S.upMsg = '雪花币不够（还差 ' + fmt(price-S.coins) + '），再滑一局就够啦。'; sfx.click();
+    }else{
+      S.coins -= price; S.up[k] = lv+1; saveUpgrade(); sfx.power();
+      S.upMsg = UP_INFO[k].name + ' 升到 Lv' + (lv+1) + '！下一局立刻生效。';
+    }
+  }
+  S.mode = 'upgrade'; renderOverlay();
+}
+
+/* ---------------- 音效（Web Audio 合成，无外部文件） ---------------- */
+let actx = null;
+function initAudio(){
+  try{
+    if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if(actx.state === 'suspended') actx.resume();
+  }catch(e){ actx = null; }
+}
+function tone(f1, f2, dur, type, vol, delay){
+  if(!actx || S.muted) return;
+  const t0 = actx.currentTime + (delay||0);
+  const osc = actx.createOscillator(), g = actx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.setValueAtTime(f1, t0);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(f2,1), t0+dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol||0.07, t0+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+  osc.connect(g); g.connect(actx.destination);
+  osc.start(t0); osc.stop(t0+dur+0.02);
+}
+const sfx = {
+  collect(){ tone(880,1500,.13,'sine',.075); tone(1320,1900,.10,'sine',.045,.07); },
+  gate(){ tone(520,780,.12,'triangle',.08); tone(780,1180,.14,'triangle',.07,.10); tone(1040,1560,.16,'sine',.05,.20); },
+  jump(){ tone(360,720,.16,'triangle',.06); },
+  hit(){ tone(200,70,.34,'sawtooth',.09); tone(120,60,.28,'square',.045,.03); },
+  power(){ tone(600,900,.10,'sine',.06); tone(900,1400,.14,'sine',.06,.08); tone(1200,1800,.18,'sine',.05,.16); },
+  over(){ tone(520,400,.22,'triangle',.07); tone(400,280,.26,'triangle',.07,.18); tone(280,160,.42,'triangle',.07,.36); },
+  click(){ tone(700,980,.07,'sine',.04); }
+};
+
+/* ---------------- 状态 ---------------- */
+const SAVE = loadUpgrade();
+const S = {
+  mode:'menu', demo:false, muted:false,
+  time:0, progress:0, curve:0, speed:0.42, distance:0, score:0,
+  combo:0, maxCombo:0, mult:1, lives:3, invuln:0,
+  jumpTime:0, jumpH:0, playerLane:0, lean:0,
+  keys:{left:false,right:false,down:false},
+  pointerDir:0, pointerStart:null,
+  entities:[], particles:[], snow:[], decos:[],
+  spawnT:0.3, mistT:0, shake:0, flash:0,
+  buffs:{shield:0,magnet:0,boost:0,slow:0},
+  up:SAVE.up, coins:SAVE.coins, temp:{shield:0,magnet:0,boost:0,slow:0},
+  earned:0, upMsg:'',
+  stats:{flakes:0,gates:0,hits:0,jumps:0},
+  coach:{skill:0.55, diff:0.22, tipT:4, msgT:0, lastBad:-99, lastGood:-99},
+  ai:{targetLane:0},
+  best:loadBest(), newRecord:false, verdict:null
+};
+function resetDecos(){
+  S.decos = [];
+  for(let i=0;i<74;i++){
+    S.decos.push({
+      t0: Math.random()*1.2,
+      lane: (Math.random()<0.5?-1:1) * rand(1.12, 2.25),
+      type: Math.random()<0.78 ? 'tree' : (Math.random()<0.6?'rock':'sign'),
+      seed: Math.random()*10
+    });
+  }
+}
+function resetSnow(){
+  S.snow = [];
+  for(let i=0;i<78;i++){
+    S.snow.push({ x:Math.random()*W, y:Math.random()*H, r:rand(1,3.4),
+      spd:rand(18,52), drift:rand(-22,22), a:rand(.25,.8) });
+  }
+}
+resetDecos(); resetSnow();
+
+/* ---------------- 自适应画布 ---------------- */
+function fit(){
+  const s = Math.min(window.innerWidth/W, window.innerHeight/H) * 0.97;
+  stage.style.transform = 'translate(-50%,-50%) scale(' + s + ')';
+  const d = Math.max(1, Math.min(2.5, (window.devicePixelRatio||1) * s));
+  canvas.width = Math.round(W*d); canvas.height = Math.round(H*d);
+  ctx.setTransform(d,0,0,d,0,0);
+}
+window.addEventListener('resize', fit); fit();
+
+/* ---------------- UI ---------------- */
+function fmt(n){ return Math.floor(n).toLocaleString('en-US'); }
+function updateHUD(){
+  ui.score.textContent = fmt(S.score);
+  ui.dist.textContent = fmt(S.distance) + ' m';
+  ui.speed.textContent = Math.round(S.speed*220);
+  ui.speedBar.style.width = clamp(S.speed/0.95*100, 8, 100) + '%';
+  ui.lives.textContent = '❄ '.repeat(Math.max(0,S.lives)).trim() || '—';
+  ui.comboVal.textContent = S.mult.toFixed(1);
+  ui.combo.classList.toggle('on', S.combo >= 3);
+  const chips = [];
+  const names = {shield:'护盾', magnet:'磁铁', boost:'加速', slow:'缓行'};
+  for(const k in S.buffs){
+    const t = S.buffs[k];
+    if(t <= 0) continue;
+    const label = (k === 'shield') ? ('×' + Math.floor(t) + ' 层') : (t.toFixed(1) + 's');
+    chips.push('<span class="chip '+k+'">'+names[k]+' Lv'+effLv(k)+' · '+label+'</span>');
+  }
+  ui.buffs.innerHTML = chips.join('');
+}
+function showToast(txt){
+  ui.toast.textContent = txt;
+  ui.toast.classList.remove('go'); void ui.toast.offsetWidth; ui.toast.classList.add('go');
+}
+function showCoach(txt){
+  ui.coachText.textContent = txt;
+  ui.coach.classList.add('on');
+  S.coach.msgT = 4.2;
+}
+function setModeUI(){
+  const playing = (S.mode==='play' || S.mode==='pause');
+  ui.hud.classList.toggle('on', playing);
+  ui.ctrl.classList.toggle('on', S.mode==='play');
+  ui.hint.classList.toggle('on', S.mode==='play' && !S.demo);
+  ui.jump.classList.toggle('on', S.mode==='play' && !S.demo);
+  ui.demo.classList.toggle('on', S.mode==='play' && S.demo);
+  if(S.mode!=='play' && S.mode!=='pause'){ ui.coach.classList.remove('on'); }
+}
+
+const TIPS_GENERIC = [
+  '眼睛看前方，别盯着脚下——提前一秒预判，比临时变道更稳。',
+  '雪堆和冰裂缝可以按空格跃过，大树和岩石只能绕开。',
+  '连续收集雪花会叠加倍率，断一次连击就要重新攒哦。',
+  '穿过红蓝旗门的收益是雪花的好几倍，值得主动对准。',
+  '按住 S 能压低重心加速，但速度越快留给你的反应时间越短。',
+  'AI 会悄悄根据你的表现调整赛道难度，放心大胆往前冲。'
+];
+function tipFor(){
+  const c = S.coach;
+  if(S.time - c.lastBad < 2.4) return '别急，刚才那下不算什么。AI 已把赛道调缓了一点，稳住重心再来。';
+  if(S.lives === 1) return '只剩一片雪花护体了！先保命，把连击和分数放一放。';
+  const aheadGate = S.entities.find(e => e.type==='gate' && e.t>PT && e.t<PT+0.35);
+  if(aheadGate) return '前方出现旗门！提前把身位挪到两杆中间，穿过去 +200 分。';
+  if(S.combo >= 10) return '连击 ×'+S.mult.toFixed(1)+'，节奏很漂亮！保持这条线路别断。';
+  if(S.speed > 0.66) return '速度提上来了，视线放远一点，优先找障碍之间的空隙。';
+  return TIPS_GENERIC[Math.floor(Math.random()*TIPS_GENERIC.length)];
+}
+function coachEvent(kind){
+  const c = S.coach;
+  if(kind === 'bad'){
+    c.skill = clamp(c.skill - 0.11, 0.05, 1);
+    c.lastBad = S.time;
+  }else{
+    c.skill = clamp(c.skill + (kind==='great'?0.055:0.028), 0.05, 1);
+    c.lastGood = S.time;
+  }
+}
+function updateCoach(dt){
+  const c = S.coach;
+  // 难度 = 玩家水平 + 进程推进，并做平滑跟随（动态难度调节 DDA）
+  const target = clamp(0.10 + c.skill*0.55 + Math.min(0.32, S.distance/9000), 0.08, 0.98);
+  c.diff += (target - c.diff) * Math.min(1, dt*0.35);
+  c.skill += (0.55 - c.skill) * Math.min(1, dt*0.012); // 缓慢回归中性
+  c.tipT -= dt;
+  if(c.tipT <= 0){
+    showCoach(tipFor());
+    c.tipT = rand(5.2, 7.6);
+  }
+  if(c.msgT > 0){
+    c.msgT -= dt;
+    if(c.msgT <= 0) ui.coach.classList.remove('on');
+  }
+}
+function buildVerdict(){
+  const st = S.stats;
+  let tag = '雪山新秀';
+  if(st.gates >= 6) tag = '旗门猎手';
+  else if(S.maxCombo >= 20) tag = '节奏大师';
+  else if(S.distance >= 2200) tag = '耐力滑手';
+  else if(st.flakes >= 40) tag = '拾光收藏家';
+  else if(st.hits >= 4) tag = '越挫越勇';
+  const acc = st.hits===0 ? '全程零碰撞，路线判断非常干净！' :
+              (st.hits<=2 ? '偶有磕碰，但整体节奏保持得不错。' : '碰撞偏多，试着把视线放远、提前变道。');
+  const advice = st.gates < 3 ? '下一局多留意红蓝旗门，收益比雪花高得多。' :
+                 (S.maxCombo < 12 ? '连着吃雪花别断，连击倍率能让分数翻倍。' : '保持现在的预判节奏，可以尝试挑战更高速度。');
+  const text = '本局滑行 ' + fmt(S.distance) + ' m，穿过 ' + st.gates + ' 道旗门、收集 ' + st.flakes +
+               ' 片雪花，最高连击 ' + S.maxCombo + '。' + acc + ' AI 教练建议：' + advice;
+  return {tag, text};
+}
+
+/* ---------------- 覆盖层 ---------------- */
+const menuHTML = () => {
+  const totalLv = UP_KEYS.reduce((a,k) => a + S.up[k], 0);
+  return `
+  <div class="logo">雪岭速降</div>
+  <div class="en">SNOWLINE RUSH</div>
+  <div class="slogan">AI 自适应 · 滑雪跑酷</div>
+  <div class="badge-line">原创作品 · 单文件 HTML5 · 离线即玩</div>
+  <div class="up-coin">❄ 雪花币 <b>${fmt(S.coins)}</b>　·　雪具总等级 <b>${totalLv}</b></div>
+  <div class="best">历史最高分 <b>${fmt(S.best.score)}</b>　最远 <b>${fmt(S.best.distance)} m</b></div>
+  <div class="btns">
+    <button class="btn primary" data-act="start">开始滑行</button>
+    <button class="btn ghost" data-act="upgrade">🎿 雪具工坊 · 升级道具</button>
+    <button class="btn warm" data-act="demo">AI 自动演示（可录屏）</button>
+    <div class="row2">
+      <button class="btn ghost small" data-act="help">玩法说明</button>
+      <button class="btn ghost small" data-act="about">创作说明</button>
+    </div>
+  </div>
+  <div class="foot">键盘：← → / A D 转向　空格 跳跃　S 加速　P 暂停<br>触屏：按住左右半屏转向，轻点屏幕或按钮跳跃<br>内容积极向上 · 挑战自我，一路向前</div>`;
+};
+const pauseHTML = () => `
+  <div class="logo" style="font-size:34px">暂停一下</div>
+  <div class="slogan">喝口热可可，雪还在等你</div>
+  <div class="result-grid">
+    <div class="res"><span>当前分数</span><b>${fmt(S.score)}</b></div>
+    <div class="res"><span>已滑行</span><b>${fmt(S.distance)} m</b></div>
+  </div>
+  <div class="btns">
+    <button class="btn primary" data-act="resume">继续滑行</button>
+    <button class="btn ghost" data-act="restart">重新开始</button>
+    <button class="btn ghost small" data-act="menu">返回主菜单</button>
+  </div>`;
+const overHTML = () => {
+  const v = S.verdict;
+  return `
+  <div class="logo" style="font-size:34px">本局结束</div>
+  <div class="slogan">${S.demo ? 'AI 演示结束' : '雪山还在，随时再来一局'}</div>
+  <div class="result-grid">
+    <div class="res"><span>最终得分</span><b>${fmt(S.score)}</b></div>
+    <div class="res"><span>滑行距离</span><b>${fmt(S.distance)} m</b></div>
+    <div class="res"><span>最高连击</span><b>${S.maxCombo}</b></div>
+    <div class="res"><span>穿过旗门</span><b>${S.stats.gates}</b></div>
+  </div>
+  ${S.newRecord ? '<div class="newrec">新纪录！刷新了历史最高分</div>' : ''}
+  <div class="coin-line">本局获得 ❄ <b>${fmt(S.earned)}</b> 雪花币　·　累计 ❄ ${fmt(S.coins)}</div>
+  <div class="verdict"><span class="vtag">AI 教练评语 · ${v.tag}</span><p>${v.text}</p></div>
+  <div class="btns">
+    <button class="btn primary" data-act="restart">再来一局</button>
+    <button class="btn ghost" data-act="upgrade">🎿 雪具工坊 · 升级道具</button>
+    <button class="btn ghost small" data-act="menu">返回主菜单</button>
+  </div>`;
+};
+const helpHTML = () => `
+  <h2>玩法说明</h2>
+  <div class="kv"><i>🎿</i><div><b>目标</b>：在无尽雪道上滑得越远越好。躲开障碍、收集雪花、穿过红蓝旗门，把分数刷高。</div></div>
+  <div class="kv"><i>⌨️</i><div><b>键盘</b>：← → 或 A D 左右转向；空格 / W / ↑ 跳跃；按住 S / ↓ 压低重心加速；P / Esc 暂停；M 静音。</div></div>
+  <div class="kv"><i>📱</i><div><b>触屏</b>：按住屏幕左半 / 右半持续转向；轻点屏幕或点「跳跃」按钮起跳。</div></div>
+  <div class="kv"><i>🌲</i><div><b>障碍</b>：松树、岩石、雪人必须绕开；雪堆、冰裂缝可以跳过去（+30 分）；冰面会让板子打滑。</div></div>
+  <div class="kv"><i>🚩</i><div><b>旗门</b>：从两根旗杆中间穿过 +200 分并加连击，是全场最划算的目标。</div></div>
+  <div class="kv"><i>❄️</i><div><b>雪花与连击</b>：每片雪花 +50 分，连续不失误会提升倍率（最高 ×3.0）；撞一次连击清零、损失一片雪花护体。</div></div>
+  <div class="kv"><i>🎁</i><div><b>道具</b>：护盾抵挡碰撞、磁铁自动吸附雪花、加速提升速度、缓行降低速度便于调整。</div></div>
+  <div class="kv"><i>🎿</i><div><b>雪具工坊</b>：每局结算按雪花 / 旗门 / 距离获得雪花币，在主菜单把护盾、磁铁、冲刺、缓行、雪板升到 Lv5，效果永久生效；同一局重复吃到同一道具还会临时强化（最多 +2 级），HUD 会显示当前 Lv。</div></div>
+  <div class="kv"><i>🤖</i><div><b>AI 教练</b>：右上角的教练会实时点评，并根据你的表现自动调节障碍密度和滑行速度，让每一局都刚好有挑战。</div></div>
+  <div class="btns"><button class="btn primary" data-act="menu">明白了，返回</button></div>`;
+const aboutHTML = () => `
+  <h2>创作说明</h2>
+  <div class="ptxt"><b>作品名称</b>：雪岭速降 SNOWLINE RUSH　|　<b>类型</b>：轻量单局跑酷　|　<b>主题</b>：在雪山赛道上挑战自我、一路向前。</div>
+  <h3>一、创作过程</h3>
+  <div class="ptxt">1. 依据《第一届"智游杯"AI+游戏创意作品挑战赛活动通知》中"借助 AI 工具开发、小型轻量化、内容积极向上"的要求，先与 AI 一起确定题材（滑雪跑酷）、核心循环与视觉风格。</div>
+  <div class="ptxt">2. 由 AI 协助完成玩法设计、数值框架、美术方案与代码骨架；再按模块逐一实现：伪 3D 雪道 → 障碍与道具 → 碰撞计分 → AI 系统 → 界面与音效。</div>
+  <div class="ptxt">3. 每完成一个模块即运行测试，针对手感、难度曲线与画面层次反复迭代，最终收敛为单个 HTML 文件，双击即可离线运行。</div>
+  <div class="ptxt">4. 追加「雪具工坊」养成系统：由 AI 协助设计雪花币经济、5 件雪具的 Lv0—Lv5 数值曲线与价格表，实现永久升级 + 局内临时强化的双层成长，并同步更新玩法说明与参赛简介。</div>
+  <h3>二、AI 在作品中的应用</h3>
+  <div class="kv"><i>🧠</i><div><b>AI 辅助开发</b>：策划、数值、美术与程序实现全程由 AI 协作完成，符合"借助 AI 工具开发"的参赛要求。</div></div>
+  <div class="kv"><i>📈</i><div><b>游戏内 AI 教练（DDA）</b>：实时统计命中、失误、连击与旗门表现，用滑动评估得到水平值，动态调节障碍密度与速度，维持"心流"难度；并生成鼓励式战术提示与赛后评语。</div></div>
+  <div class="kv"><i>🏔️</i><div><b>程序化 AI 赛道</b>：弯道、障碍、雪花串、旗门与道具均由带约束的随机算法实时生成，保证每段赛道至少留有一条可通行路线，每局都不重复。</div></div>
+  <div class="kv"><i>🎬</i><div><b>AI 自动演示</b>：主菜单一键开启，AI 以前瞻评估（避障风险 + 收集收益）自动选线、变道与跳跃，可直接用于录制 5 分钟内的初赛演示视频。</div></div>
+  <h3>三、技术实现</h3>
+  <div class="ptxt">原生 Canvas 2D 绘制伪 3D 透视雪道（近大远小 + 弯道偏移）、视差远山、飘雪与粒子；Web Audio API 实时合成音效，无任何图片 / 音频 / 第三方库依赖；状态机管理菜单、游戏、暂停、结算、雪具工坊；localStorage 分别保存最高分与「雪花币 + 雪具等级」，实现跨局永久养成。键盘与触屏双端适配。</div>
+  <h3>四、原创声明</h3>
+  <div class="ptxt">本作品为个人原创，美术元素均由代码绘制，音效由代码合成，未使用任何第三方素材，不存在抄袭。</div>
+  <div class="btns"><button class="btn primary" data-act="menu">返回主菜单</button></div>`;
+const upgradeHTML = () => {
+  const cards = UP_KEYS.map(k => {
+    const inf = UP_INFO[k], lv = S.up[k], max = lv >= 5, price = UP_PRICE[lv];
+    const dots = [0,1,2,3,4].map(i => '<i class="' + (i < lv ? 'on' : '') + '"></i>').join('');
+    const iconStyle = 'background:' + inf.color + '22;color:' + inf.color;
+    return `
+    <div class="up-card">
+      <div class="up-head">
+        <span class="up-icon" style="${iconStyle}">${inf.icon}</span>
+        <div class="up-title"><b>${inf.name}</b><small>Lv ${lv} / 5 · ${max ? '已满级' : '可升级'}</small></div>
+        <span class="up-dots">${dots}</span>
+      </div>
+      <div class="up-desc"><em>当前</em>${inf.cur(lv)}${max ? '' : '<br><em>下一级</em><span class="arrow">→</span> ' + inf.next(lv)}</div>
+      ${max ? '<div class="up-max">已满级 · 效果全部解锁</div>'
+            : '<button class="btn up-buy ' + (S.coins >= price ? '' : 'disabled') + '" data-up="' + k + '">' +
+              (S.coins >= price ? '升级' : '雪花币不足') + ' · ❄ ' + fmt(price) + '</button>'}
+    </div>`;
+  }).join('');
+  return `
+  <div class="btns" style="margin:0 0 6px"><button class="btn ghost small" data-act="menu">‹ 返回主菜单</button></div>
+  <h2>🎿 雪具工坊</h2>
+  <div class="up-coin">❄ 雪花币 <b>${fmt(S.coins)}</b></div>
+  ${S.upMsg ? '<div class="up-msg">' + S.upMsg + '</div>' : ''}
+  <div class="up-note">每局结算按雪花 / 旗门 / 距离获得雪花币。升级永久生效；同一局重复拾取同一道具还会临时强化（最多 +2 级）。</div>
+  ${cards}
+  <div class="btns"><button class="btn primary" data-act="menu">返回主菜单</button></div>`;
+};
+
+function renderOverlay(){
+  const m = S.mode;
+  ui.overlay.classList.toggle('on', m!=='play');
+  if(m==='play'){ setModeUI(); return; }
+  if(m==='menu') ui.card.innerHTML = menuHTML();
+  else if(m==='pause') ui.card.innerHTML = pauseHTML();
+  else if(m==='over') ui.card.innerHTML = overHTML();
+  else if(m==='help') ui.card.innerHTML = helpHTML();
+  else if(m==='about') ui.card.innerHTML = aboutHTML();
+  else if(m==='upgrade') ui.card.innerHTML = upgradeHTML();
+  ui.card.scrollTop = 0;
+  setModeUI();
+}
+ui.overlay.addEventListener('click', e=>{
+  const upBtn = e.target.closest('[data-up]');
+  if(upBtn){ doUpgrade(upBtn.dataset.up); return; }
+  const b = e.target.closest('[data-act]');
+  if(!b) return;
+  initAudio(); sfx.click();
+  const a = b.dataset.act;
+  if(a==='start') startGame(false);
+  else if(a==='demo') startGame(true);
+  else if(a==='resume'){ S.mode='play'; renderOverlay(); }
+  else if(a==='restart') startGame(S.demo);
+  else if(a==='menu'){ S.mode='menu'; S.demo=false; S.upMsg=''; renderOverlay(); }
+  else if(a==='help'){ S.mode='help'; renderOverlay(); }
+  else if(a==='about'){ S.mode='about'; renderOverlay(); }
+  else if(a==='upgrade'){ S.mode='upgrade'; S.upMsg=''; renderOverlay(); }
+});
+ui.btnPause.addEventListener('click', ()=>{ initAudio(); if(S.demo){ S.mode='menu'; S.demo=false; renderOverlay(); } else togglePause(); });
+ui.btnSound.addEventListener('click', ()=>{ initAudio(); toggleMute(); });
+ui.jump.addEventListener('pointerdown', e=>{ e.stopPropagation(); if(S.mode==='play') tryJump(); });
+
+function togglePause(){
+  if(S.mode==='play'){ S.mode='pause'; renderOverlay(); }
+  else if(S.mode==='pause'){ S.mode='play'; renderOverlay(); }
+}
+function toggleMute(){
+  S.muted = !S.muted;
+  ui.btnSound.textContent = S.muted ? '✕' : '♪';
+  ui.btnSound.style.color = S.muted ? '#a0b6c9' : '#1b5a91';
+}
+
+/* ---------------- 输入 ---------------- */
+window.addEventListener('keydown', e=>{
+  const k = e.key.toLowerCase();
+  if(['arrowleft','arrowright','arrowup','arrowdown',' ','w','a','s','d','p','escape','enter','m'].includes(k)) e.preventDefault();
+  if(k==='arrowleft'||k==='a') S.keys.left = true;
+  if(k==='arrowright'||k==='d') S.keys.right = true;
+  if(k==='arrowdown'||k==='s') S.keys.down = true;
+  if(k===' '||k==='w'||k==='arrowup'){ if(S.mode==='play' && !S.demo) tryJump(); }
+  if(k==='p'||k==='escape'){
+    if(S.demo){ S.mode='menu'; S.demo=false; renderOverlay(); }
+    else if(S.mode==='help'||S.mode==='about'||S.mode==='upgrade'){ S.mode='menu'; renderOverlay(); }
+    else togglePause();
+  }
+  if(k==='m') toggleMute();
+  if(k==='enter'){
+    initAudio();
+    if(S.mode==='menu') startGame(false);
+    else if(S.mode==='over') startGame(S.demo);
+    else if(S.mode==='pause'){ S.mode='play'; renderOverlay(); }
+  }
+});
+window.addEventListener('keyup', e=>{
+  const k = e.key.toLowerCase();
+  if(k==='arrowleft'||k==='a') S.keys.left = false;
+  if(k==='arrowright'||k==='d') S.keys.right = false;
+  if(k==='arrowdown'||k==='s') S.keys.down = false;
+});
+canvas.addEventListener('pointerdown', e=>{
+  if(S.mode!=='play' || S.demo) return;
+  initAudio();
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left)/r.width * W;
+  S.pointerDir = x < W/2 ? -1 : 1;
+  S.pointerStart = { t:performance.now(), x:e.clientX, y:e.clientY };
+  try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
+});
+canvas.addEventListener('pointerup', e=>{
+  S.pointerDir = 0;
+  if(S.pointerStart){
+    const dt = performance.now() - S.pointerStart.t;
+    const mv = Math.hypot(e.clientX-S.pointerStart.x, e.clientY-S.pointerStart.y);
+    if(dt < 200 && mv < 14 && S.mode==='play' && !S.demo) tryJump();
+  }
+  S.pointerStart = null;
+});
+canvas.addEventListener('pointercancel', ()=>{ S.pointerDir=0; S.pointerStart=null; });
+
+/* ---------------- 游戏流程 ---------------- */
+function startGame(demo){
+  initAudio();
+  S.demo = demo; S.mode = 'play';
+  S.time = 0; S.progress = 0; S.speed = 0.42;
+  S.distance = 0; S.score = S.up.board*120; S.combo = 0; S.maxCombo = 0; S.mult = 1;
+  S.lives = 3 + (S.up.board >= 3 ? 1 : 0); S.invuln = 0; S.jumpTime = 0; S.jumpH = 0;
+  S.playerLane = 0; S.lean = 0; S.ai.targetLane = 0;
+  S.keys.left = S.keys.right = S.keys.down = false; S.pointerDir = 0;
+  S.entities = []; S.particles = []; S.spawnT = 0.32; S.mistT = 0;
+  S.shake = 0; S.flash = 0;
+  S.buffs = { shield:Math.floor(S.up.shield/2), magnet:0, boost:0, slow:0 };
+  S.temp = {shield:0,magnet:0,boost:0,slow:0};
+  S.earned = 0;
+  S.stats = {flakes:0,gates:0,hits:0,jumps:0};
+  S.coach = {skill:0.55, diff:0.22, tipT:3.2, msgT:0, lastBad:-99, lastGood:-99};
+  S.newRecord = false; S.verdict = null;
+  resetSnow();
+  const gear = UP_KEYS.filter(k => S.up[k] > 0).length;
+  showCoach(demo ? 'AI 已接管滑板，正在自动选线。当前雪具等级同样会在演示中生效。'
+                 : (gear > 0 ? '雪具已装配：' + gear + ' 件升级装备本局生效，眼睛看前方！'
+                             : '欢迎来到雪岭！收集雪花币，去雪具工坊升级道具吧。'));
+  renderOverlay();
+  updateHUD();
+}
+function gameOver(){
+  S.mode = 'over';
+  S.verdict = buildVerdict();
+  S.newRecord = saveBest();
+  awardCoins();
+  sfx.over();
+  renderOverlay();
+}
+function tryJump(){
+  if(S.jumpTime <= 0 && S.mode==='play'){
+    S.jumpTime = 0.001; sfx.jump();
+    const p = project(S.playerLane, PT);
+    for(let i=0;i<8;i++){
+      addParticle(p.x + rand(-18,18), p.y + rand(-2,10),
+        rand(-90,-20), rand(25,80), '#ffffff', rand(2,5), .45);
+    }
+  }
+}
+function addParticle(x,y,vx,vy,color,size,life){
+  S.particles.push({x,y,vx,vy,color,size,life,max:life});
+}
+function applyBuff(kind){
+  // 同一局重复拾取同一道具 -> 本局临时强化（最多 +2 级），与永久等级叠加
+  S.temp[kind] = Math.min(2, (S.temp[kind]||0) + 1);
+  const lv = effLv(kind);
+  if(kind === 'shield') S.buffs.shield += 1 + lv;
+  else if(kind === 'magnet') S.buffs.magnet = 4 + lv*1.4;
+  else if(kind === 'boost') S.buffs.boost = 4 + lv*0.9;
+  else if(kind === 'slow') S.buffs.slow = 4 + lv*0.9;
+  const names = {shield:'护盾强化', magnet:'磁铁强化', boost:'冲刺强化', slow:'缓行强化'};
+  showToast(names[kind] + ' Lv' + lv + '！');
+  sfx.power();
+  coachEvent('good');
+}
+function mult(){ return S.mult; }
+function addCombo(n){
+  S.combo += n;
+  S.maxCombo = Math.max(S.maxCombo, S.combo);
+  S.mult = clamp(1 + Math.floor(S.combo/8)*0.5, 1, 3);
+}
+
+/* ---------------- 赛道生成（程序化 AI） ---------------- */
+const LANES = [-0.78,-0.39,0,0.39,0.78];
+function spawnGroup(){
+  const d = S.coach.diff;
+  const r = Math.random();
+  const t = -0.03;
+  if(r < 0.30){
+    // 雪花串：沿一条平滑曲线铺开，引导走线
+    const n = 3 + Math.floor(Math.random()*4);
+    const base = LANES[Math.floor(Math.random()*LANES.length)];
+    const drift = rand(-0.30,0.30);
+    for(let i=0;i<n;i++){
+      S.entities.push({ type:'flake', lane:clamp(base + drift*(i/n), -0.9, 0.9),
+        t: t - i*0.055, prevT:t - i*0.055, w:0.11, spin:Math.random()*6, checked:false });
+    }
+  }else if(r < 0.54){
+    // 旗门
+    const lane = rand(-0.55,0.55);
+    S.entities.push({ type:'gate', lane, t, prevT:t, w:0.26, checked:false });
+    // 旗门后跟一串雪花作为奖励
+    for(let i=0;i<3;i++){
+      S.entities.push({ type:'flake', lane:clamp(lane+rand(-0.1,0.1),-0.9,0.9),
+        t:t-0.10-i*0.05, prevT:t-0.10-i*0.05, w:0.11, spin:Math.random()*6, checked:false });
+    }
+  }else if(r < 0.62){
+    // 道具
+    const kinds = ['shield','magnet','boost','slow'];
+    S.entities.push({ type:'gift', kind:kinds[Math.floor(Math.random()*kinds.length)],
+      lane:LANES[Math.floor(Math.random()*LANES.length)], t, prevT:t, w:0.11, checked:false });
+  }else{
+    // 障碍组：数量随难度增长，但强制留出空档
+    const count = 1 + (Math.random() < 0.35 + d*0.45 ? 1 : 0) + (Math.random() < d*0.30 ? 1 : 0);
+    const pool = LANES.slice(); 
+    const chosen = [];
+    for(let i=0;i<count && pool.length;i++){
+      const idx = Math.floor(Math.random()*pool.length);
+      chosen.push(pool.splice(idx,1)[0]);
+    }
+    // 若三条都占满中间区域，删掉一个保证通路
+    if(chosen.length >= 3 && Math.random()<0.75) chosen.pop();
+    const types = ['tree','rock','snowman','mound','crevasse','ice'];
+    const info = {
+      tree:{w:0.105,low:false}, rock:{w:0.095,low:false}, snowman:{w:0.09,low:false},
+      mound:{w:0.13,low:true}, crevasse:{w:0.19,low:true}, ice:{w:0.16,low:true}
+    };
+    chosen.forEach((lane,i)=>{
+      let tp = types[Math.floor(Math.random()*types.length)];
+      if(Math.random()<0.22) tp = 'mound';
+      const cfg = info[tp];
+      S.entities.push({ type:tp, lane:clamp(lane+rand(-0.05,0.05),-0.92,0.92),
+        t:t - i*rand(0.01,0.06), prevT:t - i*rand(0.01,0.06), w:cfg.w, low:cfg.low,
+        soft:tp==='ice', seed:Math.random()*10, checked:false });
+    });
+    // 在障碍旁边补几片雪花，形成"风险 / 收益"选择
+    if(Math.random()<0.55){
+      const free = LANES.find(l => chosen.every(c => Math.abs(c-l) > 0.30)) || 0;
+      for(let i=0;i<3;i++){
+        S.entities.push({ type:'flake', lane:free, t:t-0.05-i*0.05,
+          prevT:t-0.05-i*0.05, w:0.11, spin:Math.random()*6, checked:false });
+      }
+    }
+  }
+}
+function nextGap(){
+  const d = S.coach.diff;
+  return clamp(0.36 - d*0.11 + rand(-0.035,0.075), 0.19, 0.46);
+}
+
+/* ---------------- 碰撞结算 ---------------- */
+function resolveEntity(e){
+  const dl = Math.abs(e.lane - S.playerLane);
+  const magnet = S.buffs.magnet > 0;
+  if(e.type === 'flake'){
+    if(dl < e.w + (magnet ? 0.42 + effLv('magnet')*0.055 : 0.085)){
+      S.score += 50*mult(); addCombo(1); S.stats.flakes++;
+      sfx.collect(); showToast('+' + Math.round(50*mult()));
+      burst(e, '#ffd45e', 10); coachEvent('good');
+    }
+    return;
+  }
+  if(e.type === 'gift'){
+    if(dl < e.w + 0.10){ applyBuff(e.kind); burst(e, '#ff9a52', 14); }
+    return;
+  }
+  if(e.type === 'gate'){
+    if(dl < 0.245){
+      S.score += 200*mult(); addCombo(2); S.stats.gates++;
+      sfx.gate(); showToast('旗门 +' + Math.round(200*mult()));
+      burst(e, '#ff6b5b', 18); coachEvent('great');
+    }else{
+      showToast('错过旗门');
+    }
+    return;
+  }
+  // 障碍物
+  if(dl >= e.w + 0.055) return;
+  if(e.low && S.jumpH > 0.42){
+    S.score += 30*mult(); S.stats.jumps++; addCombo(1);
+    showToast('漂亮！+' + Math.round(30*mult()));
+    burst(e, '#ffffff', 10); coachEvent('great');
+    return;
+  }
+  if(e.soft){
+    // 冰面：不打滑掉血，只轻微扰动
+    S.lean += rand(-0.5,0.5); burst(e, '#bfe9ff', 6);
+    return;
+  }
+  if(S.buffs.shield > 0){
+    S.buffs.shield--; S.invuln = 0.7;
+    showToast('护盾抵挡！剩余 ×' + S.buffs.shield); burst(e, '#c9a5ff', 18); sfx.power();
+    coachEvent('good'); return;
+  }
+  if(S.invuln > 0){ burst(e, '#ffffff', 6); return; }
+  // 真实碰撞
+  S.lives--; S.combo = 0; S.mult = 1; S.stats.hits++;
+  S.invuln = 1.35; S.shake = 1; S.flash = 1;
+  S.buffs.slow = Math.max(S.buffs.slow, 0.9);
+  sfx.hit(); showToast('撞到了！'); burst(e, '#ffffff', 22);
+  coachEvent('bad');
+  if(S.lives <= 0){
+    if(S.demo){ S.lives = 3; S.invuln = 1.2; showToast('AI 演示 · 自动复位'); }
+    else gameOver();
+  }
+}
+function burst(e, color, n){
+  const p = project(e.lane, PT);
+  for(let i=0;i<n;i++){
+    addParticle(p.x + rand(-12,12), p.y - rand(0,26),
+      rand(-150,150), rand(-170,40), color, rand(2,6), rand(.3,.75));
+  }
+}
+
+/* ---------------- AI 自动演示 ---------------- */
+function updateAI(dt){
+  const cands = [-0.86,-0.62,-0.38,-0.14,0.14,0.38,0.62,0.86];
+  let bestLane = S.playerLane, bestVal = -1e9;
+  for(const L of cands){
+    let v = -Math.abs(L - S.playerLane)*2.2;
+    for(const e of S.entities){
+      const d = e.t - PT;
+      if(d < 0.015 || d > 0.52) continue;
+      const w = 1 - d/0.52;
+      if(e.type==='flake'){ if(Math.abs(L-e.lane) < 0.20) v += 3.2*w; }
+      else if(e.type==='gift'){ if(Math.abs(L-e.lane) < 0.22) v += 6*w; }
+      else if(e.type==='gate'){ if(Math.abs(L-e.lane) < 0.21) v += 16*w; }
+      else if(!e.soft){
+        if(Math.abs(L-e.lane) < e.w + 0.15) v -= 16*w;
+      }
+    }
+    v += (Math.random()-0.5)*0.15;
+    if(v > bestVal){ bestVal = v; bestLane = L; }
+  }
+  S.ai.targetLane = bestLane;
+  S.playerLane += (bestLane - S.playerLane) * Math.min(1, dt*4.6);
+  S.lean = clamp((bestLane - S.playerLane)*1.6, -1, 1);
+  // 自动跳跃：来不及变道时越过矮障碍
+  if(S.jumpTime <= 0){
+    for(const e of S.entities){
+      const d = e.t - PT;
+      if(d > 0.01 && d < 0.13 && e.low && !e.soft &&
+         Math.abs(e.lane - S.playerLane) < e.w + 0.13){ tryJump(); break; }
+    }
+  }
+}
+
+/* ---------------- 更新 ---------------- */
+function update(dt){
+  S.time += dt;
+  // 速度：基础随距离增长 + AI 难度 + 道具 + 下蹲加速
+  let sp = 0.40 + Math.min(0.30, S.distance/6500);
+  sp *= (1 + 0.20*S.coach.diff);
+  if(S.buffs.boost > 0) sp *= 1.28 + effLv('boost')*0.035;
+  if(S.buffs.slow > 0) sp *= 0.76 - effLv('slow')*0.025;
+  if(S.keys.down) sp *= 1.16;
+  S.speed = sp;
+  S.progress += sp*dt;
+  S.distance += sp*dt*92;
+  S.score += sp*dt*22*mult();
+
+  // 护盾按「剩余层数」计，不参与倒计时
+  for(const k of ['magnet','boost','slow']){
+    if(S.buffs[k] > 0) S.buffs[k] = Math.max(0, S.buffs[k] - dt);
+  }
+  if(S.invuln > 0) S.invuln -= dt;
+  S.shake = Math.max(0, S.shake - dt*2.6);
+  S.flash = Math.max(0, S.flash - dt*2.2);
+
+  // 跳跃
+  if(S.jumpTime > 0){
+    S.jumpTime += dt;
+    const D = 0.74;
+    if(S.jumpTime >= D){ S.jumpTime = 0; S.jumpH = 0; }
+    else S.jumpH = Math.sin(Math.PI * S.jumpTime / D);
+  }
+
+  // 横向移动
+  if(S.demo){
+    updateAI(dt);
+  }else{
+    let dir = 0;
+    if(S.keys.left) dir -= 1;
+    if(S.keys.right) dir += 1;
+    dir += S.pointerDir;
+    dir = clamp(dir,-1,1);
+    const prev = S.playerLane;
+    S.playerLane = clamp(S.playerLane + dir*(1.55 + S.up.board*0.12)*dt, -0.92, 0.92);
+    S.lean = lerp(S.lean, clamp(dir,-1,1), Math.min(1,dt*8));
+    if(Math.abs(S.playerLane-prev) > 0.001 && Math.random()<0.3) S.mistT -= dt;
+  }
+
+  // 实体推进与碰撞（用跨越 PT 判定，稳定不受帧率影响）
+  const alive = [];
+  for(const e of S.entities){
+    e.prevT = e.t;
+    e.t += sp*dt;
+    if(e.spin !== undefined) e.spin += dt*2.2;
+    if(e.t < PT && e.prevT < PT){ /* 尚未到达 */ }
+    if(e.prevT < PT && e.t >= PT && !e.checked){
+      e.checked = true;
+      resolveEntity(e);
+    }
+    if(e.t < 1.18 && S.mode==='play') alive.push(e);
+  }
+  S.entities = alive;
+
+  // 生成
+  S.spawnT -= sp*dt;
+  if(S.spawnT <= 0){ spawnGroup(); S.spawnT = nextGap(); }
+
+  // 脚下雪雾
+  S.mistT -= dt;
+  if(S.mistT <= 0){
+    S.mistT = 0.045;
+    const p = project(S.playerLane, PT);
+    for(let i=0;i<2;i++){
+      addParticle(p.x + rand(-18,18) - S.lean*10, p.y + rand(0,12),
+        rand(-55,55) - S.lean*40, rand(-90,-25), 'rgba(255,255,255,0.95)', rand(3,8), rand(.35,.7));
+    }
+  }
+
+  updateParticles(dt);
+  updateSnow(dt, 1);
+  updateCoach(dt);
+  updateHUD();
+}
+function updateParticles(dt){
+  const out = [];
+  for(const p of S.particles){
+    p.life -= dt;
+    if(p.life <= 0) continue;
+    p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 130*dt;
+    out.push(p);
+  }
+  S.particles = out;
+}
+function updateSnow(dt, mul){
+  for(const f of S.snow){
+    f.y += (f.spd + S.speed*46*mul)*dt;
+    f.x += f.drift*dt;
+    if(f.y > H+8){ f.y = -8; f.x = Math.random()*W; }
+    if(f.x < -8) f.x = W+8;
+    if(f.x > W+8) f.x = -8;
+  }
+}
+
+/* ---------------- 绘制 ---------------- */
+function drawCloud(x,y,s){
+  ctx.fillStyle = 'rgba(255,255,255,0.62)';
+  ctx.beginPath();
+  ctx.ellipse(x,y,46*s,15*s,0,0,7);
+  ctx.ellipse(x-26*s,y+5*s,30*s,12*s,0,0,7);
+  ctx.ellipse(x+28*s,y+4*s,34*s,13*s,0,0,7);
+  ctx.ellipse(x+4*s,y-10*s,28*s,16*s,0,0,7);
+  ctx.fill();
+}
+function drawSky(){
+  const g = ctx.createLinearGradient(0,0,0,HORIZON);
+  g.addColorStop(0,'#8ec9ef'); g.addColorStop(.55,'#c6e5f8'); g.addColorStop(1,'#f4fbff');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,HORIZON);
+  const sx = W*0.76 - S.curve*24, sy = HORIZON*0.34;
+  const sg = ctx.createRadialGradient(sx,sy,3,sx,sy,120);
+  sg.addColorStop(0,'rgba(255,251,226,.95)');
+  sg.addColorStop(.22,'rgba(255,246,208,.55)');
+  sg.addColorStop(1,'rgba(255,246,208,0)');
+  ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx,sy,120,0,7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,253,238,.92)'; ctx.beginPath(); ctx.arc(sx,sy,25,0,7); ctx.fill();
+  for(let i=0;i<4;i++){
+    const x = ((i*203 + S.progress*7) % (W+300)) - 150;
+    drawCloud(x, 62 + (i%3)*36, 0.75 + (i%2)*0.3);
+  }
+}
+function ridge(baseY, amp, color, seed){
+  const pts = [];
+  for(let x=-60;x<=W+60;x+=22){
+    const y = baseY - amp*(0.48 + 0.52*Math.sin(x*0.011 + seed))*(0.85 + 0.15*Math.cos(x*0.028 + seed*1.7));
+    pts.push([x,y]);
+  }
+  ctx.beginPath(); ctx.moveTo(-60,HORIZON+18);
+  for(const p of pts) ctx.lineTo(p[0],p[1]);
+  ctx.lineTo(W+60,HORIZON+18); ctx.closePath();
+  ctx.fillStyle = color; ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.82)';
+  for(let i=1;i<pts.length-1;i++){
+    if(pts[i][1] < pts[i-1][1] && pts[i][1] < pts[i+1][1]){
+      const x = pts[i][0], y = pts[i][1];
+      ctx.beginPath(); ctx.moveTo(x,y);
+      ctx.lineTo(x-15,y+15); ctx.lineTo(x-5,y+10); ctx.lineTo(x+3,y+17);
+      ctx.lineTo(x+12,y+11); ctx.lineTo(x+17,y+16); ctx.lineTo(x,y);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+}
+function drawMountains(){
+  ridge(HORIZON-8, 96, '#b9d5ea', S.progress*0.06 + 0.4);
+  ridge(HORIZON+22, 66, '#d3e6f4', S.progress*0.10 + 2.1);
+}
+function drawGround(){
+  const g = ctx.createLinearGradient(0,HORIZON,0,H);
+  g.addColorStop(0,'#f7fcff'); g.addColorStop(.55,'#eaf6ff'); g.addColorStop(1,'#cfe7f9');
+  ctx.fillStyle = g; ctx.fillRect(0,HORIZON,W,GROUND+2);
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+  for(let i=0;i<18;i++){
+    const t = (i/18 + (S.progress*0.30 % 1)) % 1;
+    const y = HORIZON + t*GROUND;
+    ctx.globalAlpha = 0.10 + 0.22*t;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawFlag(x,y,color,s){
+  ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+  ctx.fillStyle = 'rgba(60,100,140,.35)';
+  ctx.beginPath(); ctx.ellipse(2,2,7,2.5,0,0,7); ctx.fill();
+  ctx.strokeStyle = '#f4f9ff'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-26); ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.moveTo(0,-26); ctx.lineTo(14,-21); ctx.lineTo(0,-16); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function drawRoad(){
+  const N = 36, left = [], right = [];
+  for(let i=0;i<=N;i++){
+    const t = 1.18*i/N, s = scaleF(t);
+    const cx = W/2 + S.curve*(PT-t)*260, half = W*0.42*s;
+    left.push([cx-half, HORIZON+t*GROUND]);
+    right.push([cx+half, HORIZON+t*GROUND]);
+  }
+  ctx.beginPath(); ctx.moveTo(left[0][0],left[0][1]);
+  for(const p of left) ctx.lineTo(p[0],p[1]);
+  for(let i=right.length-1;i>=0;i--) ctx.lineTo(right[i][0],right[i][1]);
+  ctx.closePath();
+  const rg = ctx.createLinearGradient(0,HORIZON,0,H);
+  rg.addColorStop(0,'#ffffff'); rg.addColorStop(.5,'#f6fcff'); rg.addColorStop(1,'#e1f1fd');
+  ctx.fillStyle = rg; ctx.fill();
+  ctx.strokeStyle = 'rgba(120,180,225,.55)'; ctx.lineWidth = 3;
+  ctx.beginPath(); left.forEach((p,i)=> i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.stroke();
+  ctx.beginPath(); right.forEach((p,i)=> i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.stroke();
+  // 旗标
+  for(let i=2;i<N;i+=3){
+    const t = 1.18*i/N, s = scaleF(t);
+    drawFlag(left[i][0], left[i][1], (i%6===0)?'#ff6b5b':'#3d8ed0', s*0.9);
+    drawFlag(right[i][0], right[i][1], (i%6===0)?'#ff6b5b':'#3d8ed0', s*0.9);
+  }
+  // 板痕
+  ctx.strokeStyle = 'rgba(150,195,230,.30)'; ctx.lineWidth = 2;
+  for(const lane of [-0.34,0.34]){
+    ctx.beginPath();
+    for(let i=0;i<=N;i++){
+      const t = 1.18*i/N, p = project(lane,t);
+      const wob = Math.sin(t*13 + S.progress*3)*4*scaleF(t);
+      i ? ctx.lineTo(p.x+wob,p.y) : ctx.moveTo(p.x+wob,p.y);
+    }
+    ctx.stroke();
+  }
+}
+function drawPine(x,y,s,seed){
+  const h = 96*s, w = 48*s;
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle = 'rgba(45,90,135,.18)';
+  ctx.beginPath(); ctx.ellipse(0,2,w*0.55,7*s,0,0,7); ctx.fill();
+  ctx.fillStyle = '#6b4a30';
+  ctx.fillRect(-3.5*s, -h*0.22, 7*s, h*0.24);
+  const cols = ['#2c6a58','#31775f','#37836a'];
+  for(let k=0;k<3;k++){
+    const by = -h*0.06 - k*h*0.27, ww = w*(1-k*0.22), top = by - h*0.44;
+    ctx.fillStyle = cols[k];
+    ctx.beginPath(); ctx.moveTo(0,top); ctx.lineTo(-ww/2,by); ctx.lineTo(ww/2,by); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    ctx.beginPath(); ctx.moveTo(0,top); ctx.lineTo(-ww*0.20,top+h*0.14);
+    ctx.lineTo(-ww*0.05,top+h*0.10); ctx.lineTo(ww*0.10,top+h*0.16);
+    ctx.lineTo(ww*0.22,top+h*0.11); ctx.lineTo(0,top); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawRock(x,y,s,seed){
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle = 'rgba(45,90,135,.18)';
+  ctx.beginPath(); ctx.ellipse(0,1,30*s,7*s,0,0,7); ctx.fill();
+  ctx.fillStyle = '#7f9ab0';
+  ctx.beginPath(); ctx.moveTo(-26*s,0); ctx.lineTo(-20*s,-26*s); ctx.lineTo(-4*s,-34*s);
+  ctx.lineTo(18*s,-27*s); ctx.lineTo(26*s,0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  ctx.beginPath(); ctx.moveTo(-20*s,-26*s); ctx.lineTo(-4*s,-34*s); ctx.lineTo(18*s,-27*s);
+  ctx.lineTo(9*s,-22*s); ctx.lineTo(-3*s,-27*s); ctx.lineTo(-14*s,-21*s); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function drawSign(x,y,s){
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle = '#eaf4fb'; ctx.fillRect(-2*s,-46*s,4*s,46*s);
+  ctx.fillStyle = '#ff8a4c'; roundRect(-17*s,-60*s,34*s,18*s,4*s); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = 'bold '+(11*s)+'px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('SNOW',0,-51*s);
+  ctx.restore();
+}
+function drawDecos(){
+  const list = S.decos.map(d=>({d, t:(d.t0+S.progress)%1.2})).sort((a,b)=>a.t-b.t);
+  for(const it of list){
+    const t = it.t, d = it.d;
+    if(t < 0 || t > 1.15) continue;
+    const p = project(d.lane, t);
+    if(p.x < -140 || p.x > W+140) continue;
+    if(d.type==='tree') drawPine(p.x,p.y,p.s,d.seed);
+    else if(d.type==='rock') drawRock(p.x,p.y,p.s,d.seed);
+    else drawSign(p.x,p.y,p.s);
+  }
+}
+function drawSnowflake(x,y,r,spin,color){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(spin||0);
+  ctx.strokeStyle = color||'#ffd45e'; ctx.lineWidth = Math.max(1.4,r*0.16); ctx.lineCap='round';
+  for(let i=0;i<6;i++){
+    ctx.rotate(Math.PI/3);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-r); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-r*0.62); ctx.lineTo(r*0.22,-r*0.78); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-r*0.62); ctx.lineTo(-r*0.22,-r*0.78); ctx.stroke();
+  }
+  ctx.fillStyle = '#fff8dc'; ctx.beginPath(); ctx.arc(0,0,r*0.24,0,7); ctx.fill();
+  ctx.restore();
+}
+function drawGate(e,p){
+  const a = project(e.lane-0.27,e.t), b = project(e.lane+0.27,e.t);
+  for(const [q,col] of [[a,'#ff6b5b'],[b,'#3d8ed0']]){
+    const hh = 74*q.s;
+    ctx.save(); ctx.translate(q.x,q.y);
+    ctx.fillStyle = 'rgba(40,90,140,.18)';
+    ctx.beginPath(); ctx.ellipse(0,1,7*q.s,3*q.s,0,0,7); ctx.fill();
+    const g = ctx.createLinearGradient(0,0,0,-hh);
+    g.addColorStop(0,'#dfeef9'); g.addColorStop(1,'#ffffff');
+    ctx.fillStyle = g; ctx.fillRect(-3*q.s,-hh,6*q.s,hh);
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(0,-hh); ctx.lineTo(26*q.s,-hh+8*q.s);
+    ctx.lineTo(0,-hh+17*q.s); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2;
+  ctx.setLineDash([6,8]);
+  ctx.beginPath(); ctx.moveTo(a.x,a.y-60*a.s); ctx.lineTo(b.x,b.y-60*b.s); ctx.stroke();
+  ctx.setLineDash([]);
+}
+function drawEntity(e,p){
+  const s = p.s, x = p.x, y = p.y;
+  if(e.type==='flake'){
+    drawSnowflake(x, y-26*s, 17*s, e.spin);
+    return;
+  }
+  if(e.type==='gate'){ drawGate(e,p); return; }
+  if(e.type==='gift'){
+    ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle='rgba(40,90,140,.18)'; ctx.beginPath(); ctx.ellipse(0,2,20*s,6*s,0,0,7); ctx.fill();
+    const col = {shield:'#a97ae0',magnet:'#ef739b',boost:'#ff9a52',slow:'#4bb8ae'}[e.kind];
+    ctx.fillStyle=col; roundRect(-19*s,-40*s,38*s,38*s,7*s); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.85)'; ctx.fillRect(-19*s,-24*s,38*s,6*s); ctx.fillRect(-3*s,-40*s,6*s,38*s);
+    ctx.fillStyle='#fff'; ctx.font='bold '+(17*s)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText({shield:'盾',magnet:'磁',boost:'速',slow:'缓'}[e.kind],0,-20*s);
+    ctx.restore(); return;
+  }
+  // 阴影
+  ctx.fillStyle='rgba(40,90,140,.16)';
+  ctx.beginPath(); ctx.ellipse(x,y+1,(e.type==='crevasse'?34:22)*s,7*s,0,0,7); ctx.fill();
+  if(e.type==='tree'){ drawPine(x,y,s*1.15,e.seed); return; }
+  if(e.type==='rock'){ drawRock(x,y,s*1.1,e.seed); return; }
+  if(e.type==='snowman'){
+    ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle='#fbfdff';
+    ctx.beginPath(); ctx.arc(0,-17*s,17*s,0,7); ctx.fill();
+    ctx.beginPath(); ctx.arc(0,-38*s,12*s,0,7); ctx.fill();
+    ctx.fillStyle='#2c4a66'; ctx.fillRect(-13*s,-56*s,26*s,5*s);
+    ctx.fillRect(-8*s,-66*s,16*s,11*s);
+    ctx.fillStyle='#ff9a52';
+    ctx.beginPath(); ctx.moveTo(0,-40*s); ctx.lineTo(11*s,-38*s); ctx.lineTo(0,-35*s); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#2c4a66';
+    ctx.beginPath(); ctx.arc(-4*s,-42*s,1.8*s,0,7); ctx.arc(4*s,-42*s,1.8*s,0,7); ctx.fill();
+    ctx.restore(); return;
+  }
+  if(e.type==='mound'){
+    ctx.save(); ctx.translate(x,y);
+    const g=ctx.createLinearGradient(0,-28*s,0,0);
+    g.addColorStop(0,'#ffffff'); g.addColorStop(1,'#dceefa');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(0,0,30*s,21*s,0,Math.PI,0); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.9)';
+    ctx.beginPath(); ctx.ellipse(-8*s,-8*s,11*s,6*s,0,Math.PI,0); ctx.fill();
+    ctx.restore(); return;
+  }
+  if(e.type==='crevasse'){
+    ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle='#3f7fb8';
+    ctx.beginPath(); ctx.moveTo(-40*s,0); ctx.lineTo(-28*s,-6*s); ctx.lineTo(-12*s,-2*s);
+    ctx.lineTo(2*s,-8*s); ctx.lineTo(20*s,-3*s); ctx.lineTo(38*s,-6*s); ctx.lineTo(42*s,4*s);
+    ctx.lineTo(18*s,7*s); ctx.lineTo(-4*s,3*s); ctx.lineTo(-26*s,8*s); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#ffffff'; ctx.lineWidth=3*s;
+    ctx.beginPath(); ctx.moveTo(-40*s,0); ctx.lineTo(-28*s,-6*s); ctx.lineTo(-12*s,-2*s);
+    ctx.lineTo(2*s,-8*s); ctx.lineTo(20*s,-3*s); ctx.lineTo(38*s,-6*s); ctx.stroke();
+    ctx.restore(); return;
+  }
+  if(e.type==='ice'){
+    ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle='rgba(150,215,250,.72)';
+    roundRect(-30*s,-8*s,60*s,12*s,5*s); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.75)';
+    roundRect(-22*s,-6*s,26*s,3*s,2*s); ctx.fill();
+    ctx.restore(); return;
+  }
+}
+function drawEntities(){
+  const list = S.entities.slice().sort((a,b)=>a.t-b.t);
+  for(const e of list){
+    if(e.t < -0.05 || e.t > 1.15) continue;
+    drawEntity(e, project(e.lane,e.t));
+  }
+}
+function drawPlayer(){
+  const p = project(S.playerLane, PT);
+  const jump = S.jumpH;
+  const y = p.y - jump*82;
+  const s = p.s * (1 + jump*0.10);
+  // 影子
+  ctx.save(); ctx.globalAlpha = 0.22*(1-jump*0.5);
+  ctx.fillStyle = '#3b6d99';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y+7, 30*s*(1-jump*0.3), 9*s*(1-jump*0.3), 0, 0, 7);
+  ctx.fill(); ctx.restore();
+  // 无敌闪烁
+  if(S.invuln > 0 && Math.floor(S.time*14)%2===0) ctx.globalAlpha = 0.45;
+  ctx.save();
+  ctx.translate(p.x, y);
+  ctx.rotate(S.lean*0.20);
+  ctx.scale(s,s);
+  // 冲刺速度线
+  if(S.buffs.boost > 0){
+    ctx.strokeStyle='rgba(255,255,255,.75)'; ctx.lineWidth=2;
+    for(let i=-2;i<=2;i++){
+      ctx.beginPath(); ctx.moveTo(i*13, 26); ctx.lineTo(i*13, 26+rand(14,32)); ctx.stroke();
+    }
+  }
+  // 滑雪板
+  const ski = (dx,tilt,col)=>{
+    ctx.save(); ctx.translate(dx,6); ctx.rotate(tilt);
+    ctx.fillStyle=col; roundRect(-5,-24,10,42,5); ctx.fill();
+    ctx.fillStyle='#fff'; roundRect(-5,-24,10,6,3); ctx.fill();
+    ctx.restore();
+  };
+  ski(-12, -0.10 + S.lean*0.05, '#2b7fc4');
+  ski(12, 0.10 + S.lean*0.05, '#2b7fc4');
+  // 腿
+  ctx.fillStyle='#1f3a5f';
+  roundRect(-11,-26,9,26,4); ctx.fill();
+  roundRect(2,-26,9,26,4); ctx.fill();
+  // 身体
+  const bg = ctx.createLinearGradient(-18,-58,18,-22);
+  bg.addColorStop(0,'#3d97dc'); bg.addColorStop(1,'#1b5a91');
+  ctx.fillStyle=bg; roundRect(-18,-58,36,36,12); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.5)'; roundRect(-18,-40,36,5,2); ctx.fill();
+  // 手臂 + 雪杖
+  ctx.strokeStyle='#17497a'; ctx.lineWidth=7; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-16,-52); ctx.lineTo(-27,-33); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(16,-52); ctx.lineTo(27,-33); ctx.stroke();
+  ctx.strokeStyle='#8fb6d4'; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.moveTo(-27,-33); ctx.lineTo(-32,-4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(27,-33); ctx.lineTo(32,-4); ctx.stroke();
+  // 围巾
+  const wave = Math.sin(S.time*9)*4;
+  ctx.fillStyle='#ff7a45'; roundRect(-15,-62,30,10,5); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-12,-56); ctx.quadraticCurveTo(-24-wave,-48,-30-wave,-36);
+  ctx.lineTo(-22-wave,-37); ctx.quadraticCurveTo(-16,-50,-6,-54); ctx.closePath(); ctx.fill();
+  // 头
+  ctx.fillStyle='#ffe0bd'; ctx.beginPath(); ctx.arc(0,-73,13,0,7); ctx.fill();
+  // 帽子
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath(); ctx.arc(0,-76,14,Math.PI,0); ctx.lineTo(14,-72); ctx.lineTo(-14,-72); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#ff7a45'; roundRect(-15,-76,30,5,2); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,-90,5,0,7); ctx.fill();
+  // 护目镜
+  ctx.fillStyle='#7fd4ff'; roundRect(-11,-75,22,8,4); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.7)'; roundRect(-8,-74,7,3,1.5); ctx.fill();
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+function drawParticles(){
+  for(const p of S.particles){
+    ctx.globalAlpha = clamp(p.life/p.max,0,1);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawSnow(){
+  for(const f of S.snow){
+    ctx.globalAlpha = f.a;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(f.x,f.y,f.r,0,7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function draw(){
+  ctx.save();
+  if(S.shake > 0){
+    ctx.translate(rand(-1,1)*S.shake*9, rand(-1,1)*S.shake*9);
+  }
+  ctx.fillStyle = '#eaf6ff';
+  ctx.fillRect(-30,-30,W+60,H+60);
+  drawSky();
+  drawMountains();
+  drawGround();
+  drawRoad();
+  drawDecos();
+  drawEntities();
+  drawParticles();
+  drawPlayer();
+  drawSnow();
+  ctx.restore();
+  if(S.flash > 0){
+    ctx.fillStyle = 'rgba(255,120,110,'+(S.flash*0.30)+')';
+    ctx.fillRect(0,0,W,H);
+  }
+  if(S.mode==='play' && S.buffs.slow > 0.95){
+    ctx.fillStyle='rgba(120,200,220,.07)'; ctx.fillRect(0,0,W,H);
+  }
+}
+
+/* ---------------- 主循环 ---------------- */
+let last = performance.now();
+function loop(now){
+  const dt = Math.min((now-last)/1000, 0.05);
+  last = now;
+  S.curve = 0.55*Math.sin(S.progress*1.25) + 0.28*Math.sin(S.progress*0.47+1.3);
+  if(S.mode === 'play'){
+    update(dt);
+  }else{
+    S.progress += 0.055*dt;
+    updateSnow(dt, 0.35);
+    updateParticles(dt);
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+renderOverlay();
+setModeUI();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

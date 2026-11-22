@@ -1,0 +1,112 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>黄昏轮回 · 英灵试炼</title>
+<style>
+  html,body{margin:0;height:100%;background:#05070d;overflow:hidden;
+    font-family:"Microsoft YaHei","PingFang SC",sans-serif;color:#e8e0cc;
+    user-select:none;-webkit-user-select:none}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  canvas{background:#080c14;border-radius:4px;box-shadow:0 0 80px rgba(0,0,0,.9),0 0 0 1px #1c2438;
+    width:min(100vw, 177.78vh);height:auto;image-rendering:auto}
+  .ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 40%,rgba(20,30,50,.92),rgba(4,6,11,.97));
+    z-index:10;text-align:center;padding:20px;box-sizing:border-box}
+  .ov h1{font-size:44px;margin:0 0 6px;letter-spacing:8px;color:#d8ae42;
+    text-shadow:0 0 30px rgba(216,174,66,.35)}
+  .ov h2{font-size:20px;font-weight:400;color:#8f97a8;margin:0 0 26px;letter-spacing:3px}
+  .ov p{color:#a8b0c0;font-size:15px;line-height:1.9;margin:4px 0}
+  .key{display:inline-block;border:1px solid #39445c;border-radius:4px;padding:1px 7px;margin:0 3px;
+    color:#d8ae42;font-size:13px;background:#121a2a}
+  .btn{margin-top:26px;padding:12px 46px;font-size:18px;letter-spacing:4px;cursor:pointer;
+    color:#0b0f18;background:linear-gradient(180deg,#e6c866,#b8932f);border:none;border-radius:3px;
+    font-family:inherit;transition:.15s}
+  .btn:hover{filter:brightness(1.12);transform:translateY(-1px)}
+  .btn:active{transform:translateY(1px)}
+  .small{font-size:13px;color:#5f6a80;margin-top:20px;letter-spacing:1px}
+  .stat{color:#d8ae42}
+  .hidden{display:none!important}
+  .chap{font-size:13px;letter-spacing:8px;color:#8a6a2a;margin-bottom:14px}
+  .alt{cursor:pointer;font-size:15px;color:#e6c866;border:1px solid #6a5418;
+    background:rgba(216,174,66,.08);padding:7px 18px;border-radius:4px;transition:.15s}
+  .alt:hover{background:rgba(216,174,66,.2)}
+  .skip{cursor:pointer;font-size:13px;color:#7f8798;text-decoration:underline}
+  .bless-row{display:flex;gap:26px;margin:6px 0 18px}
+  .bless-card{width:190px;cursor:pointer;transition:.15s;border-radius:4px;overflow:hidden}
+  .bless-card:hover{transform:translateY(-8px);filter:brightness(1.12)}
+  .bless-card img{width:100%;display:block;border:1px solid #6a5418;border-radius:3px}
+  .bless-card .bn{font-size:15px;color:#e8dcc0;margin-top:8px;font-weight:bold}
+  .bless-card .bd{font-size:12px;color:#9aa2b4;margin-top:3px;line-height:1.5}
+  .row{display:flex;gap:26px;margin-top:14px}
+  .col{text-align:left}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game" width="960" height="540"></canvas></div>
+
+<div id="ovTitle" class="ov">
+  <h1>黄昏轮回</h1>
+  <h2>英 灵 试 炼</h2>
+  <p><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> 移动　
+     <span class="key">鼠标</span> 瞄准　<span class="key">左键</span>/<span class="key">J</span> 攻击</p>
+  <p><span class="key">空格</span> 冲刺（无敌帧）　<span class="key">E</span> 拾取武器　<span class="key">1</span><span class="key">2</span><span class="key">3</span><span class="key">4</span> 换武器　
+     <span class="key">ESC</span> 暂停</p>
+  <p style="margin-top:18px;color:#7f8798">诸神黄昏已经重复了一千次。你是第 1001 个被叫醒的英灵。</p>
+  <button class="btn" id="btnStart">开 始 试 炼</button>
+  <div class="small" id="metaLine"></div>
+  <div class="small" style="margin-top:6px;color:#5f6a80">想直接看 BOSS 战：点「开始试炼」→「▶ 直接挑战 BOSS」</div>
+</div>
+
+<div id="ovIntro" class="ov hidden">
+  <div class="chap" id="introTag">序 章</div>
+  <h1 id="introTitle" style="font-size:34px;letter-spacing:4px">轮 回</h1>
+  <p id="introText" style="max-width:620px;font-size:17px;line-height:2.1;color:#c9cfdc"></p>
+  <button class="btn" id="btnIntroNext">继 续</button>
+  <div style="margin-top:16px;display:flex;gap:18px;align-items:center">
+    <span id="btnIntroBoss" class="alt">▶ 直接挑战 BOSS</span>
+    <span id="btnIntroSkip" class="skip">跳过序章</span>
+  </div>
+</div>
+
+<div id="ovBless" class="ov hidden">
+  <div class="chap">诸 神 的 祝 福</div>
+  <h2 style="margin-bottom:18px">选一位神，接下他的馈赠</h2>
+  <div id="blessRow" class="bless-row"></div>
+  <div class="small">点击卡牌领取 · 祝福会一直带到这一局结束</div>
+</div>
+
+<div id="ovPause" class="ov hidden">
+  <h1 style="font-size:32px">暂 停</h1>
+  <p>按 <span class="key">ESC</span> 继续</p>
+</div>
+
+<div id="ovDead" class="ov hidden">
+  <h1 style="font-size:34px;color:#c25b4e">你 死 了</h1>
+  <h2 id="deadSub">英灵殿的蜜酒又灌了一次</h2>
+  <div class="row">
+    <div class="col"><p>击杀　<span class="stat" id="dKills">0</span></p><p>用时　<span class="stat" id="dTime">0</span></p></div>
+    <div class="col"><p>受伤　<span class="stat" id="dHits">0</span></p><p>抵达　<span class="stat" id="dRoom">-</span></p></div>
+  </div>
+  <button class="btn" id="btnRetry">再 来 一 次</button>
+  <div class="small" id="deadMeta"></div>
+</div>
+
+<div id="ovWin" class="ov hidden">
+  <h1 style="color:#e6c866">黄 昏 落 定</h1>
+  <h2>你走完了这一轮，但线还在</h2>
+  <div class="row">
+    <div class="col"><p>击杀　<span class="stat" id="wKills">0</span></p><p>用时　<span class="stat" id="wTime">0</span></p></div>
+    <div class="col"><p>受伤　<span class="stat" id="wHits">0</span></p><p>命运　<span class="stat" id="wFate">-</span></p></div>
+  </div>
+  <button class="btn" id="btnAgain">再 织 一 次</button>
+</div>
+
+<script src="game.js?v=3"></script>
+</body>
+</html>
+
+
+
+

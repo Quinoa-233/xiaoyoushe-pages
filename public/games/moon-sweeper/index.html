@@ -1,0 +1,2165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>月面清道夫 · Moon Sweeper</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{
+    --ink:#242A31; --ink2:#5D6572; --ink3:#8B93A0;
+    --cream:#FBF8F0; --line:rgba(36,42,49,.10);
+    --gold:#D99B34; --gold-d:#B87F22; --teal:#2F8C86; --rust:#D9663F;
+  }
+  html,body{height:100%;overflow:hidden;background:#E6E2D8;
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",-apple-system,"Segoe UI",sans-serif;
+    color:var(--ink);font-feature-settings:"tnum";}
+  body{display:flex;align-items:center;justify-content:center;}
+  #stage{position:absolute;left:50%;top:50%;width:1280px;height:720px;border-radius:20px;overflow:hidden;
+    box-shadow:0 40px 90px rgba(40,45,55,.28), 0 2px 0 rgba(255,255,255,.6) inset;
+    transform-origin:center center;background:#EDEAE1;
+    transform:translate(-50%,-50%) scale(1);}
+  canvas{display:block;width:1280px;height:720px;touch-action:none;}
+
+  /* ---------- HUD ---------- */
+  #hud{position:absolute;inset:0;pointer-events:none;z-index:10;}
+  .card{background:rgba(251,248,240,.86);backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,.8);border-radius:16px;
+    box-shadow:0 8px 26px rgba(50,55,65,.12), 0 1px 0 rgba(255,255,255,.9) inset;}
+  #hudLeft{position:absolute;left:22px;top:20px;padding:12px 16px 12px 14px;width:352px;}
+  .row{display:flex;align-items:center;gap:10px;}
+  .row+.row{margin-top:9px;}
+  .lab{font-size:12px;letter-spacing:.08em;color:var(--ink2);width:44px;flex:0 0 44px;font-weight:600;}
+  .bar{position:relative;flex:1;height:11px;border-radius:6px;background:rgba(36,42,49,.10);overflow:hidden;}
+  .bar i{position:absolute;left:0;top:0;bottom:0;width:0%;border-radius:6px;
+    background:#2F8C86;transition:width .14s linear,background .3s;}
+  .val{font-size:12px;font-weight:700;color:var(--ink);width:44px;text-align:right;flex:0 0 44px;}
+
+  #hudRight{position:absolute;right:22px;top:20px;padding:10px 16px;display:flex;align-items:center;gap:14px;}
+  .goldbox{display:flex;align-items:center;gap:7px;font-size:16px;font-weight:800;color:var(--gold-d);}
+  .coin{width:17px;height:17px;border-radius:5px;background:linear-gradient(145deg,#F0C063,#D08F26);
+    box-shadow:0 1px 2px rgba(150,100,10,.4), 0 0 0 1px rgba(180,120,20,.35) inset;}
+  .divline{width:1px;height:22px;background:var(--line);}
+  .sector{font-size:13px;font-weight:700;color:var(--ink2);}
+  .sector b{color:var(--ink);font-size:16px;}
+
+  #hudMid{position:absolute;left:50%;top:22px;transform:translateX(-50%);display:flex;gap:8px;pointer-events:auto;}
+  .mini{pointer-events:auto;cursor:pointer;border:1px solid rgba(255,255,255,.85);border-radius:11px;
+    background:rgba(251,248,240,.86);backdrop-filter:blur(10px);color:var(--ink2);
+    font-size:12.5px;font-weight:700;padding:8px 14px;font-family:inherit;
+    box-shadow:0 6px 18px rgba(50,55,65,.10);transition:.16s;}
+  .mini:hover{color:var(--ink);transform:translateY(-1px);box-shadow:0 10px 22px rgba(50,55,65,.16);}
+
+  #hint{position:absolute;left:24px;bottom:22px;font-size:12.5px;color:#6B7280;
+    background:rgba(251,248,240,.7);padding:7px 13px;border-radius:10px;
+    border:1px solid rgba(255,255,255,.7);transition:opacity .6s;}
+  #sectorTag{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);
+    font-size:12px;letter-spacing:.22em;color:#8A8F98;font-weight:700;}
+
+  #boostBtn{position:absolute;right:26px;bottom:24px;width:100px;height:100px;border-radius:50%;
+    border:1px solid rgba(255,255,255,.9);background:rgba(251,248,240,.9);backdrop-filter:blur(10px);
+    color:var(--ink);font-family:inherit;font-size:13px;font-weight:800;letter-spacing:.06em;cursor:pointer;
+    box-shadow:0 10px 26px rgba(50,55,65,.16);pointer-events:auto;transition:.12s;user-select:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;line-height:1.15;}
+  #boostBtn .key{font-size:9px;font-weight:700;letter-spacing:.04em;color:#9AA0A8;
+    border:1px solid rgba(138,143,152,.4);border-radius:20px;padding:1px 6px;}
+  #boostBtn:active,#boostBtn.on{transform:scale(.94);background:#2F8C86;color:#F7FBF9;border-color:#2F8C86;}
+  #boostBtn.on .key{color:rgba(247,251,249,.9);border-color:rgba(247,251,249,.5);}
+  #boostBtn.cd{opacity:.4;filter:grayscale(.6);}
+
+  /* ---------- 覆盖层 ---------- */
+  #overlay{position:absolute;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+    background:rgba(233,229,219,.62);backdrop-filter:blur(7px);padding:28px;}
+  #overlay.show{display:flex;}
+  .panel{width:100%;max-width:760px;max-height:100%;overflow:auto;background:var(--cream);
+    border-radius:22px;padding:30px 34px;box-shadow:0 30px 70px rgba(40,45,55,.22);
+    border:1px solid rgba(255,255,255,.9);animation:pop .28s cubic-bezier(.2,.9,.3,1.2);}
+  @keyframes pop{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+  .panel::-webkit-scrollbar{width:8px}
+  .panel::-webkit-scrollbar-thumb{background:rgba(36,42,49,.18);border-radius:4px}
+
+  h1.title{font-size:52px;letter-spacing:.08em;line-height:1.1;color:var(--ink);}
+  .sub{font-size:12px;letter-spacing:.36em;color:var(--ink3);font-weight:700;margin-top:8px;}
+  .lead{font-size:14.5px;line-height:1.95;color:var(--ink2);margin-top:18px;}
+  .lead b{color:var(--ink);}
+  .feat{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:22px 0 6px;}
+  .feat div{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 14px 15px;}
+  .feat h4{font-size:13.5px;margin-bottom:6px;color:var(--ink);}
+  .feat p{font-size:12px;line-height:1.7;color:var(--ink3);}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:3px;margin-right:6px;vertical-align:1px;}
+
+  .btns{display:flex;gap:12px;margin-top:24px;flex-wrap:wrap;}
+  button.act{font-family:inherit;font-size:14.5px;font-weight:800;letter-spacing:.05em;cursor:pointer;
+    border-radius:13px;padding:14px 30px;border:1px solid transparent;transition:.16s;}
+  .primary{background:var(--ink);color:#FBF8F0;box-shadow:0 12px 26px rgba(36,42,49,.26);}
+  .primary:hover{transform:translateY(-2px);box-shadow:0 16px 32px rgba(36,42,49,.32);}
+  .ghost{background:transparent;color:var(--ink2);border-color:rgba(36,42,49,.16);}
+  .ghost:hover{background:#fff;color:var(--ink);}
+
+  .statline{display:flex;gap:26px;margin-top:20px;flex-wrap:wrap;}
+  .statline div{font-size:12px;color:var(--ink3);letter-spacing:.06em;}
+  .statline div b{display:block;font-size:26px;color:var(--ink);margin-top:4px;letter-spacing:0;}
+
+  /* 图鉴 */
+  .bookgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;}
+  .bk{display:flex;gap:12px;padding:12px;border-radius:13px;background:#fff;border:1px solid var(--line);}
+  .bk.lock{background:rgba(36,42,49,.04);border-style:dashed;opacity:.62;}
+  .spine{width:30px;height:40px;border-radius:4px 7px 7px 4px;flex:0 0 30px;
+    background:linear-gradient(150deg,#3E7C93,#2E5D73);position:relative;box-shadow:0 2px 5px rgba(30,60,80,.28);}
+  .spine:after{content:"";position:absolute;left:5px;top:5px;bottom:5px;width:2px;background:rgba(255,255,255,.45);border-radius:2px;}
+  .bk.lock .spine{background:#C9C6BE;box-shadow:none;}
+  .bk h5{font-size:13.5px;margin-bottom:3px;}
+  .bk p{font-size:11.5px;color:var(--ink3);line-height:1.6;}
+  .bk .eff{font-size:11px;color:var(--gold-d);font-weight:800;margin-top:4px;}
+
+  /* 工坊 */
+  .shopitem{display:flex;align-items:center;gap:16px;padding:14px 16px;border-radius:14px;
+    background:#fff;border:1px solid var(--line);margin-top:10px;}
+  .shopitem .nm{font-size:14px;font-weight:800;}
+  .shopitem .ds{font-size:11.5px;color:var(--ink3);margin-top:3px;}
+  .lv{display:flex;gap:4px;margin-top:7px;}
+  .lv i{width:16px;height:5px;border-radius:3px;background:rgba(36,42,49,.13);}
+  .lv i.f{background:var(--teal);}
+  .buy{margin-left:auto;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;
+    padding:10px 16px;border-radius:11px;border:1px solid rgba(36,42,49,.14);background:#FBF8F0;color:var(--ink);
+    display:flex;align-items:center;gap:6px;transition:.15s;white-space:nowrap;}
+  .buy:hover:not(:disabled){background:var(--ink);color:#FBF8F0;border-color:var(--ink);}
+  .buy:disabled{opacity:.42;cursor:not-allowed;}
+  .buy .coin{width:13px;height:13px;}
+
+  /* 选关 */
+  .lvlgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:20px;}
+  .lvl{position:relative;background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:14px 8px 13px;text-align:center;cursor:pointer;transition:.15s;font-family:inherit;}
+  .lvl:hover:not(.off){transform:translateY(-3px);box-shadow:0 12px 26px rgba(50,55,65,.15);border-color:rgba(47,140,134,.4);}
+  .lvl .no{font-size:10.5px;letter-spacing:.22em;color:var(--ink3);font-weight:800;}
+  .lvl .nm{font-size:15px;font-weight:800;margin-top:5px;}
+  .lvl .meta{font-size:10.5px;color:var(--ink3);margin-top:7px;line-height:1.7;}
+  .lvl .cost{margin-top:9px;font-size:12px;font-weight:800;color:var(--gold-d);
+    display:flex;align-items:center;justify-content:center;gap:4px;}
+  .lvl.free .cost{color:var(--teal);}
+  .lvl.off{opacity:.48;cursor:not-allowed;}
+  .lvl .coin{width:11px;height:11px;}
+  .lvl .tag{position:absolute;top:-8px;right:-6px;font-size:10px;font-weight:800;color:#fff;
+    background:var(--teal);padding:3px 8px;border-radius:8px;letter-spacing:.05em;}
+
+  #toastWrap{position:absolute;left:50%;bottom:110px;transform:translateX(-50%);z-index:25;
+    display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;}
+  .toast{background:rgba(36,42,49,.92);color:#FBF8F0;font-size:13px;font-weight:700;
+    padding:11px 20px;border-radius:12px;box-shadow:0 12px 30px rgba(36,42,49,.3);
+    display:flex;align-items:center;gap:10px;animation:tin .3s ease;}
+  .toast b{color:#F2C46A;}
+  @keyframes tin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .toast.out{opacity:0;transform:translateY(-6px);transition:.4s;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv" width="1280" height="720"></canvas>
+
+  <div id="hud">
+    <div id="hudLeft" class="card">
+      <div class="row">
+        <span class="lab">氧气</span>
+        <span class="bar"><i id="o2fill"></i></span>
+        <span class="val" id="o2val">100</span>
+      </div>
+      <div class="row">
+        <span class="lab">清洁度</span>
+        <span class="bar"><i id="pgfill" style="background:#8A93A0"></i></span>
+        <span class="val" id="pgval">0%</span>
+      </div>
+      <div class="row">
+        <span class="lab">机体</span>
+        <span class="bar"><i id="hpfill"></i></span>
+        <span class="val" id="hpval">100</span>
+      </div>
+      <div class="row">
+        <span class="lab">技能</span>
+        <span class="bar"><i id="skfill"></i></span>
+        <span class="val" id="skval">就绪</span>
+      </div>
+    </div>
+
+    <div id="hudRight" class="card">
+      <div class="goldbox"><span class="coin"></span><span id="goldVal">0/5</span></div>
+      <div class="divline"></div>
+      <div class="sector">月区 <b id="secVal">1</b>/5</div>
+    </div>
+
+    <div id="hudMid">
+      <button class="mini" id="btnCodex">图鉴</button>
+      <button class="mini" id="btnSound">音效 开</button>
+      <button class="mini" id="btnPause">暂停</button>
+    </div>
+
+    <div id="hint">WASD / 方向键 移动 · 空格 或 鼠标右键 释放强化吸取（持续 5s，有冷却） · 岩石是实体障碍，绕行或吸碎它</div>
+    <div id="sectorTag"></div>
+    <button id="boostBtn"><span>强化吸取</span><span class="key">右键 / 空格</span></button>
+  </div>
+
+  <div id="toastWrap"></div>
+  <div id="overlay"></div>
+</div>
+
+<script>
+/* =========================================================
+   月面清道夫 · Moon Sweeper
+   清理月球 + 金砖收集 + 书籍图鉴 三合一循环
+   ========================================================= */
+const W = 1280, H = 720;
+const FIELD = { x0: 28, y0: 128, x1: W - 28, y1: H - 28 };
+const TAU = Math.PI * 2;
+
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp  = (a, b, t) => a + (b - a) * t;
+const rand  = (a = 0, b = 1) => a + Math.random() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+const dist  = (x1, y1, x2, y2) => Math.hypot(x1 - x2, y1 - y2);
+const pick  = arr => arr[Math.floor(Math.random() * arr.length)];
+
+// 旧浏览器兼容：roundRect
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+    const rr = Math.min(typeof r === 'number' ? r : 0, Math.abs(w) / 2, Math.abs(h) / 2);
+    this.moveTo(x + rr, y);
+    this.arcTo(x + w, y, x + w, y + h, rr);
+    this.arcTo(x + w, y + h, x, y + h, rr);
+    this.arcTo(x, y + h, x, y, rr);
+    this.arcTo(x, y, x + w, y, rr);
+    this.closePath();
+    return this;
+  };
+}
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------------- 存档 ---------------- */
+const SAVE_KEY = 'moonSweeperSaveV1';
+const defaultSave = () => ({
+  gold: 0, totalEarned: 0, books: {}, upg: { range: 0, speed: 0, o2: 0, gold: 0, armor: 0, skill: 0 },
+  best: 0, cleared: false, muted: false, plays: 0
+});
+let save = defaultSave();
+try {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (raw) {
+    const d = defaultSave(), o = JSON.parse(raw);
+    save = Object.assign(d, o);
+    save.upg = Object.assign(d.upg, o.upg || {});   // 老存档补全新增升级项
+    if (o.totalEarned === undefined) save.totalEarned = save.gold;  // 老存档回填：以当前余额近似
+  }
+} catch (e) { /* 隐私模式忽略 */ }
+function persist() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
+}
+/** 把未入账的金砖结算进存档，重复调用只会结算一次 */
+function bankRun() {
+  if (!G || !G.runGold) { if (G) G.banked = true; return; }
+  save.gold += G.runGold;
+  save.totalEarned += G.runGold;   // 累计收集（不含已花掉的部分）
+  G.runGold = 0;
+  G.banked = true;
+  persist();
+}
+
+/* ---------------- 书籍（图鉴 + 当局增益） ---------------- */
+const BOOKS = [
+  { id:'geo',    title:'月面地质学',     tag:'勘探', desc:'月壤颗粒带静电，吸起来比想象中容易。', eff:'吸取范围 +12%', apply:r => r.suctionMul *= 1.12 },
+  { id:'gait',   title:'低重力步法',     tag:'机动', desc:'六分之一重力，跳着走比走着快。',       eff:'移动速度 +10%', apply:r => r.speedMul  *= 1.10 },
+  { id:'o2',     title:'再生氧气循环',   tag:'生存', desc:'把月壤里的氧重新挤出来，一次一点。',   eff:'清扫回氧 +30%', apply:r => r.o2Regen *= 1.3 },
+  { id:'smelt',  title:'废料冶炼手册',   tag:'工业', desc:'太空垃圾里也有好东西，只看你会不会拆。', eff:'金砖价值 +25%', apply:r => r.goldMul  *= 1.25 },
+  { id:'echo',   title:'环形山的回声',   tag:'灵感', desc:'在空无一人的地方，声音会替你干活。',   eff:'清扫效率 +20%',  apply:r => r.cleanMul *= 1.20 },
+  { id:'moss',   title:'苔藓计划',       tag:'生态', desc:'第一株苔藓长出来时，全场安静了三秒。', eff:'氧气回补 +30%', apply:r => r.o2Regen  *= 1.30 },
+  { id:'map',    title:'月球背面地图',   tag:'导航', desc:'有些坐标，只有清洁工才知道。',         eff:'吸取吸附 +25%', apply:r => r.magnetMul *= 1.25 },
+  { id:'diary',  title:'孤独宇航员日记', tag:'笔记', desc:'“第 412 天。今天也没人等我的信。”',   eff:'陨石伤害 -30%', apply:r => r.dmgMul   *= 0.70 },
+  { id:'palace', title:'广寒宫施工图',   tag:'蓝图', desc:'图纸上只有一座地基，和一片空地。',     eff:'技能持续 +2 秒', apply:r => r.skillDur += 2 },
+  { id:'code',   title:'清道夫守则',     tag:'规章', desc:'第一条：月球不需要感谢，它只需要干净。', eff:'强化吸取 +25%', apply:r => r.boostMul *= 1.25 },
+];
+const BOOK_MAP = Object.fromEntries(BOOKS.map(b => [b.id, b]));
+
+/* ---------------- 永久升级 ---------------- */
+const UPGRADES = [
+  { key:'range', name:'吸尘口改造', desc:'吸取半径 +8%',        max:8, base:30, grow:1.52 },
+  { key:'speed', name:'推进器调校', desc:'移动速度 +6%',        max:8, base:26, grow:1.50 },
+  { key:'o2',    name:'氧气循环',   desc:'氧气消耗 -5%',        max:8, base:34, grow:1.48 },
+  { key:'gold',  name:'回收精炼线', desc:'金砖收益 +10%',       max:6, base:42, grow:1.58 },
+  { key:'armor', name:'防陨装甲',   desc:'陨石伤害 -10%',       max:6, base:38, grow:1.55 },
+  { key:'skill', name:'冷却线圈',   desc:'技能冷却 -1.5秒',     max:6, base:36, grow:1.55 },
+];
+const upgCost = u => Math.round(u.base * Math.pow(u.grow, save.upg[u.key]));
+
+/* ---------------- 月区 ---------------- */
+const SECTORS = [
+  { name:'静海',            dust:44, rocks:12, goldGoal:5  },
+  { name:'风暴洋',          dust:52, rocks:15, goldGoal:10 },
+  { name:'第谷环形山',      dust:60, rocks:18, goldGoal:15 },
+  { name:'雨海',            dust:68, rocks:22, goldGoal:20 },
+  { name:'南极-艾特肯盆地', dust:78, rocks:26, goldGoal:25 },
+];
+const goldGoalOf = n => SECTORS[n - 1].goldGoal;
+const SECTOR_MAX = SECTORS.length;
+
+/* ---------------- 音效（纯 WebAudio 合成） ---------------- */
+const Audio2 = (() => {
+  let ac = null, noiseSrc = null, noiseGain = null, master = null, ready = false;
+  function noiseBuffer(ctx) {
+    const len = ctx.sampleRate * 2, buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+  function init() {
+    if (ready) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ac = new AC();
+    master = ac.createGain(); master.gain.value = save.muted ? 0 : 1; master.connect(ac.destination);
+
+    noiseSrc = ac.createBufferSource();
+    noiseSrc.buffer = noiseBuffer(ac); noiseSrc.loop = true;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 820; bp.Q.value = 0.9;
+    noiseGain = ac.createGain(); noiseGain.gain.value = 0;
+    noiseSrc.connect(bp); bp.connect(noiseGain); noiseGain.connect(master);
+    noiseSrc.start();
+    ready = true;
+  }
+  function tone(freq, dur, type = 'sine', vol = 0.08, slideTo = null) {
+    if (!ready || save.muted) return;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = freq;
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, ac.currentTime + dur);
+    g.gain.setValueAtTime(vol, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+    o.connect(g); g.connect(master);
+    o.start(); o.stop(ac.currentTime + dur + 0.02);
+  }
+  return {
+    init,
+    hum(v) { if (ready && noiseGain) noiseGain.gain.value = save.muted ? 0 : v * 0.055; },
+    clean() { tone(rand(620, 760), 0.07, 'sine', 0.045, 420); },
+    gold()  { tone(880, 0.09, 'triangle', 0.07, 1320); },
+    skill() { tone(440, 0.16, 'triangle', 0.07, 880); setTimeout(() => tone(880, 0.12, 'triangle', 0.05, 1174), 120); },
+    book()  { tone(523, 0.10, 'sine', 0.07); setTimeout(() => tone(784, 0.16, 'sine', 0.06), 90); },
+    rock()  { tone(rand(120, 160), 0.14, 'square', 0.05, 60); },
+    hit()   { tone(90, 0.28, 'sawtooth', 0.09, 40); },
+    clear() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.22, 'sine', 0.07), i * 110)); },
+    fail()  { [330, 262, 196].forEach((f, i) => setTimeout(() => tone(f, 0.30, 'sine', 0.07), i * 150)); },
+    toggle() {
+      save.muted = !save.muted; persist();
+      if (master) master.gain.value = save.muted ? 0 : 1;
+      return !save.muted;
+    }
+  };
+})();
+
+/* ---------------- 画布与背景 ---------------- */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const bgCanvas = document.createElement('canvas');
+bgCanvas.width = W; bgCanvas.height = H;
+const bgx = bgCanvas.getContext('2d');
+
+function paintBackground(seed) {
+  const rnd = mulberry32(seed);
+  const g = bgx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, '#F2EFE7'); g.addColorStop(0.55, '#EBE7DD'); g.addColorStop(1, '#E2DED3');
+  bgx.fillStyle = g; bgx.fillRect(0, 0, W, H);
+
+  // 大型阴影盆地
+  for (let i = 0; i < 5; i++) {
+    const x = rnd() * W, y = rnd() * H, r = 130 + rnd() * 200;
+    const rg = bgx.createRadialGradient(x, y, r * 0.2, x, y, r);
+    rg.addColorStop(0, 'rgba(120,112,96,0.10)');
+    rg.addColorStop(1, 'rgba(120,112,96,0)');
+    bgx.fillStyle = rg; bgx.beginPath(); bgx.arc(x, y, r, 0, TAU); bgx.fill();
+  }
+
+  // 陨石坑
+  const craters = 9 + Math.floor(rnd() * 4);
+  for (let i = 0; i < craters; i++) {
+    const x = 60 + rnd() * (W - 120);
+    const y = FIELD.y0 + 40 + rnd() * (FIELD.y1 - FIELD.y0 - 80);
+    const r = 26 + rnd() * 58;
+    const rg = bgx.createRadialGradient(x, y - r * 0.15, r * 0.1, x, y, r);
+    rg.addColorStop(0, 'rgba(196,190,176,0.85)');
+    rg.addColorStop(0.55, 'rgba(214,208,194,0.55)');
+    rg.addColorStop(0.92, 'rgba(232,227,215,0.25)');
+    rg.addColorStop(1, 'rgba(250,247,239,0.85)');
+    bgx.beginPath(); bgx.arc(x, y, r, 0, TAU); bgx.fillStyle = rg; bgx.fill();
+    bgx.beginPath(); bgx.arc(x, y, r, Math.PI * 1.02, Math.PI * 1.92);
+    bgx.strokeStyle = 'rgba(150,143,128,0.28)'; bgx.lineWidth = 2.4; bgx.stroke();
+    bgx.beginPath(); bgx.arc(x, y, r * 0.97, Math.PI * 0.05, Math.PI * 0.9);
+    bgx.strokeStyle = 'rgba(255,253,247,0.75)'; bgx.lineWidth = 1.8; bgx.stroke();
+  }
+
+  // 月壤颗粒
+  for (let i = 0; i < 2200; i++) {
+    const x = rnd() * W, y = rnd() * H, s = rnd() * 1.7 + 0.3;
+    bgx.fillStyle = rnd() > 0.5 ? 'rgba(120,112,96,0.055)' : 'rgba(255,253,246,0.16)';
+    bgx.beginPath(); bgx.arc(x, y, s, 0, TAU); bgx.fill();
+  }
+}
+
+/* ---------------- 游戏状态 ---------------- */
+const G = {
+  state: 'title',       // title | playing | paused | clear | fail
+  sector: 1,
+  player: { x: W / 2, y: H / 2 + 40, vx: 0, vy: 0, r: 18, ang: -Math.PI / 2 },
+  dust: [], rocks: [], pickups: [], meteors: [], parts: [], texts: [], floaters: [],
+  totalDustW: 0, cleanedW: 0, progress: 0,
+  o2: 100, maxO2: 100,
+  time: 0, shake: 0, meteorTimer: 6,
+  cleanedCount: 0, booksFound: [],
+  runGold: 0, runTotal: 0, banked: false, combo: 0, comboTimer: 0, bumpCd: 0,
+  damage: 0, hitFlash: 0, runActive: false,
+};
+
+// 当局增益
+function freshBuffs() {
+  return { suctionMul: 1, speedMul: 1, o2Bonus: 0, goldMul: 1, cleanMul: 1,
+           o2Regen: 1, magnetMul: 1, dmgMul: 1, skillDur: 0, boostMul: 1, books: [] };
+}
+let B = freshBuffs();
+
+/** 获得金砖：runGold 为未入账金额，runTotal 为本局累计，sectorGold 为本关累计（配额） */
+function earnGold(v) { G.runGold += v; G.runTotal += v; G.sectorGold += v; }
+
+const SUCTION_BASE = 82;
+const suctionRadius = () => SUCTION_BASE * (1 + 0.08 * save.upg.range) * B.suctionMul;
+const magnetRadius  = () => suctionRadius() * 1.15 * B.magnetMul;
+const moveSpeed     = () => 262 * (1 + 0.06 * save.upg.speed) * B.speedMul * (1 - 0.16 * G.damage);
+const goldMul       = () => (1 + 0.10 * save.upg.gold) * B.goldMul;
+
+/* ---------------- 输入 ---------------- */
+const keys = Object.create(null);
+let boosting = false;
+let skillT = 0, skillCdT = 0;      // 技能剩余持续 / 剩余冷却
+let pointerActive = false, pointer = { x: 0, y: 0 };
+
+/* ---------------- 技能：强化吸取 ---------------- */
+const skillBaseDur = () => 5 + B.skillDur;                    // 广寒宫施工图：每张 +2s
+const skillCdDur   = () => Math.max(4, 13 - 1.5 * save.upg.skill);  // 冷却线圈：每级 -1.5s
+const SKILL_O2_COST = 12;   // 开启技能一次性消耗的额外氧气
+function tryActivateSkill() {
+  if (!G || G.state !== 'playing') return;
+  if (skillT > 0 || skillCdT > 0) return;
+  if (G.o2 <= SKILL_O2_COST + 5) {          // 保底：开了技能不能直接把氧气开没
+    toast(`氧气不足 · 开启技能需要 <b>${SKILL_O2_COST}</b> 氧气`);
+    return;
+  }
+  G.o2 -= SKILL_O2_COST;
+  floatText(G.player.x, G.player.y + 30, `-${SKILL_O2_COST} 氧气`, '#D9663F', 14);
+  skillT = skillBaseDur();
+  boostBtn.classList.add('on');
+  Audio2.skill();
+  floatText(G.player.x, G.player.y - 34, `强化吸取 ${skillT.toFixed(0)}s`, '#2F8C86', 17);
+  burst(G.player.x, G.player.y, 'rgba(72,180,170,0.9)', 10, 130, 3);
+}
+function updateSkill(dt) {
+  if (skillT > 0) {
+    skillT -= dt;
+    if (skillT <= 0) {
+      skillT = 0;
+      skillCdT = skillCdDur();
+      boostBtn.classList.remove('on');
+      boostBtn.classList.add('cd');
+    }
+  } else if (skillCdT > 0) {
+    skillCdT -= dt;
+    if (skillCdT <= 0) { skillCdT = 0; boostBtn.classList.remove('cd'); }
+  }
+  boosting = skillT > 0 && G.state === 'playing';
+}
+
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
+  keys[k] = true;
+  if (k === ' ' && !e.repeat) tryActivateSkill();
+  if (k === 'escape') togglePause();
+  if (k === 'm') { document.getElementById('btnSound').textContent = '音效 ' + (Audio2.toggle() ? '开' : '关'); }
+  Audio2.init();
+  hideHint();
+}, { passive: false });
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+function toWorld(clientX, clientY) {
+  const r = cv.getBoundingClientRect();
+  return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) };
+}
+cv.addEventListener('pointerdown', e => {
+  if (e.button === 2) {                     // 右键：交给舞台层的技能处理
+    e.preventDefault();
+    Audio2.init(); hideHint();
+    return;
+  }
+  cv.setPointerCapture(e.pointerId);
+  pointerActive = true;
+  const p = toWorld(e.clientX, e.clientY);
+  pointer.x = p.x; pointer.y = p.y;
+  Audio2.init(); hideHint();
+});
+cv.addEventListener('pointermove', e => {
+  if (!pointerActive) return;
+  const p = toWorld(e.clientX, e.clientY);
+  pointer.x = p.x; pointer.y = p.y;
+});
+cv.addEventListener('pointerup', () => { pointerActive = false; });
+cv.addEventListener('pointercancel', () => { pointerActive = false; });
+
+const boostBtn = document.getElementById('boostBtn');
+boostBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); tryActivateSkill(); Audio2.init(); });
+// 右键在舞台任意位置都用于释放技能，并屏蔽浏览器右键菜单
+const stageEl = document.getElementById('stage');
+stageEl.addEventListener('contextmenu', e => { e.preventDefault(); });
+stageEl.addEventListener('pointerdown', e => {
+  if (e.button !== 2) return;
+  e.preventDefault();
+  Audio2.init(); hideHint();
+  tryActivateSkill();
+});
+
+/* ---------------- 关卡构建 ---------------- */
+function startSector(n) {
+  const cfg = SECTORS[Math.min(n, SECTOR_MAX) - 1];
+  G.sector = n;
+  G.dust = []; G.rocks = []; G.pickups = []; G.meteors = []; G.parts = []; G.texts = [];
+  G.totalDustW = 0; G.cleanedW = 0; G.progress = 0;
+  G.sectorGold = 0; G.shortToastShown = false;
+  G.resupplyRockTimer = 0;
+  G.maxO2 = 100;                 // 氧气上限固定 100，升级/书籍改为降低消耗与提高回氧
+  G.o2 = G.maxO2;
+  G.meteorTimer = 8.2;
+  G.time = 0;
+  G.player.x = W / 2; G.player.y = H / 2 + 40; G.player.vx = 0; G.player.vy = 0;
+  G.player.ang = -Math.PI / 2;
+
+  paintBackground(n * 977 + 31);
+
+  // 尘埃团
+  for (let i = 0; i < cfg.dust; i++) {
+    let x, y, tries = 0;
+    do {
+      x = rand(FIELD.x0 + 46, FIELD.x1 - 46);
+      y = rand(FIELD.y0 + 46, FIELD.y1 - 46);
+      tries++;
+    } while (dist(x, y, W / 2, H / 2 + 40) < 150 && tries < 24);
+    const r = rand(20, 38);
+    const speck = [];
+    for (let s = 0; s < 7; s++) speck.push({ a: rand(0, TAU), d: rand(0.15, 0.86), s: rand(1.1, 2.6) });
+    G.dust.push({ x, y, r, hp: 1, max: 1, speck, w: r * r, ph: rand(0, TAU), dead: false });
+    G.totalDustW += r * r;
+  }
+
+  // 岩石 / 太空垃圾（实体障碍，不能压在车上）
+  for (let i = 0; i < cfg.rocks; i++) placeRock(
+    rand(FIELD.x0 + 50, FIELD.x1 - 50),
+    rand(FIELD.y0 + 50, FIELD.y1 - 50),
+    rand(22, 38)
+  );
+
+  // 预置书籍
+  const pre = 2 + (n >= 3 ? 1 : 0);
+  for (let i = 0; i < pre; i++) {
+    const b = BOOKS[randi(0, BOOKS.length - 1)];
+    G.pickups.push(makePickup(rand(FIELD.x0 + 80, FIELD.x1 - 80), rand(FIELD.y0 + 80, FIELD.y1 - 80), 'book', b.id));
+  }
+
+  // 漂浮岩石（第 3 关起出现，尺寸与数量随关卡递增）
+  G.floaters = [];
+  const fcfg = FLOAT_SECTORS[n];
+  if (fcfg) for (let i = 0; i < fcfg.n; i++) {
+    let fx, fy, tries = 0;
+    do {
+      fx = rand(FIELD.x0 + 70, FIELD.x1 - 70);
+      fy = rand(FIELD.y0 + 70, FIELD.y1 - 70);
+      tries++;
+    } while (dist(fx, fy, G.player.x, G.player.y) < 220 && tries < 24);
+    G.floaters.push(makeFloater(fx, fy, rand(fcfg.rMin, fcfg.rMax)));
+  }
+
+  document.getElementById('sectorTag').textContent = `第 ${n} 月区 · ${cfg.name}`;
+  toast(`抵达 <b>${cfg.name}</b> · 清洁度 100% 且收集 <b>${cfg.goldGoal}</b> 金砖方可撤离`
+    + (fcfg ? ` · 当心磁悬晶岩：会漂移撞伤机体，普通吸力能慢慢磨，开技能才磨得快` : ''));
+  syncHud();
+}
+
+/* ---------------- 漂浮岩石：不规则游荡，只能用技能消融 ---------------- */
+const FLOAT_SECTORS = {
+  3: { n: 2, rMin: 15, rMax: 21 },
+  4: { n: 3, rMin: 21, rMax: 29 },
+  5: { n: 5, rMin: 28, rMax: 38 },
+};
+const FLOATER_MELT_TIME = 0.75;   // 技能照射多久消融
+const FLOATER_SLOW_RATE = 0.2;    // 不开技能时普通吸力的消融速度（约 3.7s 才磨掉一块）
+const FLOATER_HIT_CD = 0.9;       // 同一块浮石两次撞伤之间的间隔
+
+function makeFloater(x, y, r) {
+  const verts = [];
+  const cnt = randi(6, 8);
+  for (let i = 0; i < cnt; i++) {
+    const a = (i / cnt) * TAU;
+    verts.push({ a, k: rand(0.8, 1.1) });
+  }
+  return {
+    x, y, r, verts,
+    ang: rand(0, TAU), sp: rand(24, 46),   // 游荡方向与基础速度
+    t: rand(0, 20), ph: rand(0, TAU),     // 相位，制造不规律感
+    rot: rand(0, TAU), melt: 0, fastMelt: false, dead: false,
+    hitCd: 0,
+  };
+}
+
+function updateFloaters(dt) {
+  const p = G.player, sr = suctionRadius() * 1.15;
+  for (const f of G.floaters) {
+    if (f.dead) continue;
+    if (f.hitCd > 0) f.hitCd = Math.max(0, f.hitCd - dt);
+    f.t += dt;
+    // 两组不同频率正弦叠加 -> 方向与速度都不规则（转向慢、位移明显）
+    f.ang += (Math.sin(f.t * 0.38 + f.ph) * 0.95 + Math.sin(f.t * 1.05 + f.ph * 2.3) * 0.42) * dt;
+    const sp = f.sp * (0.7 + 0.35 * Math.sin(f.t * 0.85 + f.ph));
+    f.x += Math.cos(f.ang) * sp * dt;
+    f.y += Math.sin(f.ang) * sp * dt;
+
+    // 场边反弹
+    if (f.x < FIELD.x0 + f.r) { f.x = FIELD.x0 + f.r; f.ang = Math.PI - f.ang; }
+    if (f.x > FIELD.x1 - f.r) { f.x = FIELD.x1 - f.r; f.ang = Math.PI - f.ang; }
+    if (f.y < FIELD.y0 + f.r) { f.y = FIELD.y0 + f.r; f.ang = -f.ang; }
+    if (f.y > FIELD.y1 - f.r) { f.y = FIELD.y1 - f.r; f.ang = -f.ang; }
+    f.rot += dt * 0.22;
+
+    // 力场偶尔溢出的青色粒子：静止时也有存在感
+    if (Math.random() < 0.05) {
+      G.parts.push({ x: f.x + rand(-f.r, f.r) * 0.8, y: f.y + rand(-f.r, f.r) * 0.6,
+        vx: rand(-8, 8), vy: rand(-28, -10), life: 0.55, max: 0.55,
+        size: rand(1.2, 2.4), color: 'rgba(120,240,228,0.7)' });
+    }
+  }
+
+  // ---- 浮石之间的弹性碰撞：撞上后各自弹开 ----
+  for (let i = 0; i < G.floaters.length; i++) {
+    for (let j = i + 1; j < G.floaters.length; j++) {
+      const a = G.floaters[i], b = G.floaters[j];
+      if (a.dead || b.dead) continue;
+      const rr = a.r + b.r;
+      let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+      if (d >= rr) continue;
+      if (d < 0.001) { dx = 1; dy = 0; d = 1; }
+      const nx = dx / d, ny = dy / d, push = (rr - d) * 0.5;
+      a.x -= nx * push; a.y -= ny * push;
+      b.x += nx * push; b.y += ny * push;
+      a.ang = Math.atan2(-ny, -nx) + rand(-0.4, 0.4);
+      b.ang = Math.atan2(ny, nx) + rand(-0.4, 0.4);
+      if (rr - d > 2) {
+        burst((a.x + b.x) / 2, (a.y + b.y) / 2, 'rgba(140,180,190,0.7)', 3, 60, 1.8);
+      }
+    }
+  }
+
+  // ---- 浮石 × 机体：实体碰撞，撞上按质量损伤机体 ----
+  for (const f of G.floaters) {
+    if (f.dead) continue;
+    const rr = f.r + p.r;
+    let dx = p.x - f.x, dy = p.y - f.y, d = Math.hypot(dx, dy);
+    if (d >= rr) continue;
+    if (d < 0.001) { dx = 1; dy = 0; d = 1; }
+    const nx = dx / d, ny = dy / d, overlap = rr - d;
+
+    // 机体更沉：浮石让开更多，被顶开后沿法线弹走
+    p.x = clamp(p.x + nx * overlap * 0.35, FIELD.x0 + 20, FIELD.x1 - 20);
+    p.y = clamp(p.y + ny * overlap * 0.35, FIELD.y0 + 20, FIELD.y1 - 20);
+    f.x = clamp(f.x - nx * overlap * 0.65, FIELD.x0 + f.r, FIELD.x1 - f.r);
+    f.y = clamp(f.y - ny * overlap * 0.65, FIELD.y0 + f.r, FIELD.y1 - f.r);
+    f.ang = Math.atan2(-ny, -nx) + rand(-0.45, 0.45);   // 沿背离机体的法线弹开
+    f.sp = Math.min(72, f.sp + 8);
+
+    if (f.hitCd > 0) continue;
+    f.hitCd = FLOATER_HIT_CD;
+
+    // 撞击伤害与陨石直击同一套结算：浮石按尺寸折算冲击质量，机体直接接触视为全力直击
+    const power = f.r / 50;
+    const dmg = impactDamage(power, 1);
+    G.o2 = Math.max(0, G.o2 - dmg);
+    G.damage = clamp(G.damage + dmg / 55, 0, 1);
+    G.hitFlash = 1;
+    G.shake = Math.max(G.shake, 10 + dmg * 0.5);
+    const kb = 60 + power * 130;
+    p.vx += nx * kb; p.vy += ny * kb;
+
+    floatText(p.x, p.y - 30, `-${Math.round(dmg)}`, '#D9663F', 15);
+    burst(p.x - nx * p.r, p.y - ny * p.r, 'rgba(120,170,180,0.9)', 8, 140, 2.6);
+    Audio2.hit();
+  }
+
+  // 被浮石挤进岩石时，沿岩石轮廓再推一次，避免卡进石头里
+  for (const rk of G.rocks) {
+    if (rk.dead) continue;
+    const rr = rockRadius(rk) + p.r;
+    const dx = p.x - rk.x, dy = p.y - rk.y, d = Math.hypot(dx, dy);
+    if (d < rr && d > 0.001) {
+      p.x = clamp(p.x + (dx / d) * (rr - d), FIELD.x0 + 20, FIELD.x1 - 20);
+      p.y = clamp(p.y + (dy / d) * (rr - d), FIELD.y0 + 20, FIELD.y1 - 20);
+    }
+  }
+
+  // ---- 消融：普通吸力能慢慢磨，技能照射才是正常速度 ----
+  const srSlow = suctionRadius() * 0.88;
+  for (const f of G.floaters) {
+    if (f.dead) continue;
+    const d = dist(p.x, p.y, f.x, f.y);
+    const fast = skillT > 0 && d < sr + f.r;             // 技能：快速消融
+    const slow = !fast && d < srSlow + f.r;              // 普通吸力：很慢
+    if (fast || slow) {
+      f.melt += dt * (fast ? 1 : FLOATER_SLOW_RATE);
+      f.fastMelt = fast;
+      // 慢速消融时，被吸走的小碎屑往机体方向飞（告诉玩家"确实在生效"）
+      if (!fast && Math.random() < 0.3) {
+        G.parts.push({ x: f.x + rand(-f.r, f.r) * 0.85, y: f.y + rand(-f.r, f.r) * 0.85,
+          vx: (p.x - f.x) * 1.1 + rand(-10, 10), vy: (p.y - f.y) * 1.1 + rand(-10, 10),
+          life: 0.32, max: 0.32, size: rand(1.2, 2.3), color: 'rgba(150,240,230,0.72)' });
+      }
+      if (f.melt >= FLOATER_MELT_TIME) meltFloater(f);
+    } else {
+      f.melt = Math.max(0, f.melt - dt * 1.6);
+      f.fastMelt = false;
+    }
+  }
+  if (G.floaters.some(f => f.dead)) G.floaters = G.floaters.filter(f => !f.dead);
+}
+
+function meltFloater(f) {
+  f.dead = true;
+  burst(f.x, f.y, 'rgba(120,170,180,0.9)', 16, 170, 3.2);
+  burst(f.x, f.y, 'rgba(240,200,120,0.85)', 8, 130, 2.6);
+  Audio2.rock();
+  G.shake = Math.max(G.shake, 4);
+  if (Math.random() < 0.65) {
+    const coins = randi(1, 2);
+    for (let i = 0; i < coins; i++) {
+      G.pickups.push(makePickup(f.x + rand(-10, 10), f.y + rand(-10, 10), 'gold', null));
+    }
+    floatText(f.x, f.y - 12, '晶岩碎裂 · 金砖', '#D99B34', 14);
+  } else {
+    floatText(f.x, f.y - 12, '晶岩碎裂', '#5E8FA6', 13);
+  }
+}
+
+function makeRock(x, y, r) {
+  const verts = [];
+  const n = randi(6, 8);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push({ a, k: rand(0.78, 1.12) });
+  }
+  return { x, y, r, hp: 1, max: 1, verts, rot: rand(0, TAU), dead: false };
+}
+
+function makePickup(x, y, type, bookId) {
+  return { x, y, vx: rand(-24, 24), vy: rand(-24, 24), type, bookId, t: 0, dead: false };
+}
+
+/** 岩石当前碰撞半径（随被吸取而缩小） */
+const rockRadius = rk => rk.r * (0.55 + 0.45 * (rk.hp / rk.max)) * 0.96;
+
+/** 放置岩石：避开玩家与场地边缘，保证不会把车卡住；ttl 为陨石岩的存活时间 */
+function placeRock(x, y, r, ttl) {
+  const p = G.player;
+
+  // 场地岩石总量上限，超出时先挤掉最老的临时陨石岩，避免场地被堵死
+  const cap = 30 + G.sector * 4;
+  if (G.rocks.length >= cap) {
+    const idx = G.rocks.findIndex(rk => rk.ttl > 0);
+    if (idx < 0) return null;
+    G.rocks.splice(idx, 1);
+  }
+
+  const need = r * 1.05 + p.r + 14;
+  const okAt = (nx, ny) => {
+    const cx = clamp(nx, FIELD.x0 + r + 12, FIELD.x1 - r - 12);
+    const cy = clamp(ny, FIELD.y0 + r + 12, FIELD.y1 - r - 12);
+    return Math.hypot(cx - p.x, cy - p.y) >= need - 0.5 ? { x: cx, y: cy } : null;
+  };
+
+  let spot = okAt(x, y);
+  if (!spot) {
+    // 被推到边界上仍压住车时，绕玩家一圈找空位
+    const a0 = Math.atan2(y - p.y, x - p.x);
+    for (let i = 1; i <= 12 && !spot; i++) {
+      const a = a0 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * (Math.PI / 6);
+      spot = okAt(p.x + Math.cos(a) * need, p.y + Math.sin(a) * need);
+    }
+  }
+  if (!spot) return null;          // 实在放不下就这一块不生成
+
+  const rock = makeRock(spot.x, spot.y, r);
+  rock.ttl = ttl || 0;
+  rock.maxTtl = rock.ttl;
+  G.rocks.push(rock);
+  return rock;
+}
+
+/* ---------------- 粒子 / 飘字 ---------------- */
+function burst(x, y, color, n, power = 120, size = 3) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), sp = rand(0.3, 1) * power;
+    G.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      life: rand(0.3, 0.75), max: 0.75, size: size * rand(0.6, 1.4), color });
+  }
+  if (G.parts.length > 700) G.parts.splice(0, G.parts.length - 700);
+}
+function floatText(x, y, text, color, size = 16) {
+  G.texts.push({ x, y, text, color, size, life: 1.0, max: 1.0 });
+}
+
+/* ---------------- 更新 ---------------- */
+function update(dt) {
+  G.time += dt;
+  if (G.shake > 0) G.shake = Math.max(0, G.shake - dt * 34);
+  if (G.hitFlash > 0) G.hitFlash = Math.max(0, G.hitFlash - dt * 2.2);
+
+  updateSkill(dt);
+
+  updatePlayer(dt);
+  // 破损冒烟
+  if (G.damage > 0.4 && Math.random() < G.damage * 0.45) {
+    G.parts.push({ x: G.player.x + rand(-7, 7), y: G.player.y + rand(-7, 7),
+      vx: rand(-16, 16), vy: rand(-46, -20), life: 0.75, max: 0.75,
+      size: rand(2, 4.2), color: 'rgba(92,88,80,0.42)' });
+  }
+  updateSuction(dt);
+  updatePickups(dt);
+  updateMeteors(dt);
+  updateRocks(dt);
+  updateFloaters(dt);
+  updateParticles(dt);
+  updateO2(dt);
+  Audio2.hum(boosting ? 1 : 0.34);
+
+  if (G.progress >= 0.995 && G.state === 'playing') {
+    if (Math.floor(G.sectorGold) >= goldGoalOf(G.sector)) {
+      sectorClear();
+    } else {
+      // 尘埃已清洁完毕但金砖配额未达标：只补充废料岩（拆解概率掉金砖），不空投金砖
+      G.resupplyRockTimer -= dt;
+      if (G.resupplyRockTimer <= 0) {
+        G.resupplyRockTimer = 7.5;
+        placeRock(rand(FIELD.x0 + 60, FIELD.x1 - 60),
+                  rand(FIELD.y0 + 60, FIELD.y1 - 60), rand(15, 22), 34);
+        if (!G.shortToastShown) {
+          G.shortToastShown = true;
+          toast(`尘埃已清洁完毕 · 金砖配额 <b>${Math.floor(G.sectorGold)}/${goldGoalOf(G.sector)}</b>，废料岩将持续坠落，拆解它们凑齐配额`);
+        }
+      }
+    }
+  }
+}
+
+function updatePlayer(dt) {
+  const p = G.player;
+  let dx = 0, dy = 0;
+  if (keys['a'] || keys['arrowleft']) dx -= 1;
+  if (keys['d'] || keys['arrowright']) dx += 1;
+  if (keys['w'] || keys['arrowup']) dy -= 1;
+  if (keys['s'] || keys['arrowdown']) dy += 1;
+
+  if (!dx && !dy && pointerActive) {
+    const ddx = pointer.x - p.x, ddy = pointer.y - p.y;
+    const len = Math.hypot(ddx, ddy);
+    if (len > 6) { dx = ddx / len; dy = ddy / len; }
+  }
+  const len = Math.hypot(dx, dy);
+  if (len > 0) { dx /= len; dy /= len; }
+
+  const sp = moveSpeed() * (boosting ? 0.62 : 1);
+  p.vx = lerp(p.vx, dx * sp, 1 - Math.exp(-11 * dt));
+  p.vy = lerp(p.vy, dy * sp, 1 - Math.exp(-11 * dt));
+  p.x = clamp(p.x + p.vx * dt, FIELD.x0 + 20, FIELD.x1 - 20);
+  p.y = clamp(p.y + p.vy * dt, FIELD.y0 + 20, FIELD.y1 - 20);
+
+  resolveRockCollision(p);
+
+  if (Math.hypot(p.vx, p.vy) > 18) p.ang = Math.atan2(p.vy, p.vx);
+}
+
+/** 岩石是实体：车身被推出轮廓，并沿岩壁滑动 */
+function resolveRockCollision(p) {
+  if (G.bumpCd > 0) G.bumpCd -= 0.016;
+
+  for (let iter = 0; iter < 4; iter++) {
+    let pushed = false;
+    for (const rk of G.rocks) {
+      if (rk.dead) continue;
+      const rr = rockRadius(rk) + p.r;
+      let dx = p.x - rk.x, dy = p.y - rk.y;
+      let d = Math.hypot(dx, dy);
+      if (d >= rr) continue;
+      if (d < 0.001) { dx = 1; dy = 0; d = 1; }
+
+      const nx = dx / d, ny = dy / d;
+      const overlap = rr - d;
+      p.x += nx * overlap;
+      p.y += ny * overlap;
+
+      // 只消掉撞向岩石的速度分量 → 贴边滑行，不会卡死
+      const vn = p.vx * nx + p.vy * ny;
+      if (vn < 0) {
+        p.vx -= vn * nx;
+        p.vy -= vn * ny;
+        if (-vn > 120 && G.bumpCd <= 0) {
+          G.bumpCd = 0.28;
+          G.shake = Math.max(G.shake, 3.2);
+          burst(p.x - nx * p.r, p.y - ny * p.r, 'rgba(180,172,152,0.8)', 4, 70, 2.2);
+        }
+      }
+      pushed = true;
+    }
+    if (!pushed) break;
+  }
+
+  // 被夹在岩石与场地边缘时，沿切线方向做最后一次修正
+  p.x = clamp(p.x, FIELD.x0 + 20, FIELD.x1 - 20);
+  p.y = clamp(p.y, FIELD.y0 + 20, FIELD.y1 - 20);
+  for (const rk of G.rocks) {
+    if (rk.dead) continue;
+    const rr = rockRadius(rk) + p.r;
+    const dx = p.x - rk.x, dy = p.y - rk.y;
+    const d = Math.hypot(dx, dy);
+    if (d < rr && d > 0.001) {
+      const push = (rr - d) * 0.5;
+      p.x = clamp(p.x + (dx / d) * push, FIELD.x0 + 20, FIELD.x1 - 20);
+      p.y = clamp(p.y + (dy / d) * push, FIELD.y0 + 20, FIELD.y1 - 20);
+    }
+  }
+}
+
+function updateSuction(dt) {
+  const p = G.player;
+  const R = suctionRadius() * (boosting ? (1.55 * B.boostMul) : 1);
+  const cleanMul = B.cleanMul * (boosting ? 1.15 : 1);
+
+  // 尘埃
+  for (const d of G.dust) {
+    if (d.dead) continue;
+    const dd = dist(p.x, p.y, d.x, d.y);
+    const reach = R + d.r * 0.55;
+    if (dd > reach) continue;
+    const f = 1 - dd / reach;
+    d.hp -= (0.55 + f * 1.7) * cleanMul * dt;
+
+    // 朝玩家流动的尘粒
+    if (Math.random() < 0.55) {
+      const a = rand(0, TAU), rr = d.r * rand(0.3, 0.95);
+      G.parts.push({ x: d.x + Math.cos(a) * rr, y: d.y + Math.sin(a) * rr,
+        vx: (p.x - d.x) * 1.6 + rand(-12, 12), vy: (p.y - d.y) * 1.6 + rand(-12, 12),
+        life: 0.34, max: 0.34, size: rand(1.2, 2.6), color: 'rgba(186,176,152,0.85)' });
+    }
+    if (d.hp <= 0) clearDust(d);
+  }
+
+  // 岩石
+  for (const rk of G.rocks) {
+    if (rk.dead) continue;
+    const dd = dist(p.x, p.y, rk.x, rk.y);
+    const reach = R + rk.r * 0.5;
+    if (dd > reach) continue;
+    const f = 1 - dd / reach;
+    const rate = (boosting ? 0.95 : 0.30) * (0.5 + f) * B.cleanMul;
+    rk.hp -= rate * dt;
+    if (Math.random() < 0.4) {
+      const a = rand(0, TAU);
+      G.parts.push({ x: rk.x + Math.cos(a) * rk.r, y: rk.y + Math.sin(a) * rk.r,
+        vx: rand(-60, 60), vy: rand(-60, 60), life: 0.4, max: 0.4,
+        size: rand(1.4, 3), color: 'rgba(92,98,108,0.8)' });
+    }
+    if (rk.hp <= 0) breakRock(rk);
+  }
+}
+
+function clearDust(d) {
+  d.dead = true;
+  G.cleanedW += d.w;
+  G.cleanedCount++;
+  G.progress = clamp(G.cleanedW / G.totalDustW, 0, 1);
+  G.o2 = Math.min(G.maxO2, G.o2 + 2.4 * B.o2Regen);
+  burst(d.x, d.y, 'rgba(200,190,166,0.9)', 10, 110, 3);
+  Audio2.clean();
+
+  G.combo++; G.comboTimer = 1.6;
+  if (G.combo > 0 && G.combo % 10 === 0) {
+    floatText(d.x, d.y - 16, `连续 ×${G.combo}`, '#2F8C86', 17);
+  }
+
+  if (Math.random() < 0.14) G.pickups.push(makePickup(d.x, d.y, 'gold', null));
+}
+
+function breakRock(rk) {
+  rk.dead = true;
+  burst(rk.x, rk.y, 'rgba(74,80,90,0.9)', 16, 180, 3.4);
+  burst(rk.x, rk.y, 'rgba(240,200,120,0.9)', 6, 140, 3);
+  Audio2.rock();
+  G.shake = Math.max(G.shake, 5);
+
+  // 概率掉金砖：约 45% 的岩石含矿，每次 1~2 块
+  if (Math.random() < 0.45) {
+    const coins = randi(1, 2);
+    for (let i = 0; i < coins; i++) G.pickups.push(makePickup(rk.x + rand(-8, 8), rk.y + rand(-8, 8), 'gold', null));
+  }
+  if (Math.random() < 0.20) {
+    const b = BOOKS[randi(0, BOOKS.length - 1)];
+    G.pickups.push(makePickup(rk.x, rk.y, 'book', b.id));
+  }
+  G.o2 = Math.min(G.maxO2, G.o2 + 3.5 * B.o2Regen);
+}
+
+function updatePickups(dt) {
+  const p = G.player;
+  const mr = magnetRadius();
+  for (const it of G.pickups) {
+    if (it.dead) continue;
+    it.t += dt;
+    const dd = dist(it.x, it.y, p.x, p.y);
+    if (dd < mr) {
+      const k = 1 - dd / mr;
+      const pull = 620 * (0.35 + k) * dt;
+      it.x += ((p.x - it.x) / (dd || 1)) * pull;
+      it.y += ((p.y - it.y) / (dd || 1)) * pull;
+    } else {
+      it.x += it.vx * dt; it.y += it.vy * dt;
+      it.vx *= 0.94; it.vy *= 0.94;
+      it.x = clamp(it.x, FIELD.x0 + 14, FIELD.x1 - 14);
+      it.y = clamp(it.y, FIELD.y0 + 14, FIELD.y1 - 14);
+    }
+    if (dd < p.r + 14) collect(it);
+  }
+}
+
+function collect(it) {
+  it.dead = true;
+  if (it.type === 'gold') {
+    const v = 1 * goldMul();
+    earnGold(v);
+    Audio2.gold();
+    floatText(it.x, it.y, '+1', '#D99B34', 15);
+    burst(it.x, it.y, 'rgba(240,190,90,0.95)', 5, 90, 2.4);
+  } else {
+    const b = BOOK_MAP[it.bookId];
+    const firstEver = !save.books[b.id];
+    save.books[b.id] = (save.books[b.id] || 0) + 1;
+    const firstThisRun = !B.books.includes(b.id);
+    G.booksFound.push(b.id);
+    Audio2.book();
+    burst(it.x, it.y, 'rgba(90,160,190,0.95)', 12, 150, 3);
+
+    if (firstThisRun) {
+      b.apply(B);
+      B.books.push(b.id);
+      G.maxO2 = 100;
+      toast(`${firstEver ? '发现新书籍' : '再次读到'} <b>《${b.title}》</b> · ${b.eff}`);
+    } else {
+      earnGold(1);
+      toast(`重复书籍 <b>《${b.title}》</b> · 转化为 1 金砖`);
+    }
+    persist();
+  }
+}
+
+/* ---------- 陨石：难度连续曲线 ---------- */
+/** 关卡进程：月区序号 + 本区清洁进度，0 起连续增长 */
+function meteorDifficulty() {
+  return clamp((G.sector - 1) + clamp(G.progress, 0, 1) * 0.9, 0, SECTOR_MAX);
+}
+/** 连续插值，避免整级跳变 */
+const smooth01 = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+
+function nextMeteorDelay() {
+  const t = smooth01(meteorDifficulty() / 4.6);
+  return lerp(7.8, 1.7, t) * rand(0.82, 1.28);   // 间隔从 7.8s 平滑压到 1.7s
+}
+
+function spawnMeteor() {
+  const d = meteorDifficulty();
+  const t = smooth01(d / 4.6);
+
+  const heavy = Math.random() < 0.08 + t * 0.18;                  // 重陨石概率随进度上升
+  const r = heavy ? rand(60, 84) : rand(34, 56);
+  const power = (r / 50) * (heavy ? 1.1 : 1);                     // 破损程度基数
+  const ang = rand(Math.PI * 0.12, Math.PI * 0.88);               // 从上方斜落
+  const dir = { x: Math.cos(ang) * (Math.random() < 0.5 ? -1 : 1), y: -Math.sin(ang) };
+
+  // 一部分陨石冲着车来，逼玩家移动
+  let x, y;
+  const aim = Math.random() < 0.30 + t * 0.28;
+  if (aim) {
+    x = G.player.x + rand(-96, 96);
+    y = G.player.y + rand(-96, 96);
+  } else {
+    x = rand(FIELD.x0 + 70, FIELD.x1 - 70);
+    y = rand(FIELD.y0 + 70, FIELD.y1 - 70);
+  }
+  x = clamp(x, FIELD.x0 + 30, FIELD.x1 - 30);
+  y = clamp(y, FIELD.y0 + 30, FIELD.y1 - 30);
+
+  G.meteors.push({
+    x, y, r, power, dir,
+    t: 0,
+    dur: clamp((1.95 - t * 0.75) * (heavy ? 0.9 : 1) * rand(0.9, 1.12), 0.8, 2.1),
+    hit: false, heavy
+  });
+}
+
+/** 破损判定共用公式：陨石直击与浮石撞击走同一套伤害结算 */
+function impactDamage(power, falloff) {
+  const armor = Math.max(0.3, 1 - 0.10 * save.upg.armor);
+  return 11.5 * power * (0.42 + 0.58 * falloff) * B.dmgMul * armor;
+}
+
+function updateMeteors(dt) {
+  const p = G.player;
+  if (G.state === 'playing') {
+    G.meteorTimer -= dt;
+    if (G.meteorTimer <= 0) {
+      spawnMeteor();
+      if (meteorDifficulty() > 2.2 && Math.random() < 0.28) spawnMeteor();  // 高进度偶发双落
+      G.meteorTimer = nextMeteorDelay();
+    }
+  }
+
+  for (const m of G.meteors) {
+    m.t += dt;
+    if (!m.hit && m.t >= m.dur) {
+      m.hit = true;
+      Audio2.hit();
+      G.shake = Math.max(G.shake, 9 + m.power * 6);
+      burst(m.x, m.y, 'rgba(217,102,63,0.9)', Math.round(18 + m.power * 14), 200 + m.power * 80, 4);
+      burst(m.x, m.y, 'rgba(150,140,120,0.85)', Math.round(14 + m.power * 10), 180, 3.6);
+
+      const shards = 1 + Math.round(m.power);
+      for (let i = 0; i < shards; i++) {
+        placeRock(m.x + rand(-70, 70), m.y + rand(-70, 70), rand(16, 20 + m.r * 0.18), rand(22, 38));
+      }
+
+      // ---- 命中判定：按距离与陨石质量计算破损 ----
+      const d0 = dist(p.x, p.y, m.x, m.y);
+      const reach = m.r + p.r;
+      if (d0 < reach) {
+        const falloff = clamp(1 - (d0 - p.r * 0.4) / (m.r + p.r * 0.6), 0.22, 1);   // 圈心最痛
+        const dmg = impactDamage(m.power, falloff);
+
+        G.o2 = Math.max(0, G.o2 - dmg);
+        G.damage = clamp(G.damage + dmg / 55, 0, 1);
+        G.hitFlash = 1;
+        G.shake = Math.max(G.shake, 10 + dmg * 0.5);
+
+        const nx = (p.x - m.x) / (d0 || 1), ny = (p.y - m.y) / (d0 || 1);
+        const kb = 60 + m.power * 130;
+        p.vx += nx * kb; p.vy += ny * kb;
+
+        floatText(p.x, p.y - 30, `-${Math.round(dmg)}`, falloff > 0.72 ? '#D9402F' : '#D9663F',
+          Math.round(15 + dmg * 0.55));
+        if (falloff > 0.72) floatText(p.x, p.y - 52, '直击！', '#D9402F', 15);
+        burst(p.x, p.y, 'rgba(226,120,70,0.95)', 10, 150, 3);
+      }
+    }
+  }
+  G.meteors = G.meteors.filter(m => !m.hit || (m.t - m.dur) < 0.6);
+}
+
+function updateRocks(dt) {
+  for (const rk of G.rocks) {
+    if (rk.dead || !rk.ttl) continue;
+    rk.ttl -= dt;
+    if (rk.ttl <= 0) {
+      rk.dead = true;
+      burst(rk.x, rk.y, 'rgba(152,144,126,0.7)', 7, 80, 2.6);
+    }
+  }
+}
+
+function updateParticles(dt) {
+  for (const q of G.parts) {
+    q.x += q.vx * dt; q.y += q.vy * dt;
+    q.vx *= 0.93; q.vy *= 0.93;
+    q.life -= dt;
+  }
+  G.parts = G.parts.filter(q => q.life > 0);
+
+  for (const t of G.texts) { t.y -= 26 * dt; t.life -= dt * 1.35; }
+  G.texts = G.texts.filter(t => t.life > 0);
+
+  if (G.comboTimer > 0) { G.comboTimer -= dt; if (G.comboTimer <= 0) G.combo = 0; }
+
+  // 清理已死亡实体
+  if (G.dust.some(d => d.dead)) G.dust = G.dust.filter(d => !d.dead);
+  if (G.rocks.some(r => r.dead)) G.rocks = G.rocks.filter(r => !r.dead);
+  if (G.pickups.some(i => i.dead)) G.pickups = G.pickups.filter(i => !i.dead);
+}
+
+function updateO2(dt) {
+  const o2Save = Math.max(0.55, 1 - 0.05 * save.upg.o2);   // 氧气循环升级：消耗降低
+  const drain = (1.25 + G.sector * 0.22 + (boosting ? 2.3 : 0)) * o2Save * dt;
+  G.o2 = clamp(G.o2 - drain, 0, G.maxO2);
+  if (G.o2 <= 0) runFail();
+}
+
+/* ---------------- 结算 ---------------- */
+function sectorClear() {
+  G.state = 'clear';
+  Audio2.clear();
+  const bonus = Math.round((16 + G.sector * 12) * goldMul());
+  earnGold(bonus);
+  save.best = Math.max(save.best, G.sector);
+  if (G.sector >= SECTOR_MAX) save.cleared = true;
+  bankRun();          // 本区收益立刻入账，工坊能马上花
+  persist();
+  G.shake = 6;
+
+  const isFinal = G.sector >= SECTOR_MAX;
+  openPanel(`
+    <div class="sub">SECTOR ${G.sector} · CLEARED</div>
+    <h1 class="title" style="font-size:40px;margin-top:6px;">${SECTORS[G.sector - 1].name} 已清空</h1>
+    <p class="lead">${isFinal
+      ? '五个月区全部恢复洁净。月球不需要感谢，它只需要干净 —— 但今晚，它亮得不太一样。'
+      : '尘埃归零，月壤重新露出原本的灰白色。清扫完成了，但更大的月区还在等你。'}</p>
+    <div class="statline">
+      <div>清理尘埃<b>${G.cleanedCount}</b></div>
+      <div>本区奖励<b>+${bonus}</b></div>
+      <div>本次累计金砖<b>${Math.floor(G.runTotal)}</b></div>
+      <div>收集书籍<b>${new Set(G.booksFound).size}/${BOOKS.length}</b></div>
+    </div>
+    <div class="btns">
+      ${isFinal ? '' : '<button class="act primary" id="btnNext">前往下一月区</button>'}
+      <button class="act ${isFinal ? 'primary' : 'ghost'}" id="btnShop2">进入工坊</button>
+      ${isFinal ? '<button class="act ghost" id="btnHome">返回基地</button>' : ''}
+    </div>
+  `);
+  const nx = document.getElementById('btnNext');
+  if (nx) nx.onclick = () => { closePanel(); startRunNextSector(); };
+  document.getElementById('btnShop2').onclick = () => openShop(() => {
+    if (isFinal) { closePanel(); doFail('通关'); }
+    else { closePanel(); startRunNextSector(); }
+  });
+  const hm = document.getElementById('btnHome');
+  if (hm) hm.onclick = () => { closePanel(); toTitle(); };
+}
+
+function startRunNextSector() {
+  G.state = 'playing';
+  startSector(G.sector + 1);
+}
+
+function runFail() {
+  if (G.state !== 'playing') return;
+  Audio2.fail();
+  Audio2.hum(0);
+  doFail('氧气耗尽');
+}
+
+function doFail(reason) {
+  G.state = 'fail';
+  G.runActive = false;                 // 任务结束，机体损伤随本次任务作废
+  save.best = Math.max(save.best || 0, G.sector);
+  bankRun();
+  persist();
+
+  const fee = SECTOR_UNLOCK_COST[G.sector] || 0;
+  const canRe = save.gold >= fee;
+  openPanel(`
+    <div class="sub">MISSION LOG</div>
+    <h1 class="title" style="font-size:38px;margin-top:6px;">${reason === '通关' ? '清道夫 · 全线完工' : '信号中断'}</h1>
+    <p class="lead">${reason === '通关'
+      ? '你留在了月球上，把每一粒尘埃都收进了口袋。下一步，也许该打扫别的地方了。'
+      : '氧气归零。你在最后一团尘埃旁停下，把它标记在地图上，等下一次出发。'}</p>
+    <div class="statline">
+      <div>抵达月区<b>${G.sector}</b></div>
+      <div>清理尘埃<b>${G.cleanedCount}</b></div>
+      <div>带回归金砖<b>+${Math.floor(G.runTotal)}</b></div>
+      <div>收集书籍<b>${new Set(G.booksFound).size}/${BOOKS.length}</b></div>
+    </div>
+    <div class="btns">
+      <button class="act primary" id="btnAgain" ${canRe ? '' : 'disabled'}>
+        再次挑战第 ${G.sector} 月区${fee > 0 ? ` · ${fee} 金砖` : ''}
+      </button>
+      <button class="act ghost" id="btnFrom1">从第 1 关出发</button>
+      <button class="act ghost" id="btnShop3">进入工坊</button>
+      <button class="act ghost" id="btnTitle">返回基地</button>
+    </div>
+    ${canRe ? '' : `<p class="lead" style="margin-top:12px;font-size:12.5px;">金砖不足，无法直接挑战第 ${G.sector} 月区（需 ${fee}），可先从第 1 关重新推进。</p>`}
+  `);
+  document.getElementById('btnAgain').onclick = () => { closePanel(); startRun(G.sector); };
+  document.getElementById('btnFrom1').onclick = () => { closePanel(); startRun(1); };
+  document.getElementById('btnShop3').onclick = () => openShop(() => { closePanel(); toTitle(); });
+  document.getElementById('btnTitle').onclick = () => { closePanel(); toTitle(); };
+}
+
+/* ---------------- 渲染 ---------------- */
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.save();
+  if (G.shake > 0.2) ctx.translate(rand(-G.shake, G.shake) * 0.6, rand(-G.shake, G.shake) * 0.6);
+
+  ctx.drawImage(bgCanvas, 0, 0);
+  drawDust();
+  drawRocks();
+  drawFloaters();
+  drawPickups();
+  drawMeteors();
+  if (G.state !== 'title') drawPlayer();
+  drawGuideArrow();
+  drawParticles();
+  drawTexts();
+
+  ctx.restore();
+  // 边缘暗角
+  const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.42, W / 2, H / 2, H * 0.95);
+  vg.addColorStop(0, 'rgba(60,56,46,0)');
+  vg.addColorStop(1, 'rgba(60,56,46,0.16)');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+
+  // 受击闪红
+  if (G.hitFlash > 0) {
+    const fg = ctx.createRadialGradient(W / 2, H / 2, H * 0.22, W / 2, H / 2, H * 0.85);
+    fg.addColorStop(0, 'rgba(217,64,47,0)');
+    fg.addColorStop(1, `rgba(217,64,47,${0.34 * G.hitFlash})`);
+    ctx.fillStyle = fg; ctx.fillRect(0, 0, W, H);
+  }
+}
+
+function drawDust() {
+  for (const d of G.dust) {
+    const k = 0.42 + 0.58 * (d.hp / d.max);
+    const r = d.r * k;
+    const g = ctx.createRadialGradient(d.x, d.y, r * 0.12, d.x, d.y, r);
+    g.addColorStop(0, 'rgba(190,180,156,0.92)');
+    g.addColorStop(0.55, 'rgba(200,190,166,0.68)');
+    g.addColorStop(1, 'rgba(210,201,180,0)');
+    ctx.beginPath(); ctx.arc(d.x, d.y, r, 0, TAU); ctx.fillStyle = g; ctx.fill();
+
+    ctx.fillStyle = 'rgba(146,137,116,0.45)';
+    for (const s of d.speck) {
+      const rr = s.d * r;
+      ctx.beginPath();
+      ctx.arc(d.x + Math.cos(s.a + d.ph) * rr, d.y + Math.sin(s.a + d.ph) * rr, s.s * k, 0, TAU);
+      ctx.fill();
+    }
+  }
+}
+
+function drawRocks() {
+  for (const rk of G.rocks) {
+    const k = 0.55 + 0.45 * (rk.hp / rk.max);
+    ctx.save();
+    if (rk.ttl > 0 && rk.ttl < 3) ctx.globalAlpha = rk.ttl / 3;
+    ctx.translate(rk.x, rk.y + 3);
+    ctx.beginPath();
+    rk.verts.forEach((v, i) => {
+      const rr = rk.r * k * v.k;
+      const x = Math.cos(v.a + rk.rot) * rr, y = Math.sin(v.a + rk.rot) * rr;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(60,64,72,0.90)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(32,36,42,0.85)';
+    ctx.lineWidth = 1.6; ctx.stroke();
+
+    // 高光面
+    ctx.beginPath();
+    ctx.ellipse(-rk.r * 0.22 * k, -rk.r * 0.24 * k, rk.r * 0.38 * k, rk.r * 0.22 * k, -0.6, 0, TAU);
+    ctx.fillStyle = 'rgba(150,158,170,0.35)'; ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawFloaters() {
+  for (const f of G.floaters) {
+    const bob = Math.sin(f.t * 1.6 + f.ph) * 4;
+    const pulse = 0.5 + 0.5 * Math.sin(f.t * 3.4 + f.ph);
+
+    // 地面投影：两道同心椭圆（悬得更高、更飘）
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(f.x, f.y + f.r * 1.05, f.r * 0.9, f.r * 0.3, 0, 0, TAU);
+    ctx.fillStyle = 'rgba(58,54,44,0.10)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(f.x, f.y + f.r * 1.05, f.r * 0.52, f.r * 0.16, 0, 0, TAU);
+    ctx.fillStyle = 'rgba(58,54,44,0.12)';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(f.x, f.y + bob);
+
+    // ---- 悬浮能量场：青色光晕，远处也能一眼认出来 ----
+    const halo = ctx.createRadialGradient(0, 0, f.r * 0.25, 0, 0, f.r * 2.2);
+    halo.addColorStop(0, `rgba(70,224,208,${0.30 + pulse * 0.16})`);
+    halo.addColorStop(0.5, `rgba(70,224,208,${0.11 + pulse * 0.07})`);
+    halo.addColorStop(1, 'rgba(70,224,208,0)');
+    ctx.beginPath();
+    ctx.arc(0, 0, f.r * 2.2, 0, TAU);
+    ctx.fillStyle = halo;
+    ctx.fill();
+
+    // ---- 双向旋转的能量环 ----
+    const ringR = f.r * 1.52;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(0, 0, ringR, f.t * 1.15, f.t * 1.15 + 1.9);
+    ctx.strokeStyle = `rgba(120,240,228,${0.42 + pulse * 0.34})`;
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, ringR, f.t * -0.9 + Math.PI, f.t * -0.9 + Math.PI + 1.35);
+    ctx.strokeStyle = `rgba(120,240,228,${0.28 + pulse * 0.22})`;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // ---- 岩体：带青色的异材质，和灰色地面岩石彻底区分 ----
+    ctx.beginPath();
+    f.verts.forEach((v, i) => {
+      const rr = f.r * v.k;
+      const x = Math.cos(v.a + f.rot) * rr, y = Math.sin(v.a + f.rot) * rr;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.closePath();
+    const body = ctx.createLinearGradient(-f.r, -f.r, f.r, f.r);
+    body.addColorStop(0, '#5E8E96');
+    body.addColorStop(0.55, '#37606A');
+    body.addColorStop(1, '#223E46');
+    ctx.fillStyle = body;
+    ctx.fill();
+    // 亮青色描边（技能才能消融的提示）
+    ctx.strokeStyle = `rgba(105,255,238,${0.7 + pulse * 0.28})`;
+    ctx.lineWidth = 2.6;
+    ctx.stroke();
+    // 内圈冷光
+    ctx.beginPath();
+    ctx.arc(0, 0, f.r * 0.72, 0, TAU);
+    ctx.strokeStyle = `rgba(120,240,228,${0.16 + pulse * 0.16})`;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // ---- 发光裂隙 + 晶核 ----
+    ctx.strokeStyle = `rgba(150,250,240,${0.55 + pulse * 0.4})`;
+    ctx.lineWidth = 1.6;
+    const R = f.r;
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.34, -R * 0.3); ctx.lineTo(-R * 0.06, -R * 0.02); ctx.lineTo(R * 0.3, R * 0.26);
+    ctx.moveTo(R * 0.28, -R * 0.34); ctx.lineTo(R * 0.04, -R * 0.06);
+    ctx.stroke();
+    const core = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.42);
+    core.addColorStop(0, `rgba(220,255,252,${0.55 + pulse * 0.4})`);
+    core.addColorStop(0.45, `rgba(90,240,224,${0.4 + pulse * 0.3})`);
+    core.addColorStop(1, 'rgba(70,224,208,0)');
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 0.42, 0, TAU);
+    ctx.fillStyle = core;
+    ctx.fill();
+
+    // ---- 环绕的磁悬粒子 ----
+    for (let i = 0; i < 3; i++) {
+      const a = f.t * (1.3 + i * 0.22) + i * (TAU / 3) + f.ph;
+      const rr = ringR * (1.02 + 0.08 * Math.sin(f.t * 2 + i));
+      const sx = Math.cos(a) * rr, sy = Math.sin(a) * rr * 0.72;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2.1, 0, TAU);
+      ctx.fillStyle = `rgba(190,255,248,${0.55 + pulse * 0.35})`;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx - Math.sin(a) * 7, sy + Math.cos(a) * 7 * 0.72);
+      ctx.strokeStyle = 'rgba(120,240,228,0.35)';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+
+    // 逼近机体时的警戒圈（浮石是实体，会撞伤机体）
+    if (G.state === 'playing') {
+      const near = dist(G.player.x, G.player.y, f.x, f.y) - f.r - G.player.r;
+      if (near < 46) {
+        const k = clamp(1 - near / 46, 0, 1);
+        ctx.beginPath();
+        ctx.arc(0, 0, f.r * 1.42, 0, TAU);
+        ctx.setLineDash([5, 6]);
+        ctx.strokeStyle = `rgba(217,102,63,${0.22 + k * 0.55})`;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // 消融进度环：技能照射时是粗亮环，普通吸力是细虚线（表示"在磨但很慢"）
+    if (f.melt > 0) {
+      const mp = Math.min(1, f.melt / FLOATER_MELT_TIME);
+      if (f.fastMelt) {
+        ctx.beginPath();
+        ctx.arc(0, 0, f.r * 1.72, -Math.PI / 2, -Math.PI / 2 + TAU * mp);
+        ctx.strokeStyle = 'rgba(120,255,240,0.95)';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, 0, f.r * 1.72, -Math.PI / 2, -Math.PI / 2 + TAU * mp);
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, f.r * 1.66, -Math.PI / 2, -Math.PI / 2 + TAU * mp);
+        ctx.setLineDash([4, 5]);
+        ctx.strokeStyle = 'rgba(120,240,228,0.6)';
+        ctx.lineWidth = 2.4;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    ctx.restore();
+  }
+}
+
+function drawPickups() {
+  for (const it of G.pickups) {
+    const bob = Math.sin(it.t * 3.2) * 3;
+    if (it.type === 'gold') {
+      ctx.save();
+      ctx.translate(it.x, it.y + bob);
+      ctx.rotate(it.t * 1.6);
+      const g = ctx.createLinearGradient(-7, -7, 7, 7);
+      g.addColorStop(0, '#F3C767'); g.addColorStop(1, '#C98C22');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.roundRect(-7, -7, 14, 14, 3.5);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(150,100,15,0.6)'; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.translate(it.x, it.y + bob);
+      ctx.rotate(Math.sin(it.t * 1.6) * 0.12);
+      ctx.shadowColor = 'rgba(60,120,150,0.5)'; ctx.shadowBlur = 12;
+      ctx.fillStyle = '#3E7C93';
+      ctx.beginPath(); ctx.roundRect(-12, -14, 24, 28, 3); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#F4EFE2';
+      ctx.beginPath(); ctx.roundRect(-8, -11, 16, 22, 2); ctx.fill();
+      ctx.fillStyle = 'rgba(62,124,147,0.5)';
+      ctx.fillRect(-6, -7, 12, 1.5); ctx.fillRect(-6, -2.5, 12, 1.5); ctx.fillRect(-6, 2, 9, 1.5);
+      ctx.restore();
+    }
+  }
+}
+
+function drawMeteors() {
+  for (const m of G.meteors) {
+    if (!m.hit) {
+      const pr = clamp(m.t / m.dur, 0, 1);
+      const e = pr * pr;                       // 加速下落
+      const dist0 = 980;
+      const sx = m.x + m.dir.x * (1 - e) * dist0;
+      const sy = m.y + m.dir.y * (1 - e) * dist0;
+
+      ctx.save();
+      // 落点预警圈
+      ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, TAU);
+      ctx.fillStyle = `rgba(217,102,63,${0.05 + pr * 0.15})`; ctx.fill();
+      ctx.setLineDash([7, 7]);
+      ctx.strokeStyle = `rgba(217,102,63,${0.32 + pr * 0.5})`;
+      ctx.lineWidth = m.heavy ? 3 : 2; ctx.stroke();
+      ctx.setLineDash([]);
+      // 收缩进度环
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, m.r * (1 - pr * 0.97), 0, TAU);
+      ctx.strokeStyle = `rgba(217,102,63,${0.45 + pr * 0.35})`; ctx.lineWidth = 4; ctx.stroke();
+
+      // 拖尾
+      const core = Math.max(5, m.r * 0.30);
+      for (let i = 10; i >= 1; i--) {
+        const tt = Math.max(0, e - i * 0.016);
+        const px = m.x + m.dir.x * (1 - tt) * dist0;
+        const py = m.y + m.dir.y * (1 - tt) * dist0;
+        const a = (1 - i / 11) * 0.5;
+        ctx.beginPath();
+        ctx.arc(px, py, core * (1 - i / 13), 0, TAU);
+        ctx.fillStyle = `rgba(232,132,74,${a})`; ctx.fill();
+      }
+      // 流星本体
+      const gg = ctx.createRadialGradient(sx, sy, core * 0.2, sx, sy, core * 2.2);
+      gg.addColorStop(0, 'rgba(255,224,190,0.98)');
+      gg.addColorStop(0.4, 'rgba(236,140,80,0.95)');
+      gg.addColorStop(1, 'rgba(217,102,63,0)');
+      ctx.beginPath(); ctx.arc(sx, sy, core * 2.2, 0, TAU); ctx.fillStyle = gg; ctx.fill();
+      ctx.beginPath(); ctx.arc(sx, sy, core * 0.85, 0, TAU);
+      ctx.fillStyle = 'rgba(255,238,215,0.95)'; ctx.fill();
+      ctx.restore();
+    } else {
+      const e = clamp((m.t - m.dur) / 0.6, 0, 1);
+      ctx.beginPath(); ctx.arc(m.x, m.y, m.r * (1 + e * 1.6), 0, TAU);
+      ctx.strokeStyle = `rgba(217,102,63,${(1 - e) * 0.85})`;
+      ctx.lineWidth = 7 * (1 - e) + 1; ctx.stroke();
+      ctx.beginPath(); ctx.arc(m.x, m.y, m.r * (0.35 + e * 0.5), 0, TAU);
+      ctx.fillStyle = `rgba(255,236,205,${(1 - e) * 0.8})`; ctx.fill();
+    }
+  }
+}
+
+/** 清洁度 >95% 时，车旁出现箭头指引最近的一团剩余尘埃 */
+function drawGuideArrow() {
+  if (G.state !== 'playing' || G.progress < 0.95) return;
+  const p = G.player;
+  let best = null, bd = Infinity;
+  for (const d of G.dust) {
+    if (d.dead) continue;
+    const dd = dist(d.x, d.y, p.x, p.y);
+    if (dd < bd) { bd = dd; best = d; }
+  }
+  if (!best || bd < 100) return;   // 已经在吸力范围内就不用指了
+
+  const a = Math.atan2(best.y - p.y, best.x - p.x);
+  const rr = 48 + Math.sin(G.time * 5) * 4;   // 轻微呼吸浮动
+  ctx.save();
+  ctx.translate(p.x + Math.cos(a) * rr, p.y + Math.sin(a) * rr);
+  ctx.rotate(a);
+  ctx.beginPath();
+  ctx.moveTo(10, 0); ctx.lineTo(-6, -8); ctx.lineTo(-2, 0); ctx.lineTo(-6, 8);
+  ctx.closePath();
+  ctx.fillStyle = `rgba(47,140,134,${0.75 + Math.sin(G.time * 6) * 0.2})`;
+  ctx.fill();
+  ctx.restore();
+
+  // 圈内小提示文字
+  ctx.save();
+  ctx.font = 'bold 11px "Noto Sans SC", sans-serif';
+  ctx.fillStyle = 'rgba(47,140,134,0.85)';
+  ctx.textAlign = 'center';
+  ctx.fillText('剩余尘埃', p.x + Math.cos(a) * (rr + 26), p.y + Math.sin(a) * (rr + 26) + 4);
+  ctx.restore();
+}
+
+function drawPlayer() {
+  const p = G.player;
+  const R = suctionRadius() * (boosting ? (1.55 * B.boostMul) : 1);
+  const t = G.time;
+
+  // 吸力范围
+  ctx.save();
+  ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, TAU);
+  const rg = ctx.createRadialGradient(p.x, p.y, R * 0.2, p.x, p.y, R);
+  rg.addColorStop(0, 'rgba(47,140,134,0.02)');
+  rg.addColorStop(0.75, boosting ? 'rgba(47,140,134,0.10)' : 'rgba(47,140,134,0.06)');
+  rg.addColorStop(1, 'rgba(47,140,134,0)');
+  ctx.fillStyle = rg; ctx.fill();
+  ctx.setLineDash([10, 12]);
+  ctx.lineDashOffset = -t * (boosting ? 90 : 34);
+  ctx.strokeStyle = boosting ? 'rgba(47,140,134,0.55)' : 'rgba(47,140,134,0.30)';
+  ctx.lineWidth = boosting ? 2.4 : 1.6;
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 内层脉冲
+  const pulse = (Math.sin(t * 3) * 0.5 + 0.5) * 0.3 + 0.7;
+  ctx.beginPath(); ctx.arc(p.x, p.y, R * 0.45 * pulse, 0, TAU);
+  ctx.strokeStyle = 'rgba(47,140,134,0.14)'; ctx.lineWidth = 1.2; ctx.stroke();
+  ctx.restore();
+
+  // 车体
+  ctx.save();
+  ctx.translate(p.x, p.y + Math.sin(t * 6) * 0.8);
+  ctx.rotate(p.ang + Math.PI / 2);
+
+  // 阴影
+  ctx.beginPath(); ctx.ellipse(0, 5, 19, 15, 0, 0, TAU);
+  ctx.fillStyle = 'rgba(80,76,66,0.16)'; ctx.fill();
+
+  // 轮子
+  ctx.fillStyle = '#3A3F47';
+  [[-15, -6], [15, -6], [-15, 7], [15, 7]].forEach(([x, y]) => {
+    ctx.beginPath(); ctx.roundRect(x - 4, y - 6, 8, 12, 3); ctx.fill();
+  });
+
+  // 车身
+  ctx.beginPath(); ctx.roundRect(-14, -12, 28, 26, 9);
+  const bg2 = ctx.createLinearGradient(-14, -12, 14, 14);
+  bg2.addColorStop(0, '#FFFFFF'); bg2.addColorStop(1, '#E7E3D8');
+  ctx.fillStyle = bg2; ctx.fill();
+  ctx.strokeStyle = '#2B313A'; ctx.lineWidth = 2; ctx.stroke();
+
+  // 前方吸口
+  ctx.beginPath();
+  ctx.moveTo(-9, -12); ctx.lineTo(9, -12); ctx.lineTo(6, -19); ctx.lineTo(-6, -19);
+  ctx.closePath();
+  ctx.fillStyle = '#C9CDD4'; ctx.fill();
+  ctx.strokeStyle = '#2B313A'; ctx.lineWidth = 1.6; ctx.stroke();
+
+  // 舱窗
+  ctx.beginPath();
+  ctx.ellipse(0, 1, 7.5, 6, 0, 0, TAU);
+  const wg = ctx.createRadialGradient(-2, -2, 1, 0, 1, 8);
+  wg.addColorStop(0, '#8FD9D2'); wg.addColorStop(1, '#2F8C86');
+  ctx.fillStyle = wg; ctx.fill();
+  ctx.strokeStyle = 'rgba(43,49,58,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // 顶部指示灯
+  const blink = (Math.sin(t * 4) * 0.5 + 0.5);
+  ctx.beginPath(); ctx.arc(0, -8.5, 2.2, 0, TAU);
+  ctx.fillStyle = `rgba(217,102,63,${0.45 + blink * 0.55})`; ctx.fill();
+
+  // 破损痕迹：划痕随破损加深
+  if (G.damage > 0.1) {
+    ctx.strokeStyle = `rgba(44,48,56,${0.22 + G.damage * 0.6})`;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.moveTo(-10, -3); ctx.lineTo(-5, 2); ctx.lineTo(-7, 7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(9, -5); ctx.lineTo(4, 1); ctx.stroke();
+    if (G.damage > 0.45) { ctx.beginPath(); ctx.moveTo(1, 8); ctx.lineTo(8, 12); ctx.stroke(); }
+  }
+
+  ctx.restore();
+
+  // 强化时的光晕
+  if (boosting) {
+    ctx.beginPath(); ctx.arc(p.x, p.y, 26 + Math.sin(t * 12) * 2, 0, TAU);
+    ctx.strokeStyle = 'rgba(47,140,134,0.35)'; ctx.lineWidth = 3; ctx.stroke();
+  }
+}
+
+function drawParticles() {
+  for (const q of G.parts) {
+    const a = clamp(q.life / q.max, 0, 1);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = q.color;
+    ctx.beginPath(); ctx.arc(q.x, q.y, q.size * (0.4 + a * 0.8), 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawTexts() {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const t of G.texts) {
+    const a = clamp(t.life / t.max, 0, 1);
+    ctx.globalAlpha = a;
+    ctx.font = `800 ${t.size}px "PingFang SC","Microsoft YaHei",sans-serif`;
+    ctx.lineWidth = 4.5; ctx.strokeStyle = 'rgba(255,252,244,0.9)';
+    ctx.strokeText(t.text, t.x, t.y);
+    ctx.fillStyle = t.color;
+    ctx.fillText(t.text, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---------------- HUD 同步 ---------------- */
+const $o2fill = document.getElementById('o2fill');
+const $o2val = document.getElementById('o2val');
+const $pgfill = document.getElementById('pgfill');
+const $pgval = document.getElementById('pgval');
+const $hpfill = document.getElementById('hpfill');
+const $hpval = document.getElementById('hpval');
+const $skfill = document.getElementById('skfill');
+const $skval = document.getElementById('skval');
+const $goldVal = document.getElementById('goldVal');
+const $secVal = document.getElementById('secVal');
+
+function syncHud() {
+  const o2p = clamp(G.o2 / G.maxO2, 0, 1);
+  $o2fill.style.width = (o2p * 100).toFixed(1) + '%';
+  $o2fill.style.background = o2p > 0.5 ? '#2F8C86' : o2p > 0.25 ? '#D99B34' : '#D9663F';
+  $o2val.textContent = Math.ceil(G.o2);
+  const p = clamp(G.progress, 0, 1);
+  $pgfill.style.width = (p * 100).toFixed(1) + '%';
+  $pgfill.style.background = p >= 0.999 ? '#2F8C86' : '#8A93A0';
+  $pgval.textContent = Math.floor(p * 100) + '%';
+  const hp = clamp(1 - G.damage, 0, 1);
+  $hpfill.style.width = (hp * 100).toFixed(1) + '%';
+  $hpfill.style.background = hp > 0.66 ? '#5E8FA6' : hp > 0.33 ? '#D99B34' : '#D9663F';
+  $hpval.textContent = Math.round(hp * 100);
+
+  // 技能状态条：就绪 / 持续中 / 冷却中
+  if (skillT > 0) {
+    $skfill.style.width = (skillT / skillBaseDur() * 100).toFixed(1) + '%';
+    $skfill.style.background = '#2F8C86';
+    $skval.textContent = skillT.toFixed(1) + 's';
+  } else if (skillCdT > 0) {
+    $skfill.style.width = ((1 - skillCdT / skillCdDur()) * 100).toFixed(1) + '%';
+    $skfill.style.background = '#D99B34';
+    $skval.textContent = Math.ceil(skillCdT) + 's';
+  } else {
+    $skfill.style.width = '100%';
+    $skfill.style.background = '#5E8FA6';
+    $skval.textContent = '就绪';
+  }
+
+  // 金砖配额进度：始终显示 本关累计/目标，达标后继续计数让玩家掌握总量
+  const goal = goldGoalOf(G.sector);
+  const got = Math.floor(G.sectorGold);
+  $goldVal.textContent = `${got}/${goal}`;
+  $goldVal.style.color = got >= goal ? '#2F8C86' : '';
+  $secVal.textContent = Math.min(G.sector, SECTOR_MAX);
+}
+
+/* ---------------- 提示条 ---------------- */
+const toastWrap = document.getElementById('toastWrap');
+function toast(html) {
+  if (G.state === 'title') return;   // 标题界面不弹游戏内提示
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = html;
+  toastWrap.appendChild(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 420); }, 2300);
+  // 提示条最多保留 3 条（有界循环，避免任何异常情况下卡死）
+  let guard = 0;
+  while (toastWrap.children.length > 3 && guard++ < 8) {
+    const first = toastWrap.firstChild;
+    if (!first) break;
+    first.remove();
+  }
+}
+
+let hintTimer = null;
+function hideHint() {
+  if (hintTimer) return;
+  hintTimer = setTimeout(() => {
+    const h = document.getElementById('hint');
+    if (h) h.style.opacity = '0';
+  }, 1200);
+}
+
+/* ---------------- 面板 ---------------- */
+const overlay = document.getElementById('overlay');
+function openPanel(html) {
+  overlay.innerHTML = `<div class="panel">${html}</div>`;
+  overlay.classList.add('show');
+}
+function closePanel() { overlay.classList.remove('show'); overlay.innerHTML = ''; }
+
+function openCodex(back) {
+  const owned = Object.keys(save.books).length;
+  const cards = BOOKS.map(b => {
+    const got = !!save.books[b.id];
+    return `<div class="bk ${got ? '' : 'lock'}">
+      <div class="spine"></div>
+      <div>
+        <h5>${got ? '《' + b.title + '》' : '未发现的手册'}</h5>
+        <p>${got ? b.desc : '在月面上找到它，才能读到这一页。'}</p>
+        <div class="eff">${got ? b.eff + (save.books[b.id] > 1 ? ' · 已收集 ' + save.books[b.id] : '') : '???'}</div>
+      </div>
+    </div>`;
+  }).join('');
+  openPanel(`
+    <div class="sub">ARCHIVE</div>
+    <h1 class="title" style="font-size:32px;margin-top:6px;">月球档案 · 书籍收集</h1>
+    <p class="lead" style="margin-top:10px;">已发现 <b>${owned} / ${BOOKS.length}</b> 本。每一本都会在本局提供一项增益，重复发现可折算为金砖。</p>
+    <div class="bookgrid">${cards}</div>
+    <div class="btns"><button class="act primary" id="btnBack">返回</button></div>
+  `);
+  document.getElementById('btnBack').onclick = () => { closePanel(); back && back(); };
+}
+
+function openShop(after) {
+  const build = () => UPGRADES.map(u => {
+    const lv = save.upg[u.key];
+    const maxed = lv >= u.max;
+    const cost = upgCost(u);
+    const can = !maxed && save.gold >= cost;
+    const dots = Array.from({ length: u.max }, (_, i) => `<i class="${i < lv ? 'f' : ''}"></i>`).join('');
+    return `<div class="shopitem">
+      <div>
+        <div class="nm">${u.name}</div>
+        <div class="ds">${u.desc}</div>
+        <div class="lv">${dots}</div>
+      </div>
+      <button class="buy" data-k="${u.key}" ${can ? '' : 'disabled'}>
+        ${maxed ? '已满级' : `<span class="coin"></span>${cost}`}
+      </button>
+    </div>`;
+  }).join('');
+
+  const draw = () => {
+    // 任务进行中且机体有损伤 → 提供付费维修（机体不会自行修复）
+    const inRun = !!G.runActive;
+    const dmgPct = Math.round(clamp(G.damage, 0, 1) * 100);
+    const repairCost = Math.ceil(clamp(G.damage, 0, 1) * 40);
+    const repairBlock = inRun ? `
+      <div class="shopitem" style="${dmgPct > 0 ? 'border-color:rgba(217,102,63,.4);background:#FDF6F0;' : ''}">
+        <div>
+          <div class="nm">机体维修 ${dmgPct > 0 ? `<span style="color:#D9663F">· 破损 ${dmgPct}%</span>` : '· 状态良好'}</div>
+          <div class="ds">${dmgPct > 0 ? '修复全部破损，恢复机动性能与散热。机体在任务中不会自行修复。' : '机体完好，无需维修。'}</div>
+        </div>
+        <button class="buy" id="btnRepair" ${dmgPct > 0 && save.gold >= repairCost ? '' : 'disabled'}>
+          ${dmgPct > 0 ? `<span class="coin"></span>${repairCost}` : '无需维修'}
+        </button>
+      </div>` : '';
+
+    openPanel(`
+      <div class="sub">WORKSHOP</div>
+      <h1 class="title" style="font-size:32px;margin-top:6px;">月面工坊</h1>
+      <p class="lead" style="margin-top:10px;">持有金砖 <b>${Math.floor(save.gold)}</b> · 升级永久生效，跨局保留。</p>
+      ${repairBlock}
+      ${build()}
+      <div class="btns">
+        <button class="act primary" id="btnLeave">出发</button>
+        <button class="act ghost" id="btnCodex2">查看图鉴</button>
+      </div>
+    `);
+    document.querySelectorAll('.buy').forEach(btn => {
+      btn.onclick = () => {
+        const u = UPGRADES.find(x => x.key === btn.dataset.k);
+        if (!u) return;
+        const cost = upgCost(u);
+        if (save.upg[u.key] >= u.max || save.gold < cost) return;
+        save.gold -= cost; save.upg[u.key]++;
+        persist(); Audio2.book();
+        draw();
+      };
+    });
+    const rb = document.getElementById('btnRepair');
+    if (rb) rb.onclick = () => {
+      const c = Math.ceil(clamp(G.damage, 0, 1) * 40);
+      if (G.damage <= 0.01 || save.gold < c) return;
+      save.gold -= c;
+      G.damage = 0; G.hitFlash = 0;
+      persist(); Audio2.book();
+      toast('机体修复完成 · 满状态出厂');
+      draw();
+    };
+    document.getElementById('btnLeave').onclick = () => { closePanel(); after && after(); };
+    document.getElementById('btnCodex2').onclick = () => openCodex(() => draw());
+  };
+  draw();
+}
+
+/* ---------------- 流程 ---------------- */
+/** 直接挑战第 N 月区的一次性解锁费用（本次挑战有效；从第 1 关依次推进则免费） */
+const SECTOR_UNLOCK_COST = [0, 0, 10, 25, 45, 65];
+
+function startRun(fromSector = 1) {
+  const fee = SECTOR_UNLOCK_COST[fromSector] || 0;
+  if (fee > save.gold) {
+    toast(`金砖不足 · 挑战第 ${fromSector} 月区需要 ${fee} 金砖`);
+    return false;
+  }
+  if (fee > 0) save.gold -= fee;
+
+  B = freshBuffs();
+  skillT = 0; skillCdT = 0;
+  boostBtn.classList.remove('on', 'cd');
+  G.runGold = 0;
+  G.runTotal = 0;
+  G.banked = false;
+  G.cleanedCount = 0;
+  G.booksFound = [];
+  G.combo = 0;
+  G.damage = 0;          // 新任务机体满状态
+  G.hitFlash = 0;
+  G.runActive = true;
+  save.plays++; persist();
+
+  G.state = 'playing';
+  startSector(fromSector);
+  closePanel();
+  document.getElementById('hint').style.opacity = '1';
+  hintTimer = null;
+  hideHint();
+  if (fee > 0) toast(`已支付 <b>${fee}</b> 金砖 · 解锁第 ${fromSector} 月区挑战`);
+  return true;
+}
+
+function toTitle() {
+  G.state = 'title';
+  G.runActive = false;
+  Audio2.hum(0);
+  showTitle();
+}
+
+function showTitle() {
+  const owned = Object.keys(save.books).length;
+  const best = save.best || 0;
+  openPanel(`
+    <div class="sub">MOON SWEEPER · AI 协同创作</div>
+    <h1 class="title" style="margin-top:10px;">月面清道夫</h1>
+    <p class="lead">你是被派往月球的最后一名清洁工。任务只有一句话：<b>把这片灰白色的地面，扫回它原本的颜色。</b><br>
+      清扫尘埃、回收废料、捡起遗落的书 —— 每一粒尘埃里都藏着金砖，每一本书里都藏着一个更好用的自己。</p>
+    <div class="feat">
+      <div><h4><span class="dot" style="background:#CFC7B4"></span>清理月球</h4><p>吸走全部尘埃团，清洁度 100% 即可清空月区，共 5 个难度递增的月区。</p></div>
+      <div><h4><span class="dot" style="background:#D99B34"></span>收集金砖</h4><p>拆解太空垃圾、清扫掉落，金砖可在工坊兑换永久升级与机体维修。</p></div>
+      <div><h4><span class="dot" style="background:#3E7C93"></span>收集书籍</h4><p>10 本散落手册，本局提供增益，并永久归档进图鉴。</p></div>
+    </div>
+    <div class="statline">
+      <div>累计收集金砖<b>${Math.floor(save.totalEarned)}</b></div>
+      <div>最远月区<b>${best || '—'}</b></div>
+      <div>图鉴<b>${owned}/${BOOKS.length}</b></div>
+      <div>通关<b>${save.cleared ? '已达成' : '未达成'}</b></div>
+    </div>
+    <div class="btns">
+      <button class="act primary" id="btnStart">开始清扫</button>
+      <button class="act ghost" id="btnSelect">选关</button>
+      <button class="act ghost" id="btnCodexT">图鉴</button>
+      <button class="act ghost" id="btnShopT">工坊</button>
+      <button class="act ghost" id="btnWipe" style="font-size:12px;opacity:0.7;">清空数据</button>
+    </div>
+  `);
+  document.getElementById('btnStart').onclick = () => startRun(1);
+  document.getElementById('btnSelect').onclick = () => openLevelSelect();
+  document.getElementById('btnCodexT').onclick = () => openCodex(() => showTitle());
+  document.getElementById('btnShopT').onclick = () => openShop(() => showTitle());
+  // 清空数据：两段确认，清掉本地存档后回到全新状态
+  document.getElementById('btnWipe').onclick = () => {
+    const b = document.getElementById('btnWipe');
+    if (b.dataset.arm === '1') {
+      b.dataset.arm = '';
+      try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+      save = defaultSave();
+      syncHud();
+      toast('存档已清空 · 一切从头开始');
+      showTitle();
+    } else {
+      b.dataset.arm = '1';
+      b.textContent = '再点一次确认清空';
+      setTimeout(() => {
+        if (b.dataset.arm === '1') { b.dataset.arm = ''; b.textContent = '清空数据'; }
+      }, 3000);
+    }
+  };
+}
+
+/* ---------------- 选关 ---------------- */
+function openLevelSelect() {
+  const cards = SECTORS.map((c, i) => {
+    const n = i + 1;
+    const cost = SECTOR_UNLOCK_COST[n] || 0;
+    const afford = save.gold >= cost;
+    const isBest = (save.best || 0) === n;
+    return `<button class="lvl ${cost === 0 ? 'free' : ''} ${afford ? '' : 'off'}" data-n="${n}">
+      ${isBest ? '<span class="tag">最远</span>' : ''}
+      <div class="no">SECTOR 0${n}</div>
+      <div class="nm">${c.name}</div>
+      <div class="meta">尘埃 ×${c.dust} · 岩石 ×${c.rocks}<br>金砖配额 ×${c.goldGoal}</div>
+      <div class="cost">${cost === 0
+        ? '免费'
+        : `<span class="coin"></span>${cost}${afford ? '' : ' · 不足'}`}</div>
+    </button>`;
+  }).join('');
+
+  openPanel(`
+    <div class="sub">SELECT SECTOR</div>
+    <h1 class="title" style="font-size:32px;margin-top:6px;">选择月区</h1>
+    <p class="lead" style="margin-top:10px;">可以直接跳到后面的月区挑战，但需支付<b>一次性解锁金砖</b>——本次挑战有效，下次再选仍需支付。<br>
+      从第 1 关依次推进到第 5 关，则<b>不需要任何额外解锁</b>。当前持有金砖 <b>${Math.floor(save.gold)}</b>。</p>
+    <div class="lvlgrid">${cards}</div>
+    <div class="btns"><button class="act ghost" id="btnSelBack">返回</button></div>
+  `);
+  document.querySelectorAll('.lvl').forEach(el => {
+    el.onclick = () => {
+      const n = parseInt(el.dataset.n, 10);
+      const cost = SECTOR_UNLOCK_COST[n] || 0;
+      if (cost > save.gold) return;    // 金砖不足，卡片置灰
+      startRun(n);
+    };
+  });
+  document.getElementById('btnSelBack').onclick = () => showTitle();
+}
+
+function togglePause() {
+  if (G.state === 'playing') {
+    G.state = 'paused';
+    Audio2.hum(0);
+    openPanel(`
+      <div class="sub">PAUSED</div>
+      <h1 class="title" style="font-size:32px;margin-top:6px;">已暂停</h1>
+      <p class="lead">第 ${G.sector} 月区 · 清洁度 ${Math.floor(G.progress * 100)}% · 金砖配额 ${Math.floor(G.sectorGold)}/${goldGoalOf(G.sector)} · 持有金砖 ${Math.floor(save.gold + G.runGold)}</p>
+      <div class="btns">
+        <button class="act primary" id="btnResume">继续清扫</button>
+        <button class="act ghost" id="btnCodexP">图鉴</button>
+        <button class="act ghost" id="btnQuit">放弃任务</button>
+      </div>
+    `);
+    document.getElementById('btnResume').onclick = () => { closePanel(); G.state = 'playing'; };
+    document.getElementById('btnCodexP').onclick = () => openCodex(() => togglePause());
+    document.getElementById('btnQuit').onclick = () => {
+      bankRun();
+      closePanel(); toTitle();
+    };
+  } else if (G.state === 'paused') {
+    closePanel(); G.state = 'playing';
+  }
+}
+
+/* ---------------- 按钮绑定 ---------------- */
+document.getElementById('btnCodex').onclick = () => {
+  const was = G.state;
+  if (was === 'playing') G.state = 'paused';
+  openCodex(() => { if (was === 'playing') G.state = 'playing'; });
+};
+document.getElementById('btnSound').onclick = e => {
+  Audio2.init();
+  e.target.textContent = '音效 ' + (Audio2.toggle() ? '开' : '关');
+};
+document.getElementById('btnPause').onclick = () => togglePause();
+
+/* ---------------- 自适应缩放 ---------------- */
+const stage = document.getElementById('stage');
+function fit() {
+  const s = Math.min(window.innerWidth / W, window.innerHeight / H) * 0.97;
+  stage.style.transform = `translate(-50%,-50%) scale(${s})`;
+}
+addEventListener('resize', fit);
+fit();
+
+/* ---------------- 主循环 ---------------- */
+let last = performance.now();
+let loopErrCount = 0;   // 连续帧错误计数：单帧出错不中断渲染，持续出错才降级
+function loop(t) {
+  const dt = Math.min(0.034, (t - last) / 1000);
+  last = t;
+  try {
+    if (G.state === 'playing') {
+      update(dt);
+      syncHud();
+    } else {
+      // 非游戏状态也让粒子/飘字收尾，画面不至于僵死
+      updateParticles(dt * 0.6);
+      if (G.shake > 0) G.shake = Math.max(0, G.shake - dt * 34);
+    }
+    render();
+    loopErrCount = 0;
+  } catch (err) {
+    loopErrCount++;
+    if (loopErrCount <= 2) console.error('[MoonSweeper] frame error:', err);
+    if (loopErrCount >= 20) {
+      // 持续出错才降级：回到标题，给出提示而不是永远卡死/白屏
+      loopErrCount = 0;
+      G.state = 'title';
+      showTitle();
+      toast('出现了一个小故障，已自动回到标题。<br><span style="font-size:11px;opacity:.7">' +
+        ((err && err.message) || err) + '</span>');
+    }
+  }
+  requestAnimationFrame(loop);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && G.state === 'playing') togglePause();
+});
+
+/* ---------------- 启动 ---------------- */
+G.maxO2 = 100;
+G.o2 = G.maxO2;
+paintBackground(7);
+startSector(1);          // 预建一个场景作为标题背景
+G.state = 'title';
+G.runGold = 0;
+document.getElementById('sectorTag').textContent = '';
+document.getElementById('btnSound').textContent = '音效 ' + (save.muted ? '关' : '开');
+syncHud();
+showTitle();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
