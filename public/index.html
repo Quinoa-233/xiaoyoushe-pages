@@ -86,18 +86,19 @@
     transition: border-color .15s;
   }
   .btn-ghost:hover { border-color: rgba(241,239,232,0.55); }
-  .carousel-cover {
-    position: relative; width: 240px; height: 135px; border-radius: 8px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 15px; font-weight: 600; letter-spacing: 1px;
-    overflow: hidden;
+  .carousel-bg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; z-index: 0;
   }
-  .fx-layer { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .25s; }
-  .fx-block { position: absolute; width: 14px; height: 14px; border-radius: 3px; animation: fxbob 2.2s ease-in-out infinite; animation-play-state: paused; }
-  .fx-scan { position: absolute; top: 0; bottom: 0; width: 58px; background: rgba(241,239,232,0.12); transform: skewX(-18deg); animation: fxscan 2.8s linear infinite; animation-play-state: paused; }
-  .fx-tag { position: absolute; right: 8px; bottom: 8px; font-size: 10px; padding: 2px 8px; border-radius: 4px; background: rgba(0,0,0,0.5); color: #F1EFE8; }
-  .carousel-cover:hover .fx-layer { opacity: 1; }
-  .carousel-cover:hover .fx-block, .carousel-cover:hover .fx-scan { animation-play-state: running; }
+  .carousel-scrim {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    background: linear-gradient(90deg, rgba(8,8,8,0.72) 0%, rgba(8,8,8,0.45) 34%, rgba(8,8,8,0) 58%);
+  }
+  .carousel-vid {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; z-index: 1; opacity: 0; transition: opacity .25s;
+  }
+  .carousel:hover .carousel-vid.playable { opacity: 1; }
   .carousel-arrow {
     position: absolute; top: 50%; transform: translateY(-50%); z-index: 5;
     width: 34px; height: 58px; background: rgba(0,0,0,0.35); color: #F1EFE8;
@@ -111,9 +112,7 @@
   .carousel-dots { position: absolute; left: 26px; bottom: 12px; display: flex; gap: 7px; z-index: 5; }
   .carousel-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(241,239,232,0.3); cursor: pointer; transition: background .15s; }
   .carousel-dot.active { background: #85B7EB; }
-  @keyframes fxbob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
-  @keyframes fxscan { 0% { left: -25%; } 100% { left: 115%; } }
-  @media (prefers-reduced-motion: reduce) { .fx-block, .fx-scan { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .carousel-vid { transition: none; } }
 
   /* ===== 首页主体布局 ===== */
   .home-layout { display: flex; gap: 18px; }
@@ -371,6 +370,9 @@
   <section id="view-home" class="view active">
     <div class="carousel" id="carousel">
       <div class="carousel-slide" id="carousel-slide">
+        <img class="carousel-bg" id="carousel-bg" alt="">
+        <video class="carousel-vid" id="carousel-vid" muted loop playsinline preload="none"></video>
+        <div class="carousel-scrim"></div>
         <div class="carousel-info">
           <span class="badge badge-teal" id="carousel-badge"></span>
           <h2 id="carousel-title"></h2>
@@ -379,7 +381,6 @@
             <button class="btn-primary" id="carousel-play">立即游玩</button>
           </div>
         </div>
-        <div class="carousel-cover" id="carousel-cover"></div>
       </div>
       <button class="carousel-arrow left" id="car-prev" title="上一个"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3 L5 8 L10 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="carousel-arrow right" id="car-next" title="下一个"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3 L11 8 L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -786,6 +787,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 30, title: '星际逃亡', tag: '校园', cat: 'video', genre: '策略', mode: '单人',
     byline: '信息技术系云计算25301 · 尹相洁 · 第一届智游杯初赛',
+    coverImg: '/games/xingji-taowang/cover.jpg',
     views: 1330, weekViews: 166, flowers: 221, cleared: 0,
     coverBg: '#72243E', coverFg: '#ED93B1',
     tags: ['智游杯', '敬请期待'],
@@ -793,6 +795,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 31, title: '死仓', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
     byline: '信息技术系云计算25302 · 尹领 · 第一届智游杯初赛',
+    coverImg: '/games/sicang/cover.jpg',
     views: 1541, weekViews: 192, flowers: 256, cleared: 0,
     coverBg: '#26215C', coverFg: '#AFA9EC',
     tags: ['智游杯', '敬请期待'],
@@ -800,6 +803,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 32, title: '果冻合成大作战 · 马卡龙', tag: '校园', cat: 'video', genre: '休闲', mode: '单人',
     byline: '信息技术系云计算25301 · 李虹洁 · 第一届智游杯初赛',
+    coverImg: '/games/guodong-hecheng/cover.jpg',
     views: 1752, weekViews: 219, flowers: 292, cleared: 0,
     coverBg: '#633806', coverFg: '#EF9F27',
     tags: ['智游杯', '敬请期待'],
@@ -807,6 +811,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 33, title: '心动的声音', tag: '校园', cat: 'video', genre: '音游', mode: '单人',
     byline: '信息技术系云计算25301 · 兰文轩 · 第一届智游杯初赛',
+    coverImg: '/games/xindong-shengyin/cover.jpg',
     views: 1963, weekViews: 245, flowers: 327, cleared: 0,
     coverBg: '#185FA5', coverFg: '#E6F1FB',
     tags: ['智游杯', '敬请期待'],
@@ -814,6 +819,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 34, title: '未命名作品', tag: '校园', cat: 'video', genre: '其他', mode: '单人',
     byline: '信息技术系云计算25301 · 高梓祺 · 第一届智游杯初赛',
+    coverImg: '/games/gaofuzhi-demo/cover.jpg',
     views: 2174, weekViews: 271, flowers: 362, cleared: 0,
     coverBg: '#085041', coverFg: '#5DCAA5',
     tags: ['智游杯', '敬请期待'],
@@ -821,6 +827,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 35, title: '蓝色鲸鱼小姐', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
     byline: '信息技术系云计算26302 · 李佳晓 · 第一届智游杯初赛',
+    coverImg: '/games/lanse-jingyu/cover.jpg',
     views: 2385, weekViews: 298, flowers: 397, cleared: 0,
     coverBg: '#712B13', coverFg: '#F0997B',
     tags: ['智游杯', '敬请期待'],
@@ -828,6 +835,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 36, title: '疾风闪避', tag: '校园', cat: 'video', genre: '跑酷', mode: '单人',
     byline: '信息技术系云计算26301 · 张文 · 第一届智游杯初赛',
+    coverImg: '/games/jifeng-shanbi/cover.jpg',
     views: 2596, weekViews: 324, flowers: 432, cleared: 0,
     coverBg: '#0C447C', coverFg: '#85B7EB',
     tags: ['智游杯', '敬请期待'],
@@ -835,6 +843,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 37, title: '渊途铸甲', tag: '校园', cat: 'dl', genre: '冒险', mode: '单人',
     byline: '信息技术系人工智能25302 · 杨子钦 · 第一届智游杯初赛',
+    coverImg: '/games/yuantu-zhujia/cover.jpg',
     views: 207, weekViews: 60, flowers: 34, cleared: 0,
     coverBg: '#27500A', coverFg: '#97C459',
     tags: ['智游杯', '敬请期待'],
@@ -842,6 +851,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 38, title: '接糖果 Catch', tag: '校园', cat: 'video', genre: '休闲', mode: '单人',
     byline: '信息技术系人工智能25303 · 元欣宇 · 第一届智游杯初赛',
+    coverImg: '/games/jie-tangguo/cover.jpg',
     views: 418, weekViews: 60, flowers: 69, cleared: 0,
     coverBg: '#72243E', coverFg: '#ED93B1',
     tags: ['智游杯', '敬请期待'],
@@ -849,6 +859,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 39, title: '经验地牢 · 二次开发', tag: '校园', cat: 'dl', genre: 'RPG', mode: '单人',
     byline: '信息技术系人工智能25302 · 张凌宇 · 第一届智游杯初赛',
+    coverImg: '/games/jingyan-dilao/cover.jpg',
     views: 629, weekViews: 78, flowers: 104, cleared: 0,
     coverBg: '#26215C', coverFg: '#AFA9EC',
     tags: ['智游杯', '敬请期待'],
@@ -856,6 +867,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 40, title: '魔法高塔', tag: '校园', cat: 'dl', genre: 'RPG', mode: '单人',
     byline: '信息技术系计算机25301 · 李文豪 · 第一届智游杯初赛',
+    coverImg: '/games/mofa-gaota/cover.jpg',
     views: 840, weekViews: 105, flowers: 140, cleared: 0,
     coverBg: '#633806', coverFg: '#EF9F27',
     tags: ['智游杯', '敬请期待'],
@@ -863,6 +875,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 41, title: '60Days', tag: '校园', cat: 'dl', genre: '生存', mode: '单人',
     byline: '信息技术系计算机26301 · 蒋雪韬 · 第一届智游杯初赛',
+    coverImg: '/games/60days/cover.jpg',
     views: 1051, weekViews: 131, flowers: 175, cleared: 0,
     coverBg: '#185FA5', coverFg: '#E6F1FB',
     tags: ['智游杯', '敬请期待'],
@@ -870,6 +883,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 42, title: 'RuralFarm · 田园物语', tag: '校园', cat: 'dl', genre: '经营', mode: '单人',
     byline: '信息技术系人工智能26303 · 郭淑琳 · 第一届智游杯初赛',
+    coverImg: '/games/rural-farm/cover.jpg',
     views: 1262, weekViews: 157, flowers: 210, cleared: 0,
     coverBg: '#085041', coverFg: '#5DCAA5',
     tags: ['智游杯', '敬请期待'],
@@ -877,6 +891,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 43, title: '逐光旅途', tag: '校园', cat: 'video', genre: '冒险', mode: '单人',
     byline: '信息技术系计算机26301 · 刘家豪 · 第一届智游杯初赛',
+    coverImg: '/games/zhuguang-lvtu/cover.jpg',
     views: 1473, weekViews: 184, flowers: 245, cleared: 0,
     coverBg: '#712B13', coverFg: '#F0997B',
     tags: ['智游杯', '敬请期待'],
@@ -884,6 +899,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 44, title: '异境回响', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
     byline: '信息技术系计算机26301 · 马越 · 第一届智游杯初赛',
+    coverImg: '/games/yijing-huixiang/cover.jpg',
     views: 1684, weekViews: 210, flowers: 280, cleared: 0,
     coverBg: '#0C447C', coverFg: '#85B7EB',
     tags: ['智游杯', '敬请期待'],
@@ -891,6 +907,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 45, title: '铁誓 · 边陲余生', tag: '校园', cat: 'video', genre: '生存', mode: '单人',
     byline: '信息技术系计算机26301 · 张煜埕 · 第一届智游杯初赛',
+    coverImg: '/games/tieshi-bianchui/cover.jpg',
     views: 1895, weekViews: 236, flowers: 315, cleared: 0,
     coverBg: '#27500A', coverFg: '#97C459',
     tags: ['智游杯', '敬请期待'],
@@ -898,6 +915,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 46, title: '岸边的一天', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
     byline: '信息技术系计算机26301 · 林健 · 第一届智游杯初赛',
+    coverImg: '/games/anbian/cover.jpg',
     views: 2106, weekViews: 263, flowers: 351, cleared: 0,
     coverBg: '#72243E', coverFg: '#ED93B1',
     tags: ['智游杯', '敬请期待'],
@@ -905,6 +923,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 47, title: 'Flee', tag: '校园', cat: 'video', genre: '跑酷', mode: '单人',
     byline: '信息技术系大数据26301 · 陈月娇 · 第一届智游杯初赛',
+    coverImg: '/games/flee/cover.jpg',
     views: 2317, weekViews: 289, flowers: 386, cleared: 0,
     coverBg: '#26215C', coverFg: '#AFA9EC',
     tags: ['智游杯', '敬请期待'],
@@ -912,6 +931,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 48, title: '霓虹断点', tag: '校园', cat: 'video', genre: '动作', mode: '单人',
     byline: '信息技术系大数据26303 · 刘小雨 · 第一届智游杯初赛',
+    coverImg: '/games/hongdian/cover.jpg',
     views: 2528, weekViews: 316, flowers: 421, cleared: 0,
     coverBg: '#633806', coverFg: '#EF9F27',
     tags: ['智游杯', '敬请期待'],
@@ -919,6 +939,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 49, title: '灵动小猫 · 星夜奇旅', tag: '校园', cat: 'video', genre: '冒险', mode: '单人',
     byline: '信息技术系物联网26303 · 徐隆昊 · 第一届智游杯初赛',
+    coverImg: '/games/lingdong-xiaomao/cover.jpg',
     views: 2739, weekViews: 342, flowers: 456, cleared: 0,
     coverBg: '#185FA5', coverFg: '#E6F1FB',
     tags: ['智游杯', '敬请期待'],
@@ -943,34 +964,15 @@ document.querySelectorAll('[data-nav]').forEach(el => {
   el.addEventListener('click', () => showView(el.dataset.nav));
 });
 
-/* ================= 首页轮播（精选 / 新品推送） ================= */
+/* ================= 首页轮播（精选 / 新品推送，全幅拼贴海报） ================= */
 const CAROUSEL = [
-  { id: 1, badge: '本周精选 · 智游杯参赛作品', cls: 'badge-teal' },
-  { id: 2, badge: '智游杯初赛 · 动作射击', cls: 'badge-blue' },
-  { id: 18, badge: '智游杯初赛 · 格斗新作', cls: 'badge-amber' },
-  { id: 19, badge: '智游杯初赛 · 沉浸推理', cls: 'badge-teal' }
+  { id: 1, badge: '本周精选 · 智游杯参赛作品', cls: 'badge-teal', poster: '/covers/carousel-1.jpg' },
+  { id: 2, badge: '智游杯初赛 · 动作射击', cls: 'badge-blue', poster: '/covers/carousel-2.jpg' },
+  { id: 18, badge: '智游杯初赛 · 格斗新作', cls: 'badge-amber', poster: '/covers/carousel-3.jpg' },
+  { id: 19, badge: '智游杯初赛 · 沉浸推理', cls: 'badge-teal', poster: '/covers/carousel-4.jpg' }
 ];
 let carIdx = 0, carTimer = null;
 
-function buildCoverFx(g) {
-  const colors = [g.coverFg, '#FAC775', '#97C459', '#ED93B1'];
-  const spots = [
-    { l: '16%', t: '60%', d: '0s' }, { l: '42%', t: '26%', d: '.5s' },
-    { l: '68%', t: '58%', d: '1s' }, { l: '86%', t: '28%', d: '1.5s' }
-  ];
-  let html = '<span class="fx-layer"><span class="fx-scan"></span>';
-  spots.forEach((s, i) => {
-    html += '<span class="fx-block" style="left:' + s.l + '; top:' + s.t + '; background:' + colors[i % colors.length] + '; animation-delay:' + s.d + ';"></span>';
-  });
-  return html + '<span class="fx-tag">预览 · 动态演示</span></span>';
-}
-function buildCoverMedia(g) {
-  if (g.previewVid) {
-    return '<video class="fx-layer" src="' + g.previewVid + '" muted loop playsinline preload="metadata"></video>' +
-      '<span class="fx-tag">预览 · 动态演示</span>';
-  }
-  return buildCoverFx(g);
-}
 function renderCarousel() {
   const item = CAROUSEL[carIdx];
   const g = GAMES.find(x => x.id === item.id);
@@ -982,10 +984,11 @@ function renderCarousel() {
     badge.className = 'badge ' + item.cls;
     document.getElementById('carousel-title').textContent = '《' + g.title + '》 · ' + g.genre;
     document.getElementById('carousel-meta').textContent = g.byline.split('·').slice(0, 2).join('·') + ' · 点开即玩 · 已获小红花 ' + g.flowers.toLocaleString();
-    const cover = document.getElementById('carousel-cover');
-    cover.style.background = g.coverBg;
-    cover.style.color = g.coverFg;
-    cover.innerHTML = buildCoverMedia(g);
+    document.getElementById('carousel-bg').src = item.poster;
+    const vid = document.getElementById('carousel-vid');
+    vid.classList.toggle('playable', !!g.previewVid);
+    vid.pause();
+    vid.removeAttribute('src'); // 切换时卸载上一张的视频，悬停时再按需加载
     document.querySelectorAll('#carousel-dots .carousel-dot').forEach((d, i) => d.classList.toggle('active', i === carIdx));
     slide.style.opacity = '1';
   }, 180);
@@ -996,18 +999,18 @@ function carStart() { carStop(); carTimer = setInterval(() => carGo(1), 5000); }
 document.getElementById('car-prev').addEventListener('click', e => { e.stopPropagation(); carGo(-1); carStart(); });
 document.getElementById('car-next').addEventListener('click', e => { e.stopPropagation(); carGo(1); carStart(); });
 const carBox = document.getElementById('carousel');
-carBox.addEventListener('mouseenter', carStop);
-carBox.addEventListener('mouseleave', carStart);
+carBox.addEventListener('mouseenter', () => {
+  carStop();
+  const g = GAMES.find(x => x.id === CAROUSEL[carIdx].id);
+  const v = document.getElementById('carousel-vid');
+  if (g.previewVid && !v.getAttribute('src')) v.src = g.previewVid;
+  if (g.previewVid) v.play().catch(() => {});
+});
+carBox.addEventListener('mouseleave', () => {
+  carStart();
+  document.getElementById('carousel-vid').pause();
+});
 carBox.addEventListener('click', () => openDetail(CAROUSEL[carIdx].id));
-const carCoverEl = document.getElementById('carousel-cover');
-carCoverEl.addEventListener('mouseenter', () => {
-  const v = carCoverEl.querySelector('video.fx-layer');
-  if (v) v.play().catch(() => {});
-});
-carCoverEl.addEventListener('mouseleave', () => {
-  const v = carCoverEl.querySelector('video.fx-layer');
-  if (v) v.pause();
-});
 document.getElementById('carousel-play').addEventListener('click', e => {
   e.stopPropagation();
   openPlayModal(GAMES.find(x => x.id === CAROUSEL[carIdx].id));
