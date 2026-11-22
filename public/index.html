@@ -236,7 +236,6 @@
     outline: none; font-family: inherit; resize: none;
   }
 
-  .detail-side { width: 220px; flex-shrink: 0; }
   .friend-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
   .friend-row .f-ava {
     width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
@@ -451,12 +450,6 @@
         </div>
         <div class="tab-panel" data-dpanel="devlog">
           <p class="game-desc" id="devlog-text"></p>
-        </div>
-      </div>
-      <div class="detail-side">
-        <div class="side-card">
-          <h4>本周最热</h4>
-          <div id="detail-hot"></div>
         </div>
       </div>
     </div>
@@ -938,17 +931,39 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
 ];
 
+/* ================= 本机数据持久化 =================
+   浏览量/小红花存 localStorage，刷新不丢。
+   注意：这是"本机数据"——每台设备各记各的；以后接上后端再换成全站共享。 */
+const STATS_KEY = 'ninth_stats_v1';
+let statsStore = {};
+try { statsStore = JSON.parse(localStorage.getItem(STATS_KEY)) || {}; } catch (e) { statsStore = {}; }
+function saveStats() {
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(statsStore)); } catch (e) {}
+}
+GAMES.forEach(g => {
+  const s = statsStore[g.id];
+  if (s) { g.views = s.v || 0; g.weekViews = s.w || 0; g.flowers = s.f || 0; g.myFlower = !!s.m; }
+});
+function recordStat(g) {
+  statsStore[g.id] = { v: g.views, w: g.weekViews, f: g.flowers, m: g.myFlower ? 1 : 0 };
+  saveStats();
+}
+
 /* SVG 小图标：小红花 / 小眼睛 */
 const FLOWER_ICON = '<svg width="13" height="13" viewBox="0 0 20 20" style="vertical-align:-2px;"><g fill="#E24B4A"><circle cx="10" cy="4" r="3.4"/><circle cx="15.7" cy="8.1" r="3.4"/><circle cx="13.5" cy="14.9" r="3.4"/><circle cx="6.5" cy="14.9" r="3.4"/><circle cx="4.3" cy="8.1" r="3.4"/></g><circle cx="10" cy="10" r="3.1" fill="#FAC775"/></svg>';
 const EYE_ICON = '<svg width="13" height="13" viewBox="0 0 20 20" style="vertical-align:-2px;" fill="none"><path d="M1.5 10 C4 5.5, 16 5.5, 18.5 10 C16 14.5, 4 14.5, 1.5 10 Z" stroke="#B4B2A9" stroke-width="1.6"/><circle cx="10" cy="10" r="2.6" fill="#B4B2A9"/></svg>';
 
 /* ================= 视图切换 ================= */
+let curFilter = 'all';
 function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + name).classList.add('active');
   document.querySelectorAll('.nav-tabs button').forEach(b => {
     b.classList.toggle('active', b.dataset.nav === name);
   });
+  // 回到首页/排行榜时重渲染，让小红花和浏览量显示最新值
+  if (name === 'home') renderGrid(curFilter);
+  if (name === 'rank') renderRankTable();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('[data-nav]').forEach(el => {
@@ -1017,6 +1032,7 @@ function stopCoverVid(el) {
   if (v) v.pause();
 }
 function renderGrid(filter) {
+  curFilter = filter;
   const grid = document.getElementById('game-grid');
   const list = GAMES.filter(g => filter === 'all' || g.cat === filter);
   grid.innerHTML = '';
@@ -1079,7 +1095,8 @@ function openDetail(id) {
     (g.featured ? '<span class="badge badge-blue">本周精选</span>' : '');
   document.getElementById('detail-byline').textContent = g.byline;
   document.getElementById('detail-tags').innerHTML = g.tags.map(t => '<span class="tag-chip">' + t + '</span>').join('');
-  g.views++; // 游客每次点开，浏览数 +1（本机演示，刷新即重置）
+  g.views++; // 游客每次点开，浏览数 +1（存本机 localStorage，刷新不丢）
+  recordStat(g);
   document.getElementById('detail-stats').innerHTML =
     stat('总浏览量', g.views.toLocaleString()) +
     stat('本周浏览', g.weekViews.toLocaleString()) +
@@ -1088,7 +1105,6 @@ function openDetail(id) {
   document.getElementById('detail-desc').textContent = g.desc;
   document.getElementById('devlog-text').textContent = g.devlog || '暂无日志。';
   renderFlowerBtn();
-  renderDetailHot();
   showView('detail');
 }
 function renderFlowerBtn() {
@@ -1100,20 +1116,9 @@ document.getElementById('detail-flower').addEventListener('click', () => {
   if (!currentGame) return;
   currentGame.myFlower = !currentGame.myFlower;
   currentGame.flowers += currentGame.myFlower ? 1 : -1;
+  recordStat(currentGame);
   renderFlowerBtn();
 });
-function renderDetailHot() {
-  const list = [...GAMES].sort((a, b) => b.views - a.views).slice(0, 5);
-  const box = document.getElementById('detail-hot');
-  box.innerHTML = '';
-  list.forEach((x, i) => {
-    const item = document.createElement('div');
-    item.className = 'rank-item';
-    item.innerHTML = '<span class="rk-num">' + (i + 1) + '</span><span class="rk-name">' + x.title + '</span><span class="rk-hot">' + x.views.toLocaleString() + '</span>';
-    item.addEventListener('click', () => openDetail(x.id));
-    box.appendChild(item);
-  });
-}
 function stat(label, value, cls) {
   return '<div class="stat-card"><div class="label">' + label + '</div><div class="value ' + (cls || '') + '">' + value + '</div></div>';
 }
