@@ -62,7 +62,13 @@
     border-radius: 4px; padding: 2px 8px;
   }
 
-  main { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; }
+  /* Q版吉祥物小队：固定右下角，黑底用 lighten 混合融入背景 */
+  .mascots {
+    position: fixed; right: 0; bottom: 0; width: min(34vw, 460px);
+    mix-blend-mode: lighten; opacity: .95;
+    pointer-events: none; z-index: 0;
+  }
+  main { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; position: relative; z-index: 1; }
   .view { display: none; }
   .view.active { display: block; }
 
@@ -361,6 +367,7 @@
 </head>
 <body>
 
+<img class="mascots" src="/covers/mascots.jpg" alt="">
 <header class="topbar">
   <div class="logo">第九艺术<small>校园游戏平台</small></div>
   <nav class="nav-tabs">
