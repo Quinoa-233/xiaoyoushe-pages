@@ -397,11 +397,7 @@
       </div>
       <div class="sidebar">
         <div class="side-card">
-          <h4>热门榜 · 本周</h4>
-          <div id="rank-list"></div>
-        </div>
-        <div class="side-card">
-          <h4>新作速递</h4>
+          <h4>新品速递</h4>
           <div class="news-item" data-open="17">回声花园 · 昨日上架<span class="new-flag">NEW</span></div>
           <div class="news-item" data-open="29">孤剑试炼 · 3 天前</div>
           <div class="news-item" data-open="24">黄昏轮回 · 上周</div>
@@ -1056,18 +1052,6 @@ document.querySelectorAll('.filter-chip').forEach(chip => {
   });
 });
 
-function renderRankList() {
-  const list = [...GAMES].sort((a, b) => b.views - a.views).slice(0, 5);
-  const box = document.getElementById('rank-list');
-  box.innerHTML = '';
-  list.forEach((g, i) => {
-    const item = document.createElement('div');
-    item.className = 'rank-item';
-    item.innerHTML = '<span class="rk-num">' + (i + 1) + '</span><span class="rk-name">' + g.title + '</span><span class="rk-hot">' + g.views.toLocaleString() + '</span>';
-    item.addEventListener('click', () => openDetail(g.id));
-    box.appendChild(item);
-  });
-}
 document.querySelectorAll('[data-open]').forEach(el => {
   el.addEventListener('click', () => openDetail(parseInt(el.dataset.open)));
 });
@@ -1203,7 +1187,6 @@ document.addEventListener('keydown', e => { // Esc 快捷关闭（鼠标被游�
 /* ================= 初始化 ================= */
 renderCarousel();
 renderGrid('all');
-renderRankList();
 renderRankTable();
 </script>
 </body>
