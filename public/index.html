@@ -961,20 +961,12 @@ document.querySelectorAll('[data-nav]').forEach(el => {
 });
 
 /* ================= 首页横幅（二次元大图） =================
-   第一次打开优先展示 v4（黄昏天台），之后每次打开在 v2/v4 里随机；
-   左右箭头/圆点可手动切换，自动轮换功能保留待启用 */
+   当前只放铁道清新图一张（2026-11-22 主人定的）；以后加新图往数组里追加即可，
+   自动轮换 carStart() 保留未启用 */
 const CAROUSEL = [
-  { id: 19, badge: '智游杯初赛 · 沉浸推理', cls: 'badge-teal', poster: '/covers/carousel-1.jpg' },
-  { id: 2, badge: '智游杯初赛 · 动作射击', cls: 'badge-blue', poster: '/covers/carousel-2.jpg' }
+  { id: 19, badge: '智游杯初赛 · 沉浸推理', cls: 'badge-teal', poster: '/covers/carousel-1.jpg' }
 ];
-let carIdx;
-if (!localStorage.getItem('ninth_seen_banner')) {
-  carIdx = 0;
-  try { localStorage.setItem('ninth_seen_banner', '1'); } catch (e) {}
-} else {
-  carIdx = Math.floor(Math.random() * CAROUSEL.length);
-}
-let carTimer = null;
+let carIdx = 0, carTimer = null;
 
 function renderCarousel() {
   const item = CAROUSEL[carIdx];
@@ -999,6 +991,11 @@ document.getElementById('car-prev').addEventListener('click', e => { e.stopPropa
 document.getElementById('car-next').addEventListener('click', e => { e.stopPropagation(); carGo(1); });
 const carBox = document.getElementById('carousel');
 carBox.addEventListener('click', () => openDetail(CAROUSEL[carIdx].id));
+if (CAROUSEL.length < 2) { /* 只有一张横幅时隐藏箭头和圆点 */
+  document.getElementById('car-prev').style.display = 'none';
+  document.getElementById('car-next').style.display = 'none';
+  document.getElementById('carousel-dots').style.display = 'none';
+}
 document.getElementById('carousel-play').addEventListener('click', e => {
   e.stopPropagation();
   openPlayModal(GAMES.find(x => x.id === CAROUSEL[carIdx].id));
