@@ -7,7 +7,16 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #14111d url('/covers/bg-city.jpg') center top / cover no-repeat fixed;
+    /* 极简未来感暗色背景：深色底 + 冷色光晕 + 细网格，纯 CSS 无图片 */
+    background:
+      radial-gradient(1100px 550px at 88% -8%, rgba(70, 90, 200, 0.13), transparent 62%),
+      radial-gradient(950px 520px at -8% 32%, rgba(55, 75, 160, 0.09), transparent 58%),
+      radial-gradient(1000px 700px at 55% 115%, rgba(110, 70, 150, 0.07), transparent 60%),
+      linear-gradient(rgba(241, 239, 232, 0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(241, 239, 232, 0.022) 1px, transparent 1px),
+      linear-gradient(180deg, #131218 0%, #0d0c11 100%);
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+    background-attachment: fixed;
     color: #F1EFE8;
     font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
     font-size: 13px;
