@@ -39,6 +39,15 @@
     min-height: 100vh;
     overflow-x: hidden;
   }
+  /* 日间模式：环境光换成清晨蓝调；承载面（卡片/面板）仍保持深色，文字对比度不退化 */
+  body[data-theme="day"] {
+    background:
+      radial-gradient(1300px 560px at 50% -6%, rgba(120, 186, 232, 0.34), transparent 66%),
+      radial-gradient(850px 420px at 88% 12%, rgba(160, 205, 240, 0.20), transparent 60%),
+      radial-gradient(760px 520px at 8% 28%, rgba(196, 222, 245, 0.13), transparent 55%),
+      linear-gradient(180deg, #22394D 0%, #1A2B3B 55%, #101C27 100%);
+  }
+  body[data-theme="day"] .topbar { background: rgba(20, 34, 46, 0.76); }
   /* ===== 插画层：独立 fixed 图层，只负责氛围，不承载文字 ===== */
   .bg-art{
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
@@ -100,6 +109,20 @@
   }
   .search-box:focus { border-color: rgba(133,183,235,.55); background: rgba(255,255,255,.07); }
   .search-box::placeholder { color: #A9A69D; }
+  /* 日间 / 夜间切换 */
+  .theme-toggle {
+    flex: 0 0 auto;
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-2);
+    border: 1px solid var(--line-strong); background: rgba(255,255,255,.03);
+    transition: color .15s, border-color .15s, background .15s, transform .15s;
+  }
+  .theme-toggle:hover { color: var(--accent-text); border-color: var(--accent); background: var(--accent-soft); }
+  .theme-toggle:active { transform: scale(.94); }
+  .theme-toggle:focus-visible { outline: 2px solid #85B7EB; outline-offset: 2px; }
+  body[data-theme="night"] .ico-moon { display: none; }
+  body[data-theme="day"] .ico-sun { display: none; }
   .avatar {
     width: 32px; height: 32px; border-radius: 50%;
     background: #185FA5; color: #E6F1FB;
@@ -128,36 +151,24 @@
     box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
   }
   .carousel:hover { transform: translateY(-2px); }
-  /* 内容遮罩：左侧托住文案，底部给信息卡一块干净的落点 */
+  /* 内容遮罩：只压底部，给海报自带标题留出干净的上半屏 */
   .carousel::after {
     content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-    background:
-      linear-gradient(100deg, rgba(8,10,16,.52) 0%, rgba(8,10,16,.28) 32%, rgba(8,10,16,0) 58%),
-      linear-gradient(180deg, transparent 64%, rgba(6,9,14,.45) 100%);
+    background: linear-gradient(180deg, transparent 64%, rgba(6,9,14,.30) 100%);
   }
   .carousel-slide {
     position: absolute; inset: 0; display: flex;
     align-items: flex-end; justify-content: flex-end;
-    padding: 18px 22px; gap: 16px; min-width: 0; transition: opacity .25s;
+    padding: 18px 22px; gap: 16px; min-width: 0;
   }
-  .carousel-info {
-    position: relative; z-index: 3;
-    background: rgba(9, 12, 18, 0.86);
-    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-    border-radius: 12px;
-    padding: 14px 18px 16px; max-width: 340px;
-    border: 1px solid rgba(255,255,255,0.10);
-    border-left: 2px solid var(--accent);
-    box-shadow: 0 12px 32px rgba(0,0,0,.5);
-  }
+  /* 海报本身就是 2x 图，按原始比例铺，禁止浏览器再重采样 */
+  .carousel-bg { image-rendering: -webkit-optimize-contrast; }
   .badge {
     display: inline-block; font-size: 11px; padding: 2px 10px; border-radius: 4px;
   }
   .badge-teal { background: #085041; color: #9FE1CB; }
   .badge-amber { background: #633806; color: #FAC775; }
   .badge-blue { background: #0C447C; color: #85B7EB; }
-  .carousel-info h2 { font-size: 19px; font-weight: 600; line-height: 1.35; margin: 8px 0 5px; color: var(--text-1); }
-  .carousel-info .meta { font-size: 12.5px; color: var(--text-2); line-height: 1.55; }
   .btn-primary {
     display: inline-block; background: #185FA5; color: #E6F1FB;
     padding: 8px 22px; border-radius: 6px; font-size: 13px; font-weight: 600;
@@ -203,7 +214,13 @@
     color: #fff; line-height: 1.55; letter-spacing: .06em;
     text-shadow: 0 0 4px rgba(25,45,90,.95), 0 2px 8px rgba(25,45,90,.9), 0 0 20px rgba(25,45,90,.7);
   }
-  @media (max-width: 900px) { .banner-copy { display: none; } }   /* 平板及以下：文案会撞上信息卡，只留信息卡 */
+  @media (max-width: 900px) { .banner-copy { display: none; } }   /* 平板及以下：文案会撞上海报，只留图 */
+  /* 日间模式：海报是亮底，覆盖文案整组反色成深蓝，跟海报自带标题同一种语言 */
+  body[data-theme="day"] .banner-copy .bc-feats b { color: #12263F; text-shadow: 0 1px 2px rgba(255,255,255,.9), 0 0 10px rgba(255,255,255,.8); }
+  body[data-theme="day"] .banner-copy .bc-feats i { color: rgba(18,38,63,.86); text-shadow: 0 1px 2px rgba(255,255,255,.9), 0 0 8px rgba(255,255,255,.75); }
+  body[data-theme="day"] .banner-copy .bc-ico { border-color: rgba(18,38,63,.72); background: rgba(255,255,255,.62); }
+  body[data-theme="day"] .banner-copy .bc-ico svg { stroke: #12263F; }
+  body[data-theme="day"] .banner-copy .bc-slogan { color: #12263F; text-shadow: 0 1px 2px rgba(255,255,255,.9), 0 0 12px rgba(255,255,255,.7); }
   .carousel-arrow {
     position: absolute; top: 50%; transform: translateY(-50%); z-index: 5;
     width: 34px; height: 58px; background: rgba(0,0,0,0.35); color: #F7F5F0;
@@ -606,16 +623,6 @@
       width: 100%; height: auto;
       aspect-ratio: 1536 / 652;   /* 跟海报原图同比例，手机上不裁掉两侧的排版文字 */
     }
-    .carousel-info {
-      position: static; max-width: none; margin: 0; padding: 12px 0 2px;
-      background: none; border: 0; border-radius: 0; box-shadow: none;
-      -webkit-backdrop-filter: none; backdrop-filter: none;
-    }
-    .carousel-info h2 { font-size: 17px; margin: 7px 0 5px; }
-    .carousel-info .meta { font-size: 12px; line-height: 1.6; }
-    .carousel-info > div:last-child { margin-top: 10px !important; }
-    .carousel-info .btn-primary { width: 100%; text-align: center; padding: 11px 0; font-size: 13.5px; }
-    .carousel-arrow, .carousel-dots { display: none; }
 
     /* 二级筛选：吸顶 + 横向滑动，不换行挤成两排 */
     .section-head {
@@ -699,7 +706,7 @@
   /* 尊重系统"减少透明度"偏好：全部转实色 */
   @media (prefers-reduced-transparency: reduce) {
     .topbar { -webkit-backdrop-filter: none; backdrop-filter: none; background: #0C1017; }
-    .carousel-info { -webkit-backdrop-filter: none; backdrop-filter: none; background: #0C1017; }
+    .section-head { -webkit-backdrop-filter: none; backdrop-filter: none; background: #0C1017; }
   }
   @media (prefers-reduced-motion: reduce) {
     * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
@@ -707,6 +714,13 @@
 </style>
 </head>
 <body>
+<script>
+/* 主题在首帧就定好，避免图标和底色闪一下 */
+(function () {
+  try { document.body.dataset.theme = localStorage.getItem('ninth_theme') || 'night'; }
+  catch (e) { document.body.dataset.theme = 'night'; }
+})();
+</script>
 
 <div class="bg-art" aria-hidden="true"></div>
 
@@ -720,6 +734,10 @@
   </nav>
   <div class="spacer"></div>
   <input class="search-box" placeholder="搜索游戏或同学（即将上线）" disabled>
+  <button class="theme-toggle" id="theme-toggle" title="切换日间 / 夜间" aria-label="切换日间夜间模式">
+    <svg class="ico-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.4v2.2M12 19.4v2.2M2.4 12h2.2M19.4 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/></svg>
+    <svg class="ico-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.6 8.6 0 0 1 9.5 3.5a8.6 8.6 0 1 0 11 11z"/></svg>
+  </button>
   <div class="avatar" data-nav="me" title="游客模式">客</div>
 </header>
 
@@ -738,18 +756,7 @@
           </ul>
           <div class="bc-slogan">游戏不止于生活<br>而是另一种可能</div>
         </div>
-        <div class="carousel-info">
-          <span class="badge badge-teal" id="carousel-badge"></span>
-          <h2 id="carousel-title"></h2>
-          <div class="meta" id="carousel-meta"></div>
-          <div style="margin-top:14px; display:flex; gap:10px;">
-            <button class="btn-primary" id="carousel-play">立即游玩</button>
-          </div>
-        </div>
       </div>
-      <button class="carousel-arrow left" id="car-prev" title="上一个"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3 L5 8 L10 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <button class="carousel-arrow right" id="car-next" title="下一个"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3 L11 8 L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <div class="carousel-dots" id="carousel-dots"></div>
     </div>
 
     <div class="home-layout">
@@ -1376,52 +1383,32 @@ document.querySelectorAll('[data-nav]').forEach(el => {
   el.addEventListener('click', () => showView(el.dataset.nav));
 });
 
-/* ================= 首页横幅（二次元大图） =================
-   当前只放铁道清新图一张（2026-11-22 主人定的）；以后加新图往数组里追加即可，
-   自动轮换 carStart() 保留未启用 */
+/* ================= 首页横幅（日间 / 夜间双图） ================= */
 const CAROUSEL = [
-  { id: 19, badge: '智游杯初赛 · 沉浸推理', cls: 'badge-teal', poster: '/covers/carousel-1.jpg' }
+  { id: 19, poster: { day: '/covers/carousel-1-day.jpg', night: '/covers/carousel-1-night.jpg' } }
 ];
-let carIdx = 0, carTimer = null;
+const THEME_KEY = 'ninth_theme';
+let carIdx = 0;
 
+function currentTheme() {
+  return document.body.dataset.theme === 'day' ? 'day' : 'night';
+}
 function renderCarousel() {
   const item = CAROUSEL[carIdx];
-  const g = GAMES.find(x => x.id === item.id);
-  const slide = document.getElementById('carousel-slide');
-  slide.style.opacity = '0';
-  setTimeout(() => {
-    const badge = document.getElementById('carousel-badge');
-    badge.textContent = item.badge;
-    badge.className = 'badge ' + item.cls;
-    document.getElementById('carousel-title').textContent = '《' + g.title + '》 · ' + g.genre;
-    document.getElementById('carousel-meta').textContent = g.byline.split('·').slice(0, 2).join('·') + ' · 点开即玩 · 已获小红花 ' + g.flowers.toLocaleString();
-    document.getElementById('carousel-bg').src = item.poster;
-    document.querySelectorAll('#carousel-dots .carousel-dot').forEach((d, i) => d.classList.toggle('active', i === carIdx));
-    slide.style.opacity = '1';
-  }, 180);
+  document.getElementById('carousel-bg').src = item.poster[currentTheme()] || item.poster.night;
 }
-function carGo(delta) { carIdx = (carIdx + delta + CAROUSEL.length) % CAROUSEL.length; renderCarousel(); }
-function carStop() { if (carTimer) { clearInterval(carTimer); carTimer = null; } }
-function carStart() { carStop(); carTimer = setInterval(() => carGo(1), 5000); } /* 自动轮换功能保留，当前不启用 */
-document.getElementById('car-prev').addEventListener('click', e => { e.stopPropagation(); carGo(-1); });
-document.getElementById('car-next').addEventListener('click', e => { e.stopPropagation(); carGo(1); });
+function applyTheme(t) {
+  document.body.dataset.theme = (t === 'day' ? 'day' : 'night');
+  try { localStorage.setItem(THEME_KEY, document.body.dataset.theme); } catch (e) {}
+  renderCarousel();
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.title = currentTheme() === 'day' ? '切换到夜间模式' : '切换到日间模式';
+}
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  applyTheme(currentTheme() === 'day' ? 'night' : 'day');
+});
 const carBox = document.getElementById('carousel');
 carBox.addEventListener('click', () => openDetail(CAROUSEL[carIdx].id));
-if (CAROUSEL.length < 2) { /* 只有一张横幅时隐藏箭头和圆点 */
-  document.getElementById('car-prev').style.display = 'none';
-  document.getElementById('car-next').style.display = 'none';
-  document.getElementById('carousel-dots').style.display = 'none';
-}
-document.getElementById('carousel-play').addEventListener('click', e => {
-  e.stopPropagation();
-  openPlayModal(GAMES.find(x => x.id === CAROUSEL[carIdx].id));
-});
-CAROUSEL.forEach((_, i) => {
-  const d = document.createElement('span');
-  d.className = 'carousel-dot';
-  d.addEventListener('click', e => { e.stopPropagation(); carIdx = i; renderCarousel(); });
-  document.getElementById('carousel-dots').appendChild(d);
-});
 function startCoverVid(el, src) {
   let v = el.querySelector('.cover-vid');
   if (!v) {
@@ -1617,7 +1604,9 @@ function renderSideStats() {
 }
 
 /* ================= 初始化 ================= */
-renderCarousel();
+let savedTheme = 'night';
+try { savedTheme = localStorage.getItem(THEME_KEY) || 'night'; } catch (e) {}
+applyTheme(savedTheme);
 renderGrid('all');
 renderRankTable();
 renderSideStats();
