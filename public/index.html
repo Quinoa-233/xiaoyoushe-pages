@@ -86,7 +86,7 @@
   .carousel {
     position: relative;
     background: #14141B; border-radius: 12px;
-    aspect-ratio: 1536 / 652; margin-bottom: 20px; overflow: hidden;
+    aspect-ratio: 1777 / 760; margin-bottom: 20px; overflow: hidden;
     cursor: pointer; transition: transform .15s;
   }
   .carousel:hover { transform: translateY(-2px); }
@@ -1227,12 +1227,11 @@ renderRankTable();
   const BGS = [
     { label: '光晕', url: '' },
     { label: '夜海 A', url: '/covers/bg-a.jpg' },
-    { label: '水乡 B', url: '/covers/bg-b.jpg' },
     { label: '烟火 C', url: '/covers/bg-c.jpg' }
   ];
   const box = document.createElement('div');
   box.id = 'bg-switch';
-  const saved = localStorage.getItem('ninth_bg') || '';
+  const saved = (localStorage.getItem('ninth_bg') || '').replace('bg-b.jpg', '');
   function apply(url) {
     if (url) {
       document.body.classList.add('bg-img');
