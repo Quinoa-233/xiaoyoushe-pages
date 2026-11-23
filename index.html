@@ -2,16 +2,66 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>校游社 · 校园游戏平台（第一版原型）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A0E15">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>第九艺术 · 校园游戏平台</title>
+<link rel="icon" type="image/png" href="/favicon.png">
 <style>
+  /* ===== 设计令牌 ===== */
+  :root{
+    --surface-1:#0A0E15; --surface-2:#13171F; --surface-3:#191920; --surface-4:#20222B;
+    --text-1:#F7F5F0; --text-2:#C7C4BA; --text-3:#A9A69D; --text-num:#D8D5CB;
+    --accent:#378ADD; --accent-soft:rgba(55,138,221,.16); --accent-text:#A9D3F7;
+    --line:rgba(255,255,255,.07); --line-strong:rgba(255,255,255,.14);
+    --radius-md:10px; --radius-lg:14px;
+    --ease:cubic-bezier(.2,.8,.2,1);
+    --bg-url:none;
+    /* 版面容器：宽屏尽量铺开，窄屏左右留白同步收窄 */
+    --page-max:1720px;
+    --page-pad:clamp(12px, 2.2vw, 28px);
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #221F1C;
-    color: #F1EFE8;
+    /* 底：冷调光晕 + 细星空点阵；插画由 .bg-art 独立图层承担 */
+    background:
+      radial-gradient(1300px 560px at 50% -6%, rgba(45, 140, 175, 0.20), transparent 64%),
+      radial-gradient(850px 420px at 88% 12%, rgba(55, 110, 180, 0.09), transparent 60%),
+      radial-gradient(760px 520px at 8% 28%, rgba(45, 120, 150, 0.07), transparent 55%),
+      radial-gradient(rgba(255,255,255, 0.035) 1px, transparent 1.7px),
+      linear-gradient(180deg, #131E2B 0%, #0F1720 55%, var(--surface-1) 100%);
+    background-size: auto, auto, auto, 26px 26px, auto;
+    background-attachment: fixed;
+    color: #F7F5F0;
     font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
     font-size: 13px;
     min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* ===== 插画层：独立 fixed 图层，只负责氛围，不承载文字 ===== */
+  .bg-art{
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: var(--bg-url) center top / cover no-repeat;
+    filter: saturate(.75) brightness(.78);
+    transform: translateZ(0);
+  }
+  body.bg-img { background: #080B11; }
+  /* 遮罩一：纵向渐变，越往内容区越实 */
+  body.bg-img .bg-art::before{
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      rgba(8,10,16,.28) 0%,
+      rgba(8,10,16,.46) 42%,
+      rgba(8,10,16,.62) 72%,
+      rgba(8,10,16,.80) 100%);
+  }
+  /* 遮罩二：径向暗角，压住画面边缘的高频细节 */
+  body.bg-img .bg-art::after{
+    content: ""; position: absolute; inset: 0;
+    background:
+      radial-gradient(120% 80% at 50% 0%, rgba(8,10,16,.05), rgba(8,10,16,.45) 78%),
+      rgba(8,10,16,.12);
   }
   a { color: inherit; text-decoration: none; }
   button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
@@ -19,28 +69,37 @@
   /* ===== 顶部导航 ===== */
   .topbar {
     display: flex; align-items: center; gap: 24px;
-    padding: 0 32px; height: 56px;
-    background: #2C2C2A;
-    border-bottom: 1px solid rgba(241,239,232,0.12);
+    padding: 0 var(--page-pad); height: 56px;
+    background: rgba(10, 13, 19, 0.72);
+    -webkit-backdrop-filter: blur(14px) saturate(120%);
+    backdrop-filter: blur(14px) saturate(120%);
+    border-bottom: 1px solid var(--line);
     position: sticky; top: 0; z-index: 50;
   }
+  /* 超宽屏：顶栏内容跟主区左边缘对齐，不贴屏幕边 */
+  @media (min-width: 1780px) {
+    .topbar { padding-inline: calc((100% - var(--page-max)) / 2 + var(--page-pad)); }
+  }
   .logo { font-size: 17px; font-weight: 600; color: #85B7EB; letter-spacing: 1px; }
-  .logo small { font-size: 11px; color: #888780; font-weight: 400; margin-left: 8px; letter-spacing: 0; }
+  .logo small { font-size: 11px; color: #A9A69D; font-weight: 400; margin-left: 8px; letter-spacing: 0; }
   .nav-tabs { display: flex; gap: 4px; height: 100%; }
   .nav-tabs button {
-    padding: 0 16px; font-size: 13px; color: #B4B2A9;
-    border-bottom: 2px solid transparent; height: 100%;
+    padding: 0 16px; font-size: 13.5px; color: #C7C4BA;
+    border-bottom: 2px solid transparent; height: 100%; white-space: nowrap;
     transition: color .15s;
   }
-  .nav-tabs button:hover { color: #F1EFE8; }
-  .nav-tabs button.active { color: #F1EFE8; border-bottom-color: #378ADD; }
+  .nav-tabs button:hover { color: #F7F5F0; }
+  .nav-tabs button.active { color: #F7F5F0; font-weight: 600; border-bottom-color: var(--accent); }
+  .nav-tabs button:focus-visible { outline: 2px solid #85B7EB; outline-offset: -2px; }
   .topbar .spacer { flex: 1; }
   .search-box {
-    background: #221F1C; border: 1px solid rgba(241,239,232,0.18);
-    border-radius: 6px; padding: 6px 14px; width: 220px;
-    color: #F1EFE8; font-size: 12px; outline: none;
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 8px; padding: 7px 14px; width: 220px;
+    color: #F7F5F0; font-size: 12px; outline: none;
+    transition: border-color .15s, background .15s;
   }
-  .search-box::placeholder { color: #888780; }
+  .search-box:focus { border-color: rgba(133,183,235,.55); background: rgba(255,255,255,.07); }
+  .search-box::placeholder { color: #A9A69D; }
   .avatar {
     width: 32px; height: 32px; border-radius: 50%;
     background: #185FA5; color: #E6F1FB;
@@ -48,32 +107,57 @@
     font-size: 13px; font-weight: 600; cursor: pointer;
   }
   .prototype-tag {
-    font-size: 11px; color: #888780; border: 1px dashed rgba(241,239,232,0.3);
+    font-size: 11px; color: #A9A69D; border: 1px dashed rgba(255,255,255,0.3);
     border-radius: 4px; padding: 2px 8px;
   }
 
-  main { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; }
+  main {
+    max-width: var(--page-max); margin: 0 auto;
+    padding: 24px var(--page-pad) 64px;
+    position: relative; z-index: 1;
+  }
   .view { display: none; }
   .view.active { display: block; }
 
   /* ===== 首页：精选横幅 ===== */
   .carousel {
-    position: relative; display: flex; align-items: center;
-    background: #26215C; border-radius: 12px;
-    padding: 22px 26px 34px; margin-bottom: 20px;
-    cursor: pointer; transition: transform .15s;
+    position: relative;
+    background: #14141B; border-radius: var(--radius-lg);
+    aspect-ratio: 1536 / 652; margin-bottom: 28px; overflow: hidden;
+    cursor: pointer; transition: transform .22s var(--ease), box-shadow .22s var(--ease);
+    box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
   }
   .carousel:hover { transform: translateY(-2px); }
-  .carousel-slide { display: flex; align-items: center; gap: 24px; flex: 1; min-width: 0; transition: opacity .25s; }
-  .carousel-info { flex: 1; min-width: 0; }
+  /* 内容遮罩：左侧托住文案，底部给信息卡一块干净的落点 */
+  .carousel::after {
+    content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background:
+      linear-gradient(100deg, rgba(8,10,16,.52) 0%, rgba(8,10,16,.28) 32%, rgba(8,10,16,0) 58%),
+      linear-gradient(180deg, transparent 64%, rgba(6,9,14,.45) 100%);
+  }
+  .carousel-slide {
+    position: absolute; inset: 0; display: flex;
+    align-items: flex-end; justify-content: flex-end;
+    padding: 18px 22px; gap: 16px; min-width: 0; transition: opacity .25s;
+  }
+  .carousel-info {
+    position: relative; z-index: 3;
+    background: rgba(9, 12, 18, 0.86);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 14px 18px 16px; max-width: 340px;
+    border: 1px solid rgba(255,255,255,0.10);
+    border-left: 2px solid var(--accent);
+    box-shadow: 0 12px 32px rgba(0,0,0,.5);
+  }
   .badge {
     display: inline-block; font-size: 11px; padding: 2px 10px; border-radius: 4px;
   }
   .badge-teal { background: #085041; color: #9FE1CB; }
   .badge-amber { background: #633806; color: #FAC775; }
   .badge-blue { background: #0C447C; color: #85B7EB; }
-  .carousel-info h2 { font-size: 17px; font-weight: 600; margin: 10px 0 4px; }
-  .carousel-info .meta { font-size: 12px; color: #AFA9EC; }
+  .carousel-info h2 { font-size: 19px; font-weight: 600; line-height: 1.35; margin: 8px 0 5px; color: var(--text-1); }
+  .carousel-info .meta { font-size: 12.5px; color: var(--text-2); line-height: 1.55; }
   .btn-primary {
     display: inline-block; background: #185FA5; color: #E6F1FB;
     padding: 8px 22px; border-radius: 6px; font-size: 13px; font-weight: 600;
@@ -81,26 +165,48 @@
   }
   .btn-primary:hover { background: #1D6FBF; }
   .btn-ghost {
-    display: inline-block; border: 1px solid rgba(241,239,232,0.3);
+    display: inline-block; border: 1px solid rgba(255,255,255,0.3);
     color: #D3D1C7; padding: 7px 18px; border-radius: 6px; font-size: 13px;
     transition: border-color .15s;
   }
-  .btn-ghost:hover { border-color: rgba(241,239,232,0.55); }
-  .carousel-cover {
-    position: relative; width: 240px; height: 135px; border-radius: 8px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 15px; font-weight: 600; letter-spacing: 1px;
-    overflow: hidden;
+  .btn-ghost:hover { border-color: rgba(255,255,255,0.55); }
+  .carousel-bg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; z-index: 0;
   }
-  .fx-layer { position: absolute; inset: 0; display: block; opacity: 0; transition: opacity .25s; }
-  .fx-block { position: absolute; width: 14px; height: 14px; border-radius: 3px; animation: fxbob 2.2s ease-in-out infinite; animation-play-state: paused; }
-  .fx-scan { position: absolute; top: 0; bottom: 0; width: 58px; background: rgba(241,239,232,0.12); transform: skewX(-18deg); animation: fxscan 2.8s linear infinite; animation-play-state: paused; }
-  .fx-tag { position: absolute; right: 8px; bottom: 8px; font-size: 10px; padding: 2px 8px; border-radius: 4px; background: rgba(0,0,0,0.5); color: #F1EFE8; }
-  .carousel-cover:hover .fx-layer { opacity: 1; }
-  .carousel-cover:hover .fx-block, .carousel-cover:hover .fx-scan { animation-play-state: running; }
+  /* 横幅文案排版：海报本身已有标题与副标题，此处只补"四项特色 + 一句主张" */
+  .banner-copy { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+  .banner-copy .bc-feats {
+    position: absolute; left: 4.8%; top: 40%;
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: clamp(10px, 1.5vw, 20px);
+  }
+  .banner-copy .bc-feats li { display: flex; align-items: center; gap: 12px; }
+  .banner-copy .bc-ico {
+    width: clamp(26px, 2.6vw, 36px); height: clamp(26px, 2.6vw, 36px);
+    border: 1.5px solid rgba(255,255,255,.8); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(30,60,110,.3); flex: none;
+  }
+  .banner-copy .bc-feats b {
+    display: block; font-size: clamp(12px, 1.25vw, 16px); font-weight: 700; color: #fff;
+    text-shadow: 0 1px 3px rgba(15,35,75,.95), 0 0 8px rgba(15,35,75,.9), 0 0 20px rgba(15,35,75,.75);
+  }
+  .banner-copy .bc-feats i {
+    display: block; margin-top: 2px; font-style: normal;
+    font-size: clamp(10px, .95vw, 12px); color: rgba(255,255,255,.92);
+    text-shadow: 0 1px 3px rgba(15,35,75,.95), 0 0 8px rgba(15,35,75,.85), 0 0 18px rgba(15,35,75,.7);
+  }
+  .banner-copy .bc-slogan {
+    position: absolute; left: 48%; top: 25%;
+    font-size: clamp(13px, 1.5vw, 21px); font-weight: 600; font-style: italic;
+    color: #fff; line-height: 1.55; letter-spacing: .06em;
+    text-shadow: 0 0 4px rgba(25,45,90,.95), 0 2px 8px rgba(25,45,90,.9), 0 0 20px rgba(25,45,90,.7);
+  }
+  @media (max-width: 900px) { .banner-copy { display: none; } }   /* 平板及以下：文案会撞上信息卡，只留信息卡 */
   .carousel-arrow {
     position: absolute; top: 50%; transform: translateY(-50%); z-index: 5;
-    width: 34px; height: 58px; background: rgba(0,0,0,0.35); color: #F1EFE8;
+    width: 34px; height: 58px; background: rgba(0,0,0,0.35); color: #F7F5F0;
     display: flex; align-items: center; justify-content: center;
     opacity: 0; transition: opacity .15s, background .15s;
   }
@@ -109,74 +215,149 @@
   .carousel-arrow.left { left: 0; border-radius: 0 10px 10px 0; }
   .carousel-arrow.right { right: 0; border-radius: 10px 0 0 10px; }
   .carousel-dots { position: absolute; left: 26px; bottom: 12px; display: flex; gap: 7px; z-index: 5; }
-  .carousel-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(241,239,232,0.3); cursor: pointer; transition: background .15s; }
+  .carousel-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.3); cursor: pointer; transition: background .15s; }
   .carousel-dot.active { background: #85B7EB; }
-  @keyframes fxbob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
-  @keyframes fxscan { 0% { left: -25%; } 100% { left: 115%; } }
-  @media (prefers-reduced-motion: reduce) { .fx-block, .fx-scan { animation: none; } }
 
   /* ===== 首页主体布局 ===== */
-  .home-layout { display: flex; gap: 18px; }
+  .home-layout { display: flex; gap: 24px; }
   .home-main { flex: 1; min-width: 0; }
-  .section-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-  .section-head h3 { font-size: 15px; font-weight: 600; }
-  .filters { display: flex; gap: 6px; }
+  .section-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .section-head h3 { font-size: 16px; font-weight: 600; letter-spacing: .2px; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; }
   .filter-chip {
-    font-size: 12px; padding: 4px 12px; border-radius: 14px;
-    border: 1px solid rgba(241,239,232,0.2); color: #B4B2A9;
-    transition: all .15s;
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13px; padding: 6px 14px; border-radius: 999px;
+    background: rgba(255,255,255,.02);
+    border: 1px solid rgba(255,255,255,.12); color: var(--text-3);
+    transition: color .15s, background .15s, border-color .15s, box-shadow .15s;
   }
-  .filter-chip:hover { border-color: rgba(241,239,232,0.4); }
-  .filter-chip.active { background: #185FA5; border-color: #185FA5; color: #E6F1FB; }
+  .filter-chip:hover { color: var(--text-1); border-color: rgba(255,255,255,.28); }
+  .filter-chip.active {
+    color: var(--accent-text); background: var(--accent-soft);
+    border-color: var(--accent); font-weight: 600;
+    box-shadow: 0 0 0 1px rgba(55,138,221,.32), 0 0 16px rgba(55,138,221,.22);
+  }
+  .filter-chip.active::before {
+    content: ""; width: 5px; height: 5px; border-radius: 50%;
+    background: #85B7EB; box-shadow: 0 0 8px #378ADD;
+  }
+  .filter-chip:focus-visible { outline: 2px solid #85B7EB; outline-offset: 2px; }
 
-  .game-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .game-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 18px; align-items: start; }
   .game-card {
-    background: #2C2C2A; border: 1px solid rgba(241,239,232,0.12);
-    border-radius: 10px; overflow: hidden; cursor: pointer;
-    transition: transform .15s, border-color .15s;
+    background: var(--surface-3); border: 1px solid var(--line);
+    border-radius: var(--radius-lg); overflow: hidden; cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,.40), 0 4px 12px rgba(0,0,0,.28);
+    transition: transform .22s var(--ease), box-shadow .22s var(--ease), border-color .22s;
   }
-  .game-card:hover { transform: translateY(-3px); border-color: rgba(241,239,232,0.3); }
+  @media (hover: hover) {
+    .game-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(133,183,235,.38);
+      box-shadow: 0 10px 28px rgba(0,0,0,.55), 0 0 22px rgba(55,138,221,.10);
+    }
+    .game-card:hover .cover-img,
+    .game-card:hover .cover-vid { transform: scale(1.06); }
+  }
+  .game-card:active { transform: translateY(-1px) scale(.995); }
+  .game-card:focus-visible { outline: 2px solid #85B7EB; outline-offset: 2px; }
   .game-cover {
-    height: 96px; display: flex; align-items: center; justify-content: center;
-    font-size: 15px; font-weight: 600; letter-spacing: 1px;
+    aspect-ratio: 16 / 9; height: auto; position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 600; letter-spacing: 1px; text-align: center; padding: 0 14px;
   }
-  .game-card-body { padding: 10px 12px 12px; }
-  .game-card-body .title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-  .game-card-body .meta { font-size: 11px; color: #888780; margin-top: 5px; }
+  .game-cover .cover-img, .game-cover .cover-vid {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; display: block;
+    transition: transform .38s var(--ease);
+  }
+  .game-cover .cover-title { position: relative; text-shadow: 0 1px 6px rgba(0,0,0,0.5); }
+  .game-card-body { padding: 12px 14px 14px; }
+  .game-card-body .title {
+    font-size: 15px; font-weight: 600; line-height: 1.4; color: var(--text-1);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .game-card-body .meta {
+    font-size: 12px; color: var(--text-3); margin-top: 5px; line-height: 1.5;
+    display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  }
   .meta .tag-school { color: #9FE1CB; }
   .meta .tag-import { color: #FAC775; }
-  .heat-row { display: flex; align-items: center; gap: 14px; margin-top: 7px; font-size: 11px; color: #B4B2A9; }
-  .heat-row .h-item { display: inline-flex; align-items: center; gap: 4px; }
-  .heat-row svg { display: block; }
+  .meta .dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,.28); }
+  .heat-row {
+    display: flex; align-items: center; gap: 16px; margin-top: 9px;
+    font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums;
+  }
+  .heat-row .h-item { display: inline-flex; align-items: center; gap: 5px; }
+  .heat-row .h-item .num { color: var(--text-num); font-weight: 600; }
+  .heat-row svg { display: block; opacity: .72; }
   .value.pink { color: #F09595; }
   .flower-btn { display: inline-flex; align-items: center; gap: 6px; }
   .flower-btn.on { border-color: rgba(226,75,74,0.65); color: #F09595; }
 
-  .sidebar { width: 220px; flex-shrink: 0; }
-  .side-card {
-    background: #2C2C2A; border: 1px solid rgba(241,239,232,0.12);
-    border-radius: 10px; padding: 14px; margin-bottom: 14px;
+  /* 插画模式下：卡片区一块磨砂承载层，文字与卡片落在干净的底上 */
+  .home-main { position: relative; }
+  body.bg-img .home-main::before {
+    content: ""; position: absolute; inset: -16px -14px -18px; z-index: -1;
+    border-radius: 18px;
+    background: rgba(10, 13, 19, .72);
+    -webkit-backdrop-filter: blur(18px) saturate(110%);
+    backdrop-filter: blur(18px) saturate(110%);
   }
-  .side-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+
+  .sidebar { width: 260px; flex-shrink: 0; }
+  .sidebar-inner { position: sticky; top: 76px; }
+  .side-card {
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: var(--radius-lg); padding: 16px 16px 14px; margin-bottom: 14px;
+  }
+  .side-card h4 {
+    font-size: 13.5px; font-weight: 600; margin-bottom: 12px; color: var(--text-1);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .side-card h4::before {
+    content: ""; width: 3px; height: 12px; border-radius: 2px;
+    background: var(--accent); box-shadow: 0 0 8px rgba(55,138,221,.6);
+  }
   .rank-item {
     display: flex; align-items: center; gap: 10px; padding: 6px 0;
     cursor: pointer; border-radius: 6px;
   }
   .rank-item:hover .rk-name { color: #85B7EB; }
-  .rank-item .rk-num { width: 18px; font-size: 13px; font-weight: 600; color: #888780; text-align: center; }
+  .rank-item .rk-num { width: 18px; font-size: 13px; font-weight: 600; color: #A9A69D; text-align: center; }
   .rank-item:nth-child(1) .rk-num { color: #EF9F27; }
-  .rank-item:nth-child(2) .rk-num { color: #B4B2A9; }
+  .rank-item:nth-child(2) .rk-num { color: #C7C4BA; }
   .rank-item:nth-child(3) .rk-num { color: #B4775A; }
   .rank-item .rk-name { font-size: 12px; flex: 1; }
-  .rank-item .rk-hot { font-size: 11px; color: #888780; }
-  .news-item { font-size: 12px; color: #B4B2A9; padding: 5px 0; cursor: pointer; }
-  .news-item:hover { color: #F1EFE8; }
-  .news-item .new-flag { color: #97C459; font-size: 10px; margin-left: 6px; }
+  .rank-item .rk-hot { font-size: 11px; color: #A9A69D; }
+  .news-item { font-size: 12.5px; color: var(--text-2); padding: 6px 0; cursor: pointer; transition: color .15s; }
+  .news-item:hover { color: var(--text-1); }
+  .news-item .new-flag { color: #5DCAA5; font-size: 10px; margin-left: 6px; }
+  /* 侧栏：站点数据 */
+  .side-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+  .side-stats .n { font-size: 19px; font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; line-height: 1.3; }
+  .side-stats .l { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  /* 侧栏：创作中心入口 */
+  .side-cta {
+    background:
+      radial-gradient(120% 100% at 100% 0%, rgba(55,138,221,.20), transparent 62%),
+      var(--surface-2);
+    border-color: rgba(55,138,221,.26);
+  }
+  .side-cta p { font-size: 12px; color: var(--text-3); line-height: 1.65; margin-bottom: 12px; }
+  .btn-side {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 600; color: var(--accent-text);
+    background: var(--accent-soft); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 6px 12px;
+    transition: background .15s, box-shadow .15s;
+  }
+  .btn-side:hover { background: rgba(55,138,221,.26); box-shadow: 0 0 16px rgba(55,138,221,.22); }
 
   /* ===== 详情页 ===== */
-  .breadcrumb { font-size: 12px; color: #888780; margin-bottom: 16px; }
+  .breadcrumb { font-size: 12px; color: #A9A69D; margin-bottom: 16px; }
   .breadcrumb span.link { cursor: pointer; }
-  .breadcrumb span.link:hover { color: #B4B2A9; }
+  .breadcrumb span.link:hover { color: #C7C4BA; }
   .detail-head { display: flex; gap: 24px; align-items: flex-start; }
   .detail-cover {
     width: 260px; height: 146px; border-radius: 10px; flex-shrink: 0;
@@ -186,35 +367,35 @@
   .detail-info { flex: 1; min-width: 0; }
   .detail-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .detail-title-row h2 { font-size: 19px; font-weight: 600; }
-  .detail-byline { font-size: 12px; color: #B4B2A9; margin-top: 8px; }
+  .detail-byline { font-size: 12px; color: #C7C4BA; margin-top: 8px; }
   .tag-chips { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   .tag-chip {
-    border: 1px solid rgba(241,239,232,0.25); color: #D3D1C7;
+    border: 1px solid rgba(255,255,255,0.25); color: #D3D1C7;
     font-size: 11px; padding: 3px 12px; border-radius: 4px;
   }
   .detail-actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
-  .detail-actions .mytime { font-size: 12px; color: #888780; }
+  .detail-actions .mytime { font-size: 12px; color: #A9A69D; }
 
   .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
-  .stat-card { background: #2C2C2A; border-radius: 10px; padding: 14px 16px; }
-  .stat-card .label { font-size: 12px; color: #888780; }
+  .stat-card { background: rgba(24, 24, 30, 0.7); border-radius: 10px; padding: 14px 16px; }
+  .stat-card .label { font-size: 12px; color: #A9A69D; }
   .stat-card .value { font-size: 22px; font-weight: 600; margin-top: 5px; }
   .stat-card .value.green { color: #97C459; }
 
   .detail-layout { display: flex; gap: 18px; }
   .detail-main { flex: 1; min-width: 0; }
-  .detail-tabs { display: flex; gap: 20px; border-bottom: 1px solid rgba(241,239,232,0.12); }
+  .detail-tabs { display: flex; gap: 20px; border-bottom: 1px solid rgba(255,255,255,0.12); }
   .detail-tabs button {
-    font-size: 13px; color: #B4B2A9; padding: 10px 2px;
+    font-size: 13px; color: #C7C4BA; padding: 10px 2px;
     border-bottom: 2px solid transparent; margin-bottom: -1px;
   }
-  .detail-tabs button.active { color: #F1EFE8; border-bottom-color: #378ADD; }
+  .detail-tabs button.active { color: #F7F5F0; border-bottom-color: #378ADD; }
   .tab-panel { display: none; padding-top: 16px; }
   .tab-panel.active { display: block; }
   .game-desc { font-size: 13px; line-height: 1.8; color: #D3D1C7; }
 
   .comment-card {
-    background: #2C2C2A; border: 1px solid rgba(241,239,232,0.12);
+    background: #2C2C2A; border: 1px solid rgba(255,255,255,0.12);
     border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;
     display: flex; gap: 12px;
   }
@@ -223,17 +404,16 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 600;
   }
-  .comment-card .c-meta { font-size: 11px; color: #B4B2A9; }
+  .comment-card .c-meta { font-size: 11px; color: #C7C4BA; }
   .comment-card .c-meta .rec-up { color: #97C459; }
   .comment-card .c-meta .rec-down { color: #E24B4A; }
   .comment-card .c-text { font-size: 13px; margin-top: 5px; line-height: 1.6; }
   .comment-input {
-    width: 100%; background: #2C2C2A; border: 1px solid rgba(241,239,232,0.18);
-    border-radius: 8px; padding: 11px 14px; color: #F1EFE8; font-size: 12px;
+    width: 100%; background: #2C2C2A; border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 8px; padding: 11px 14px; color: #F7F5F0; font-size: 12px;
     outline: none; font-family: inherit; resize: none;
   }
 
-  .detail-side { width: 220px; flex-shrink: 0; }
   .friend-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
   .friend-row .f-ava {
     width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
@@ -244,8 +424,8 @@
   /* ===== 个人中心 ===== */
   .me-layout { display: flex; gap: 16px; align-items: flex-start; }
   .profile-card {
-    width: 220px; flex-shrink: 0; background: #2C2C2A;
-    border: 1px solid rgba(241,239,232,0.12); border-radius: 12px;
+    width: 220px; flex-shrink: 0; background: rgba(22, 22, 28, 0.66);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 12px;
     padding: 20px; text-align: center;
   }
   .profile-card .big-ava {
@@ -254,37 +434,39 @@
     display: flex; align-items: center; justify-content: center;
   }
   .profile-card .p-name { font-size: 15px; font-weight: 600; margin-top: 12px; }
-  .profile-card .p-class { font-size: 12px; color: #B4B2A9; margin-top: 5px; }
+  .profile-card .p-class { font-size: 12px; color: #C7C4BA; margin-top: 5px; }
   .lv-bar { height: 6px; background: #221F1C; border-radius: 3px; margin-top: 12px; overflow: hidden; }
   .lv-bar > div { width: 62%; height: 100%; background: #378ADD; }
-  .profile-card .lv-hint { font-size: 11px; color: #888780; margin-top: 7px; }
+  .profile-card .lv-hint { font-size: 11px; color: #A9A69D; margin-top: 7px; }
   .p-stats {
     display: flex; justify-content: space-around; margin-top: 16px;
-    border-top: 1px solid rgba(241,239,232,0.12); padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,0.12); padding-top: 14px;
   }
   .p-stats .num { font-size: 16px; font-weight: 600; }
-  .p-stats .lbl { font-size: 11px; color: #888780; margin-top: 3px; }
+  .p-stats .lbl { font-size: 11px; color: #A9A69D; margin-top: 3px; }
 
   .me-main { flex: 1; min-width: 0; }
   .panel {
-    background: #2C2C2A; border: 1px solid rgba(241,239,232,0.12);
+    background: rgba(18, 18, 23, 0.62);
+    border: 1px solid rgba(255,255,255,0.1);
     border-radius: 12px; padding: 16px 18px; margin-bottom: 14px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
   }
   .panel-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
   .panel-head h4 { font-size: 14px; font-weight: 600; }
   .panel-head .hint { font-size: 12px; color: #97C459; }
-  .panel-head .gray { font-size: 12px; color: #888780; }
+  .panel-head .gray { font-size: 12px; color: #A9A69D; }
   .chart { display: flex; align-items: flex-end; gap: 14px; height: 110px; padding: 0 8px; }
   .chart-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 5px; }
   .chart-bar { width: 100%; border-radius: 4px; background: #0C447C; }
   .chart-bar.peak { background: #185FA5; }
-  .chart-bar.zero { background: transparent; border: 1px dashed rgba(241,239,232,0.25); height: 12px; }
-  .chart-val { font-size: 11px; color: #888780; }
+  .chart-bar.zero { background: transparent; border: 1px dashed rgba(255,255,255,0.25); height: 12px; }
+  .chart-val { font-size: 11px; color: #A9A69D; }
   .chart-labels { display: flex; gap: 14px; margin-top: 8px; padding: 0 8px; }
-  .chart-labels span { flex: 1; text-align: center; font-size: 11px; color: #888780; }
+  .chart-labels span { flex: 1; text-align: center; font-size: 11px; color: #A9A69D; }
 
   .feed-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
-  .feed-row + .feed-row { border-top: 1px solid rgba(241,239,232,0.08); }
+  .feed-row + .feed-row { border-top: 1px solid rgba(255,255,255,0.08); }
   .feed-row .f-ava {
     width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center; font-size: 12px;
@@ -299,25 +481,26 @@
     aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center;
     justify-content: center; font-size: 11px;
   }
-  .badge-cell.locked { background: #221F1C; border: 1px dashed rgba(241,239,232,0.25); color: #888780; }
-  .recent-item { font-size: 12px; color: #B4B2A9; padding: 5px 0; cursor: pointer; }
-  .recent-item:hover { color: #F1EFE8; }
+  .badge-cell.locked { background: #221F1C; border: 1px dashed rgba(255,255,255,0.25); color: #A9A69D; }
+  .recent-item { font-size: 12px; color: #C7C4BA; padding: 5px 0; cursor: pointer; }
+  .recent-item:hover { color: #F7F5F0; }
 
   /* ===== 排行榜 ===== */
   .rank-table { width: 100%; border-collapse: collapse; }
   .rank-table th {
-    text-align: left; font-size: 12px; color: #888780; font-weight: 400;
-    padding: 10px 14px; border-bottom: 1px solid rgba(241,239,232,0.12);
+    text-align: left; font-size: 12px; color: #A9A69D; font-weight: 400;
+    padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.12);
+    white-space: nowrap;
   }
-  .rank-table td { padding: 12px 14px; border-bottom: 1px solid rgba(241,239,232,0.08); font-size: 13px; }
-  .rank-table tr:hover td { background: rgba(241,239,232,0.03); }
+  .rank-table td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 13px; }
+  .rank-table tr:hover td { background: rgba(255,255,255,0.03); }
   .rank-table tr.row-click { cursor: pointer; }
   .rank-table .rk-num { font-weight: 600; width: 40px; }
 
   /* ===== 占位页 ===== */
   .todo-page { text-align: center; padding: 90px 0; }
-  .todo-page h3 { font-size: 16px; font-weight: 600; color: #B4B2A9; }
-  .todo-page p { font-size: 12px; color: #888780; margin-top: 10px; }
+  .todo-page h3 { font-size: 16px; font-weight: 600; color: #C7C4BA; }
+  .todo-page p { font-size: 12px; color: #A9A69D; margin-top: 10px; }
 
   /* ===== 弹窗 ===== */
   .modal-mask {
@@ -327,20 +510,208 @@
   }
   .modal-mask.show { display: flex; }
   .modal {
-    background: #2C2C2A; border: 1px solid rgba(241,239,232,0.2);
+    background: #2C2C2A; border: 1px solid rgba(255,255,255,0.2);
     border-radius: 14px; padding: 26px 30px; width: 420px; max-width: 90vw;
   }
   .modal h3 { font-size: 16px; font-weight: 600; }
-  .modal p { font-size: 13px; color: #B4B2A9; line-height: 1.7; margin: 12px 0 18px; }
+  .modal p { font-size: 13px; color: #C7C4BA; line-height: 1.7; margin: 12px 0 18px; }
   .modal .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
   .modal-timer { font-size: 26px; font-weight: 600; color: #85B7EB; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
-  .modal .timer-hint { font-size: 11px; color: #888780; margin-top: 4px; }
+  .modal .timer-hint { font-size: 11px; color: #A9A69D; margin-top: 4px; }
+  .modal.playing { width: min(1040px, 94vw); padding: 18px 20px 20px; }
+  .modal-head { display: none; }   /* 只有进入游玩态才显示标题与关闭按钮 */
+  .modal.playing .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .modal.playing .modal-head h3 { margin: 0; }
+  .game-frame { width: 100%; height: min(66vh, 620px); border: none; border-radius: 10px; background: #1A1917; display: block; }
+  .frame-hint { font-size: 11px; color: #A9A69D; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .frame-hint a { color: #85B7EB; text-decoration: none; }
+  .frame-hint a:hover { text-decoration: underline; }
+
+  /* ===== 响应式 ===== */
+  .tabbar { display: none; }
+
+  @media (max-width: 1150px) {
+    .sidebar { display: none; }
+  }
+  @media (max-width: 900px) {
+    .game-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 14px; }
+    .detail-head { flex-direction: column; gap: 16px; }
+    .detail-cover { width: 100%; height: auto; aspect-ratio: 16 / 9; }
+    .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .carousel:hover { transform: none; }
+    /* 平板宽度：顶栏收紧，避免品牌与导航折成两行 */
+    .topbar { padding: 0 var(--page-pad); gap: 14px; }
+    .logo small { display: none; }
+    .nav-tabs button { padding: 0 12px; font-size: 13px; }
+    .search-box { width: 168px; }
+  }
+
+  /* ---- 手机版：≤640px 单列重排 + 底部导航 ---- */
+  @media (max-width: 640px) {
+    :root { --tabbar-h: 54px; }
+    body {
+      padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+      -webkit-text-size-adjust: 100%;
+      -webkit-tap-highlight-color: transparent;
+    }
+    main { padding: 14px var(--page-pad) 20px; }
+
+    /* 顶栏：只留品牌与头像，导航下沉到底部 */
+    .topbar {
+      height: 52px; padding: 0 var(--page-pad); gap: 10px;
+      background: rgba(10, 13, 19, .94);   /* 手机上少透一点，滚过的卡片不会在标题后面留鬼影 */
+    }
+    .logo { font-size: 16px; letter-spacing: .5px; }
+    .logo small { display: none; }
+    .nav-tabs { display: none; }
+    .topbar .search-box { display: none; }
+    .avatar { width: 30px; height: 30px; font-size: 12px; }
+
+    /* 底部导航栏 */
+    .tabbar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+      display: flex; align-items: stretch;
+      background: rgba(10, 13, 19, .94);
+      -webkit-backdrop-filter: blur(16px) saturate(120%);
+      backdrop-filter: blur(16px) saturate(120%);
+      border-top: 1px solid var(--line-strong);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .tabbar button {
+      position: relative;
+      flex: 1; min-height: var(--tabbar-h);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      color: var(--text-3); transition: color .15s, background .15s;
+      touch-action: manipulation;
+    }
+    .tabbar button svg { width: 21px; height: 21px; stroke: currentColor; display: block; }
+    .tabbar button span { font-size: 10.5px; letter-spacing: .3px; line-height: 1; }
+    .tabbar button.active { color: var(--accent-text); }
+    .tabbar button.active span { font-weight: 600; }
+    .tabbar button.active::before {
+      content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 26px; height: 2px; border-radius: 0 0 2px 2px;
+      background: var(--accent); box-shadow: 0 0 10px rgba(55,138,221,.9);
+    }
+    .tabbar button.active svg { filter: drop-shadow(0 0 6px rgba(55,138,221,.8)); }
+    .tabbar button:active { background: rgba(255,255,255,.05); }
+    .tabbar button:focus-visible { outline: 2px solid #85B7EB; outline-offset: -3px; }
+
+    /* 横幅：图在上、文案在下，不再用浮层压住海报，标题在手机上也能读到 */
+    .carousel { aspect-ratio: auto; border-radius: 14px; margin-bottom: 16px; }
+    .carousel::after { display: none; }
+    .carousel-slide { position: relative; inset: auto; display: block; padding: 0; opacity: 1 !important; }
+    .carousel-bg {
+      position: relative; inset: auto; display: block;
+      width: 100%; height: auto;
+      aspect-ratio: 1536 / 652;   /* 跟海报原图同比例，手机上不裁掉两侧的排版文字 */
+    }
+    .carousel-info {
+      position: static; max-width: none; margin: 0; padding: 12px 0 2px;
+      background: none; border: 0; border-radius: 0; box-shadow: none;
+      -webkit-backdrop-filter: none; backdrop-filter: none;
+    }
+    .carousel-info h2 { font-size: 17px; margin: 7px 0 5px; }
+    .carousel-info .meta { font-size: 12px; line-height: 1.6; }
+    .carousel-info > div:last-child { margin-top: 10px !important; }
+    .carousel-info .btn-primary { width: 100%; text-align: center; padding: 11px 0; font-size: 13.5px; }
+    .carousel-arrow, .carousel-dots { display: none; }
+
+    /* 二级筛选：吸顶 + 横向滑动，不换行挤成两排 */
+    .section-head {
+      position: sticky; top: 52px; z-index: 20;
+      flex-direction: column; align-items: stretch; gap: 8px;
+      margin: 0 -14px 12px; padding: 8px 0 10px;
+      background: rgba(10, 13, 19, .93);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--line);
+    }
+    .section-head h3 { font-size: 15px; padding: 0 14px; }
+    .filters {
+      flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain;
+      gap: 8px; padding: 0 14px 2px; margin: 0;
+      scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    }
+    .filters::-webkit-scrollbar { display: none; }
+    .filter-chip { flex: none; padding: 8px 14px; font-size: 12.5px; touch-action: manipulation; }
+
+    /* 卡片：单列改横向图文，一屏能看到更多作品 */
+    .game-grid { grid-template-columns: 1fr; gap: 12px; }
+    .game-card { display: flex; align-items: stretch; }
+    .game-cover {
+      width: 40%; flex: none; aspect-ratio: auto; height: auto; min-height: 92px;
+      padding: 0 8px; font-size: 13px; letter-spacing: 0;
+    }
+    .game-card-body { flex: 1; min-width: 0; padding: 10px 12px 11px; }
+    .game-card-body .title { font-size: 14px; }
+    .game-card-body .meta { font-size: 11.5px; gap: 6px; margin-top: 4px; }
+    .heat-row { gap: 12px; margin-top: 7px; font-size: 11.5px; }
+
+    /* 侧栏：不再整块消失，改成网格下方的通栏卡片 */
+    .home-layout { display: block; }
+    .sidebar { display: block; width: auto; margin-top: 18px; }
+    .sidebar-inner { position: static; display: grid; gap: 12px; }
+    .side-card { margin-bottom: 0; }
+    .news-item, .rank-item { padding: 8px 0; }
+
+    /* 详情页 */
+    .breadcrumb { font-size: 11.5px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .detail-title-row h2 { font-size: 18px; }
+    .detail-title-row { gap: 8px; }
+    .detail-byline { font-size: 11.5px; line-height: 1.6; }
+    .detail-actions { gap: 10px; margin-top: 14px; }
+    .detail-actions .btn-primary { flex: 1; text-align: center; padding: 12px 0; }
+    .detail-actions .btn-ghost { padding: 11px 14px; }
+    .stat-grid { gap: 10px; margin: 16px 0; }
+    .stat-card { padding: 12px 13px; }
+    .stat-card .value { font-size: 19px; }
+    .game-desc { font-size: 13px; line-height: 1.85; }
+
+    /* 排行榜：收起类型与通关人数两列，避免横向溢出 */
+    .panel { padding: 2px 0; }
+    .rank-table th, .rank-table td { padding: 10px 8px; }
+    .rank-table th:nth-child(3), .rank-table td:nth-child(3),
+    .rank-table th:nth-child(6), .rank-table td:nth-child(6) { display: none; }
+    .rank-table td:nth-child(2) { max-width: 148px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rank-table .rk-num { width: 26px; }
+
+    /* 弹窗：开始游玩时占满整屏 */
+    .modal { width: auto; max-width: calc(100vw - 28px); padding: 20px 18px; }
+    .modal.playing {
+      width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh;
+      border: 0; border-radius: 0; overflow-y: auto;
+      padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+    }
+    .modal.playing .modal-head { margin-bottom: 8px; }
+    .modal.playing .modal-head h3 { font-size: 13px; }
+    .modal.playing .modal-head .btn-ghost { padding: 8px 14px; font-size: 12.5px; min-height: 34px; flex: none; }
+    .modal.playing .game-frame { height: calc(100dvh - 96px); border-radius: 8px; }
+    .frame-hint { font-size: 10.5px; gap: 8px; }
+    .frame-hint span:first-child { display: none; }
+    .todo-page { padding: 56px 0; }
+  }
+
+  @media (max-width: 380px) {
+    .game-cover { width: 37%; }
+    .tabbar button span { font-size: 10px; }
+    .rank-table td:nth-child(2) { max-width: 118px; }
+  }
+  /* 尊重系统"减少透明度"偏好：全部转实色 */
+  @media (prefers-reduced-transparency: reduce) {
+    .topbar { -webkit-backdrop-filter: none; backdrop-filter: none; background: #0C1017; }
+    .carousel-info { -webkit-backdrop-filter: none; backdrop-filter: none; background: #0C1017; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+  }
 </style>
 </head>
 <body>
 
+<div class="bg-art" aria-hidden="true"></div>
+
 <header class="topbar">
-  <div class="logo">校游社<small>校园游戏平台 · 原型</small></div>
+  <div class="logo">第九艺术<small>校园游戏平台</small></div>
   <nav class="nav-tabs">
     <button data-nav="home" class="active">首页</button>
     <button data-nav="rank">排行榜</button>
@@ -348,8 +719,7 @@
     <button data-nav="studio">创作中心</button>
   </nav>
   <div class="spacer"></div>
-  <span class="prototype-tag">第一版原型 · 数据为模拟</span>
-  <input class="search-box" placeholder="搜索游戏或同学（原型未实现）" disabled>
+  <input class="search-box" placeholder="搜索游戏或同学（即将上线）" disabled>
   <div class="avatar" data-nav="me" title="游客模式">客</div>
 </header>
 
@@ -358,6 +728,16 @@
   <section id="view-home" class="view active">
     <div class="carousel" id="carousel">
       <div class="carousel-slide" id="carousel-slide">
+        <img class="carousel-bg" id="carousel-bg" alt="">
+        <div class="banner-copy">
+          <ul class="bc-feats">
+            <li><span class="bc-ico"><svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 5.7L3 17.7 6.3 21l5.7-5.7a4.5 4.5 0 0 0 5.7-6l-2.6 2.6-2.7-2.7 2.6-2.9z"/></svg></span><span><b>独立游戏开发</b><i>从想法到实现</i></span></li>
+            <li><span class="bc-ico"><svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="5"/><path d="M6 12h4M8 10v4"/><circle cx="16" cy="11" r="0.6" fill="#fff"/><circle cx="18.5" cy="13" r="0.6" fill="#fff"/></svg></span><span><b>原创作品</b><i>用游戏表达世界</i></span></li>
+            <li><span class="bc-ico"><svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/></svg></span><span><b>技术探索</b><i>热爱 · 学习 · 分享</i></span></li>
+            <li><span class="bc-ico"><svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16.2 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M21 20c0-2.6-1.6-4.7-3.9-5.5"/></svg></span><span><b>热爱共创</b><i>一起做有趣的事</i></span></li>
+          </ul>
+          <div class="bc-slogan">游戏不止于生活<br>而是另一种可能</div>
+        </div>
         <div class="carousel-info">
           <span class="badge badge-teal" id="carousel-badge"></span>
           <h2 id="carousel-title"></h2>
@@ -366,7 +746,6 @@
             <button class="btn-primary" id="carousel-play">立即游玩</button>
           </div>
         </div>
-        <div class="carousel-cover" id="carousel-cover"></div>
       </div>
       <button class="carousel-arrow left" id="car-prev" title="上一个"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3 L5 8 L10 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="carousel-arrow right" id="car-next" title="下一个"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3 L11 8 L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -379,23 +758,30 @@
           <h3>全部游戏</h3>
           <div class="filters">
             <button class="filter-chip active" data-filter="all">全部</button>
-            <button class="filter-chip" data-filter="校园">校园作品</button>
-            <button class="filter-chip" data-filter="引进">引进游戏</button>
-            <button class="filter-chip" data-filter="双人">双人同屏</button>
+            <button class="filter-chip" data-filter="play">即点即玩</button>
+            <button class="filter-chip" data-filter="video">视频演示</button>
+            <button class="filter-chip" data-filter="dl">桌面 / 手机版</button>
           </div>
         </div>
         <div class="game-grid" id="game-grid"></div>
       </div>
       <div class="sidebar">
-        <div class="side-card">
-          <h4>热门榜 · 本周</h4>
-          <div id="rank-list"></div>
-        </div>
-        <div class="side-card">
-          <h4>新作速递</h4>
-          <div class="news-item" data-open="6">节奏方块 · 昨日上架<span class="new-flag">NEW</span></div>
-          <div class="news-item" data-open="7">单词勇者 · 3 天前</div>
-          <div class="news-item" data-open="3">课室大乱斗 · 上周</div>
+        <div class="sidebar-inner">
+          <div class="side-card">
+            <h4>新品速递</h4>
+            <div class="news-item" data-open="17">回声花园 · 昨日上架<span class="new-flag">NEW</span></div>
+            <div class="news-item" data-open="29">孤剑试炼 · 3 天前</div>
+            <div class="news-item" data-open="24">黄昏轮回 · 上周</div>
+          </div>
+          <div class="side-card">
+            <h4>站点数据</h4>
+            <div class="side-stats" id="side-stats"></div>
+          </div>
+          <div class="side-card side-cta">
+            <h4>创作中心</h4>
+            <p>你的作品也可以出现在这里。上传游戏，写上简介，让全校同学玩到。</p>
+            <button class="btn-side" data-nav="studio">开始投稿 →</button>
+          </div>
         </div>
       </div>
     </div>
@@ -413,7 +799,7 @@
 
   <!-- ===== 详情页 ===== -->
   <section id="view-detail" class="view">
-    <div class="breadcrumb"><span class="link" data-nav="home">首页</span> / <span id="crumb-tag"></span> / <span id="crumb-title" style="color:#B4B2A9;"></span></div>
+    <div class="breadcrumb"><span class="link" data-nav="home">首页</span> / <span id="crumb-tag"></span> / <span id="crumb-title" style="color:#C7C4BA;"></span></div>
     <div class="detail-head">
       <div class="detail-cover" id="detail-cover"></div>
       <div class="detail-info">
@@ -448,12 +834,6 @@
           <p class="game-desc" id="devlog-text"></p>
         </div>
       </div>
-      <div class="detail-side">
-        <div class="side-card">
-          <h4>本周最热</h4>
-          <div id="detail-hot"></div>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -481,13 +861,50 @@
   </section>
 </main>
 
+<!-- ===== 移动端底部导航（≤640px 显示，桌面隐藏） ===== -->
+<nav class="tabbar" aria-label="主导航">
+  <button data-nav="home" class="active">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.4l8.5 7.2"/><path d="M5.8 9.8V20.4h12.4V9.8"/><path d="M9.8 20.4v-5.6h4.4v5.6"/></svg>
+    <span>首页</span>
+  </button>
+  <button data-nav="rank">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V11"/><path d="M10 20V5"/><path d="M16 20v-6"/><path d="M21.5 20H2.5"/></svg>
+    <span>排行</span>
+  </button>
+  <button data-nav="community">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 11.6a8 8 0 0 1-11.4 7.2L4.3 20.4l1.7-4.7a8 8 0 1 1 14.6-4.1z"/><path d="M9 11.5h6M9 14.6h3.6"/></svg>
+    <span>社区</span>
+  </button>
+  <button data-nav="studio">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="4.2" width="17.6" height="15.6" rx="3.4"/><path d="M12 8.8v6.4M8.8 12h6.4"/></svg>
+    <span>创作</span>
+  </button>
+  <button data-nav="me">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.2" r="3.6"/><path d="M4.8 20.4c0-3.6 3.2-6.4 7.2-6.4s7.2 2.8 7.2 6.4"/></svg>
+    <span>我的</span>
+  </button>
+</nav>
+
 <!-- ===== 游玩弹窗（游客模式，无计时） ===== -->
 <div class="modal-mask" id="play-modal">
-  <div class="modal">
-    <h3 id="modal-title">开始游玩</h3>
-    <p>第一版原型还没有接入真正的游戏。正式版这里会内嵌网页游戏画布，点开即玩，全程游客模式、无需登录。</p>
-    <div class="modal-btns" style="margin-top:18px; justify-content:center;">
-      <button class="btn-primary" id="modal-close">知道了</button>
+  <div class="modal" id="play-modal-box">
+    <div class="modal-head" id="modal-head">
+      <h3 id="modal-title-playing"></h3>
+      <button class="btn-ghost" id="modal-close-top">关闭</button>
+    </div>
+    <div id="modal-placeholder">
+      <h3 id="modal-title">开始游玩</h3>
+      <p>这个游戏还没有接入网页版。正式版会内嵌网页游戏画布，点开即玩，全程游客模式、无需登录。</p>
+      <div class="modal-btns" style="margin-top:18px; justify-content:center;">
+        <button class="btn-primary" id="modal-close">知道了</button>
+      </div>
+    </div>
+    <div id="modal-game" style="display:none;">
+      <iframe class="game-frame" id="game-frame" title="game" allow="fullscreen; autoplay; gamepad"></iframe>
+      <div class="frame-hint">
+        <span>鼠标被游戏抓住出不来？按一次 <b style="color:#F0997B;">Esc</b> 释放，再点右上角关闭</span>
+        <span><a id="game-newtab" href="#" target="_blank" rel="noopener">新窗口打开</a> · 游客模式</span>
+      </div>
     </div>
   </div>
 </div>
@@ -496,60 +913,477 @@
 /* ================= 模拟数据（游客模式：浏览 / 小红花 / 通关，无时长无评论） ================= */
 const GAMES = [
   {
-    id: 1, title: '回声残影', tag: '校园', genre: '平台解谜', mode: '单人',
-    byline: '计科 2 班 · Echoes 小组 · 更新于 11 月 5 日',
-    views: 8620, weekViews: 1240, flowers: 1723, cleared: 56, myFlower: false,
+    id: 1, title: '第七号样本：残影', tag: '校园', cat: 'play', genre: '平台解谜', mode: '单人',
+    byline: '人工智能26303 · 赵文珺 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
     coverBg: '#085041', coverFg: '#5DCAA5', featured: true,
     tags: ['解谜', '像素风', '钥匙收集', '时序门'],
+    playUrl: 'https://echoes-demo.app.workbuddy.host/?sharecode=7O7FAGB4JM',
+    coverImg: '/games/echoes/cover.jpg', previewVid: '/games/echoes/preview.mp4',
     desc: '一款像素风平台解谜游戏。你要在残影重叠的旧校舍里收集 8 枚钥匙，解开时序门的谜题，找到记忆消失的真相。共 8 关，另有隐藏结局。',
     devlog: '11 月 5 日：手感调优完成，SPEED 从 280 降到 240，多人反馈"一按就窜"的问题解决了。第 6 关两道 0.6 秒时序门放宽到 1.0 秒。\n11 月 1 日：新增钥匙全收集成就。\n10 月 28 日：网页版发布。'
   },
-  { id: 2, title: '像素农场', tag: '引进', genre: '模拟经营', mode: '单人', byline: '外部引进 · 汉化组适配', views: 15200, weekViews: 2100, flowers: 2450, cleared: 0, coverBg: '#712B13', coverFg: '#F0997B', tags: ['经营', '放置', '适合摸鱼'], desc: '种地、养鸡、扩建农场。引进的休闲经营游戏，适合课间挂机。', devlog: '引进游戏无开发者日志。' },
-  { id: 3, title: '课室大乱斗', tag: '校园', genre: '动作', mode: '双人同屏', byline: '高二 3 班 · 游戏社 · 更新于 11 月 2 日', views: 3980, weekViews: 860, flowers: 720, cleared: 0, coverBg: '#0C447C', coverFg: '#85B7EB', tags: ['双人', '动作', '课室主题'], desc: '双人同屏对战的课室大乱斗，橡皮擦对决粉笔头，下课十分钟的最佳选择。', devlog: '11 月 2 日：修复了双人模式按键冲突问题。' },
-  { id: 5, title: '跑酷模拟器', tag: '校园', genre: '跑酷', mode: '单人', byline: '初三 1 班 · 独立开发', views: 5210, weekViews: 940, flowers: 890, cleared: 0, coverBg: '#27500A', coverFg: '#97C459', tags: ['跑酷', '竞技', '排行榜'], desc: '一层楼一层楼往上跑，全服排行榜见真章。', devlog: '' },
-  { id: 6, title: '节奏方块', tag: '校园', genre: '音游', mode: '单人', byline: '高一 5 班 · 音乐社 × 游戏社', views: 1180, weekViews: 620, flowers: 460, cleared: 0, coverBg: '#72243E', coverFg: '#ED93B1', tags: ['音游', '新作', '卡点'], desc: '跟着节拍消除方块的音游，曲目全部由音乐社原创。', devlog: '' },
-  { id: 7, title: '单词勇者', tag: '校园', genre: '教育', mode: '单人', byline: '英语教研组 × 高一 2 班', views: 940, weekViews: 310, flowers: 260, cleared: 0, coverBg: '#26215C', coverFg: '#AFA9EC', tags: ['教育', '背单词', 'RPG'], desc: '打怪即背单词的教育 RPG，英语老师亲自参与出题。', devlog: '' },
-  { id: 8, title: '贪吃蛇 online', tag: '引进', genre: '休闲', mode: '多人', byline: '外部引进', views: 9800, weekViews: 1300, flowers: 1600, cleared: 0, coverBg: '#633806', coverFg: '#EF9F27', tags: ['休闲', '多人', '经典'], desc: '经典贪吃蛇的联网版，可以和同学同场竞技。', devlog: '引进游戏无开发者日志。' }
+  { id: 2, title: 'NEON STRIKE · 霓虹突击', tag: '校园', cat: 'play', genre: '动作射击', mode: '单人',
+    byline: '云计算25301 · 路顺 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#085041', coverFg: '#5DCAA5',
+    tags: ['射击', '霓虹', '街机'],
+    playUrl: '/games/neon-strike/',
+    coverImg: '/games/neon-strike/cover.jpg', previewVid: '/games/neon-strike/preview.mp4',
+    desc: '霓虹风格的太空射击，弹幕与得分一网打尽。',
+    devlog: '暂无开发者日志。' },
+  { id: 3, title: '星球清道夫 · 净土计划', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
+    byline: '云计算25302 · 尹源鑫 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#712B13', coverFg: '#F0997B',
+    tags: ['休闲', '消除', '环保'],
+    playUrl: '/games/planet-cleaner/',
+    coverImg: '/games/planet-cleaner/cover.jpg', previewVid: '/games/planet-cleaner/preview.mp4',
+    desc: '驾驶清扫船净化星球，还宇宙一片净土。',
+    devlog: '暂无开发者日志。' },
+  { id: 4, title: '鼠鼠大逃亡', tag: '校园', cat: 'play', genre: '跑酷', mode: '单人',
+    byline: '云计算25302 · 张学通 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#0C447C', coverFg: '#85B7EB',
+    tags: ['跑酷', '收集', '可爱'],
+    playUrl: '/games/mouse-escape/',
+    coverImg: '/games/mouse-escape/cover.jpg', previewVid: '/games/mouse-escape/preview.mp4',
+    desc: '收集奶酪钻进小洞，躲避追击跑得越远越好。',
+    devlog: '暂无开发者日志。' },
+  { id: 5, title: '苍穹防线 · 飞机大战', tag: '校园', cat: 'play', genre: '射击', mode: '单人',
+    byline: '云计算25302 · 王佳旭 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#27500A', coverFg: '#97C459',
+    tags: ['射击', '飞机', '弹幕'],
+    playUrl: '/games/sky-defense/',
+    coverImg: '/games/sky-defense/cover.jpg', previewVid: '/games/sky-defense/preview.mp4',
+    desc: '经典飞机大战，守卫苍穹防线的每一寸天空。',
+    devlog: '暂无开发者日志。' },
+  { id: 6, title: '微光守护 · Glimmer Watch', tag: '校园', cat: 'play', genre: '生存', mode: '单人',
+    byline: '云计算25302 · 王文翰 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#72243E', coverFg: '#ED93B1',
+    tags: ['生存', '氛围', '像素'],
+    playUrl: '/games/glimmer-watch/',
+    coverImg: '/games/glimmer-watch/cover.jpg', previewVid: '/games/glimmer-watch/preview.mp4',
+    desc: '在微光将熄的世界里撑过一个个垃圾日。',
+    devlog: '暂无开发者日志。' },
+  { id: 7, title: '第 4 厂 · 削土豆的人', tag: '校园', cat: 'play', genre: '叙事', mode: '单人',
+    byline: '云计算25302 · 王津 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['叙事', '剧情', '模拟'],
+    playUrl: '/games/factory-4/',
+    coverImg: '/games/factory-4/cover.jpg', previewVid: '/games/factory-4/preview.mp4',
+    desc: '供应总局的削皮车间，一个关于流水线的故事。',
+    devlog: '暂无开发者日志。' },
+  { id: 8, title: '成语猎人', tag: '校园', cat: 'play', genre: '教育', mode: '单人',
+    byline: '云计算25302 · 邱文龙 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['教育', '成语', '答题'],
+    playUrl: '/games/idiom-hunter/',
+    coverImg: '/games/idiom-hunter/cover.jpg', previewVid: '/games/idiom-hunter/preview.mp4',
+    desc: '用成语当武器狩猎题目，边玩边涨词汇量。',
+    devlog: '暂无开发者日志。' },
+  { id: 9, title: '萌味餐厅 · 3D厨房', tag: '校园', cat: 'play', genre: '经营', mode: '单人',
+    byline: '云计算26302 · 张子涵 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#185FA5', coverFg: '#E6F1FB',
+    tags: ['经营', '3D', '模拟'],
+    playUrl: '/games/cute-diner/',
+    coverImg: '/games/cute-diner/cover.jpg', previewVid: '/games/cute-diner/preview.mp4',
+    desc: '3D 厨房经营 Demo，接单、烹饪、上菜一条龙。',
+    devlog: '暂无开发者日志。' },
+  { id: 10, title: '擂茶小馆', tag: '校园', cat: 'play', genre: '经营', mode: '单人',
+    byline: '人工智能25301 · 刘晓晴 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#085041', coverFg: '#5DCAA5',
+    tags: ['经营', '美食', '传统文化'],
+    playUrl: '/games/leicha-tea/',
+    coverImg: '/games/leicha-tea/cover.jpg', previewVid: '/games/leicha-tea/preview.mp4',
+    desc: '手工现擂·随心搭配，把客家擂茶开成小店。',
+    devlog: '暂无开发者日志。' },
+  { id: 11, title: '萝卜猎手', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
+    byline: '人工智能25302 · 周文博 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#712B13', coverFg: '#F0997B',
+    tags: ['休闲', '农场', '收集'],
+    playUrl: '/games/carrot-hunter/',
+    coverImg: '/games/carrot-hunter/cover.jpg', previewVid: '/games/carrot-hunter/preview.mp4',
+    desc: '在田地里追捕萝卜，轻松愉快的收集小游戏。',
+    devlog: '暂无开发者日志。' },
+  { id: 12, title: '警笛之下 · Under the Siren', tag: '校园', cat: 'play', genre: '解谜', mode: '单人',
+    byline: '人工智能25302 · 张云鹏 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#0C447C', coverFg: '#85B7EB',
+    tags: ['解谜', '悬疑', '剧情'],
+    playUrl: '/games/under-siren/',
+    coverImg: '/games/under-siren/cover.jpg', previewVid: '/games/under-siren/preview.mp4',
+    desc: '警报响起之后，真相藏在警笛声下面。',
+    devlog: '暂无开发者日志。' },
+  { id: 13, title: '汽车大逃杀 · 公路关卡战', tag: '校园', cat: 'play', genre: '竞速', mode: '单人',
+    byline: '人工智能25302 · 张占磊 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#27500A', coverFg: '#97C459',
+    tags: ['竞速', '对战', '关卡'],
+    playUrl: '/games/car-battle/',
+    coverImg: '/games/car-battle/cover.jpg', previewVid: '/games/car-battle/preview.mp4',
+    desc: '公路关卡制大逃杀，方向盘上见真章。',
+    devlog: '暂无开发者日志。' },
+  { id: 14, title: '星际突击', tag: '校园', cat: 'play', genre: '射击', mode: '单人',
+    byline: '人工智能26301 · 赵宏奥 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#72243E', coverFg: '#ED93B1',
+    tags: ['射击', '太空', '街机'],
+    playUrl: '/games/star-assault/',
+    coverImg: '/games/star-assault/cover.jpg', previewVid: '/games/star-assault/preview.mp4',
+    desc: '太空射击街机作，机体升级火力全开。',
+    devlog: '暂无开发者日志。' },
+  { id: 15, title: '小鱼快游 · 桂圆鱼', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
+    byline: '人工智能26302 · 于慧源 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['休闲', '海洋', '养成'],
+    playUrl: '/games/fish-swim/',
+    coverImg: '/games/fish-swim/cover.jpg', previewVid: '/games/fish-swim/preview.mp4',
+    desc: '带着桂圆鱼畅游深海，躲避天敌收集食物。',
+    devlog: '暂无开发者日志。' },
+  { id: 16, title: '雪岭速降 SNOWLINE RUSH', tag: '校园', cat: 'play', genre: '跑酷', mode: '单人',
+    byline: '大数据25301 · 李昊坤 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['跑酷', '滑雪', 'AI自适应'],
+    playUrl: '/games/snowline-rush/',
+    coverImg: '/games/snowline-rush/cover.jpg', previewVid: '/games/snowline-rush/preview.mp4',
+    desc: 'AI 自适应难度的滑雪跑酷，雪道越滑越快。',
+    devlog: '暂无开发者日志。' },
+  { id: 17, title: '回声花园 · Echo Garden', tag: '校园', cat: 'play', genre: '模拟', mode: '单人',
+    byline: '大数据25302 · 张熠阳 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#185FA5', coverFg: '#E6F1FB',
+    tags: ['模拟', '治愈', '种花'],
+    playUrl: '/games/echo-garden/',
+    coverImg: '/games/echo-garden/cover.jpg', previewVid: '/games/echo-garden/preview.mp4',
+    desc: '在花园里种下回声，听它们慢慢发芽。',
+    devlog: '暂无开发者日志。' },
+  { id: 18, title: 'AI 娘格斗 · 算力擂台', tag: '校园', cat: 'play', genre: '格斗', mode: '单人',
+    byline: '大数据26301 · 孙凯文 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#085041', coverFg: '#5DCAA5',
+    tags: ['格斗', '对战', '算力'],
+    playUrl: '/games/ai-battle/',
+    coverImg: '/games/ai-battle/cover.jpg', previewVid: '/games/ai-battle/preview.mp4',
+    desc: '把算力当武力，AI 娘们在擂台上一决高下。',
+    devlog: '暂无开发者日志。' },
+  { id: 19, title: '迷雾画廊', tag: '校园', cat: 'play', genre: '解谜', mode: '单人',
+    byline: '大数据26301 · 李静怡 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#712B13', coverFg: '#F0997B',
+    tags: ['解谜', '推理', 'AI沉浸'],
+    playUrl: '/games/mist-gallery/',
+    coverImg: '/games/mist-gallery/cover.jpg', previewVid: '/games/mist-gallery/preview.mp4',
+    desc: 'AI 沉浸式推理侦探游戏，拨开画廊的迷雾。',
+    devlog: '暂无开发者日志。' },
+  { id: 20, title: '星界远征', tag: '校园', cat: 'play', genre: '冒险', mode: '单人',
+    byline: '大数据26303 · 张永康 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#0C447C', coverFg: '#85B7EB',
+    tags: ['冒险', '探索', '星际'],
+    playUrl: '/games/star-expedition/',
+    coverImg: '/games/star-expedition/cover.jpg', previewVid: '/games/star-expedition/preview.mp4',
+    desc: '组建舰队远征星界，未知星域等你探索。',
+    devlog: '暂无开发者日志。' },
+  { id: 21, title: '月面清道夫 · Moon Sweeper', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
+    byline: '大数据26303 · 李晨洁 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#27500A', coverFg: '#97C459',
+    tags: ['休闲', '太空', '清扫'],
+    playUrl: '/games/moon-sweeper/',
+    coverImg: '/games/moon-sweeper/cover.jpg', previewVid: '/games/moon-sweeper/preview.mp4',
+    desc: '在月面上清扫太空垃圾，化身月球环卫工。',
+    devlog: '暂无开发者日志。' },
+  { id: 22, title: '星火拾荒者 · SPARK SCAVENGER', tag: '校园', cat: 'play', genre: '动作', mode: '单人',
+    byline: '物联网26303 · 程振一 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#72243E', coverFg: '#ED93B1',
+    tags: ['动作', '拾荒', '末日'],
+    playUrl: '/games/spark-scavenger/',
+    coverImg: '/games/spark-scavenger/cover.jpg', previewVid: '/games/spark-scavenger/preview.mp4',
+    desc: '末日废土拾荒求生，收集星火点亮文明。',
+    devlog: '暂无开发者日志。' },
+  { id: 23, title: '传感器守护者 · 仓库布防', tag: '校园', cat: 'play', genre: '塔防', mode: '单人',
+    byline: '物联网26303 · 陈子涵 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['塔防', '策略', '仓库'],
+    playUrl: '/games/sensor-guard/',
+    coverImg: '/games/sensor-guard/cover.jpg', previewVid: '/games/sensor-guard/preview.mp4',
+    desc: '布防传感器守卫仓库， IoT 主题的塔防新作。',
+    devlog: '暂无开发者日志。' },
+  { id: 24, title: '黄昏轮回 · 英灵试炼', tag: '校园', cat: 'play', genre: 'RPG', mode: '单人',
+    byline: '计算机25301 · 崔皓泽 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['RPG', 'Roguelike', '北欧'],
+    playUrl: '/games/dusk-cycle/',
+    coverImg: '/games/dusk-cycle/cover.jpg', 
+    desc: '北欧英灵主题 Roguelike，每一次轮回都是新构筑。',
+    devlog: '暂无开发者日志。' },
+  { id: 25, title: '残域余烬：归途', tag: '校园', cat: 'play', genre: '生存', mode: '单人',
+    byline: '计算机26301 · 徐茂恒 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#185FA5', coverFg: '#E6F1FB',
+    tags: ['生存', '营地', '末日'],
+    playUrl: '/games/ember-road/',
+    coverImg: '/games/ember-road/cover.jpg', previewVid: '/games/ember-road/preview.mp4',
+    desc: '在残域中经营营地、收集余烬，走完归途。',
+    devlog: '暂无开发者日志。' },
+  { id: 26, title: '地牢逃途', tag: '校园', cat: 'play', genre: 'RPG', mode: '单人',
+    byline: '计算机26301 · 谢宸琳 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#085041', coverFg: '#5DCAA5',
+    tags: ['RPG', '地牢', '可玩'],
+    playUrl: '/games/dungeon-escape/',
+    
+    desc: '大型地牢逃亡，装备与路线自由搭配。',
+    devlog: '暂无开发者日志。' },
+  { id: 27, title: '海底大作战 · 答题闯关', tag: '校园', cat: 'play', genre: '教育', mode: '单人',
+    byline: '计算机26302 · 李国盛 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#712B13', coverFg: '#F0997B',
+    tags: ['教育', '四大名著', '答题'],
+    playUrl: '/games/sea-battle/',
+    coverImg: '/games/sea-battle/cover.jpg', previewVid: '/games/sea-battle/preview.mp4',
+    desc: '四大名著答题闯关，在海底一路杀到龙宫。',
+    devlog: '暂无开发者日志。' },
+  { id: 28, title: 'Q版泡泡堂 · 水球大作战', tag: '校园', cat: 'play', genre: '对战', mode: '单人',
+    byline: '计算机26302 · 李恒达 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#0C447C', coverFg: '#85B7EB',
+    tags: ['对战', '泡泡堂', '水球'],
+    playUrl: '/games/water-bomb/',
+    coverImg: '/games/water-bomb/cover.jpg', previewVid: '/games/water-bomb/preview.mp4',
+    desc: 'Q 版水球大乱斗，经典泡泡堂的清新复刻。',
+    devlog: '暂无开发者日志。' },
+  { id: 29, title: '孤剑试炼 · Lone Blade Trials', tag: '校园', cat: 'play', genre: '动作', mode: '单人',
+    byline: '计算机26302 · 李金坤 · 第一届智游杯初赛',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#27500A', coverFg: '#97C459',
+    tags: ['动作', '武侠', '试炼'],
+    playUrl: '/games/lone-blade/',
+    coverImg: '/games/lone-blade/cover.jpg', previewVid: '/games/lone-blade/preview.mp4',
+    desc: '一人一剑闯试炼，武侠动作 v0.8。',
+    devlog: '暂无开发者日志。' },
+  { id: 30, title: '星际逃亡', tag: '校园', cat: 'video', genre: '策略', mode: '单人',
+    byline: '信息技术系云计算25301 · 尹相洁 · 第一届智游杯初赛',
+    coverImg: '/games/xingji-taowang/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#72243E', coverFg: '#ED93B1',
+    tags: ['智游杯', '敬请期待'],
+    desc: 'Python 桌面作品，含演示视频与源码。',
+    devlog: '暂无开发者日志。' },
+  { id: 31, title: '死仓', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
+    byline: '信息技术系云计算25302 · 尹领 · 第一届智游杯初赛',
+    coverImg: '/games/sicang/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['智游杯', '敬请期待'],
+    desc: '剧情向作品，含演示视频与设计文档。',
+    devlog: '暂无开发者日志。' },
+  { id: 32, title: '果冻合成大作战 · 马卡龙', tag: '校园', cat: 'video', genre: '休闲', mode: '单人',
+    byline: '信息技术系云计算25301 · 李虹洁 · 第一届智游杯初赛',
+    coverImg: '/games/guodong-hecheng/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['智游杯', '敬请期待'],
+    desc: '合成玩法休闲作，含演示视频。',
+    devlog: '暂无开发者日志。' },
+  { id: 33, title: '心动的声音', tag: '校园', cat: 'video', genre: '音游', mode: '单人',
+    byline: '信息技术系云计算25301 · 兰文轩 · 第一届智游杯初赛',
+    coverImg: '/games/xindong-shengyin/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#185FA5', coverFg: '#E6F1FB',
+    tags: ['智游杯', '敬请期待'],
+    desc: '声音主题作品，含演示视频与简介。',
+    devlog: '暂无开发者日志。' },
+  { id: 34, title: '未命名作品', tag: '校园', cat: 'video', genre: '其他', mode: '单人',
+    byline: '信息技术系云计算25301 · 高梓祺 · 第一届智游杯初赛',
+    coverImg: '/games/gaofuzhi-demo/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#085041', coverFg: '#5DCAA5',
+    tags: ['智游杯', '敬请期待'],
+    desc: '含演示视频与作品简介。',
+    devlog: '暂无开发者日志。' },
+  { id: 35, title: '蓝色鲸鱼小姐', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
+    byline: '信息技术系云计算26302 · 李佳晓 · 第一届智游杯初赛',
+    coverImg: '/games/lanse-jingyu/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#712B13', coverFg: '#F0997B',
+    tags: ['智游杯', '敬请期待'],
+    desc: '剧情向作品，含演示视频与优化版简介。',
+    devlog: '暂无开发者日志。' },
+  { id: 36, title: '疾风闪避', tag: '校园', cat: 'video', genre: '跑酷', mode: '单人',
+    byline: '信息技术系云计算26301 · 张文 · 第一届智游杯初赛',
+    coverImg: '/games/jifeng-shanbi/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#0C447C', coverFg: '#85B7EB',
+    tags: ['智游杯', '敬请期待'],
+    desc: '躲避类跑酷，含演示视频与文档。',
+    devlog: '暂无开发者日志。' },
+  { id: 37, title: '渊途铸甲', tag: '校园', cat: 'dl', genre: '冒险', mode: '单人',
+    byline: '信息技术系人工智能25302 · 杨子钦 · 第一届智游杯初赛',
+    coverImg: '/games/yuantu-zhujia/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#27500A', coverFg: '#97C459',
+    tags: ['智游杯', '敬请期待'],
+    desc: '手机版 APK 作品，下载功能上线后提供。',
+    devlog: '暂无开发者日志。' },
+  { id: 38, title: '接糖果 Catch', tag: '校园', cat: 'video', genre: '休闲', mode: '单人',
+    byline: '信息技术系人工智能25303 · 元欣宇 · 第一届智游杯初赛',
+    coverImg: '/games/jie-tangguo/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#72243E', coverFg: '#ED93B1',
+    tags: ['智游杯', '敬请期待'],
+    desc: '接糖果休闲游戏，含项目报告与视频。',
+    devlog: '暂无开发者日志。' },
+  { id: 39, title: '经验地牢 · 二次开发', tag: '校园', cat: 'dl', genre: 'RPG', mode: '单人',
+    byline: '信息技术系人工智能25302 · 张凌宇 · 第一届智游杯初赛',
+    coverImg: '/games/jingyan-dilao/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['智游杯', '敬请期待'],
+    desc: '基于 Experienced Pixel Dungeon 的二次开发，附下载链接。',
+    devlog: '暂无开发者日志。' },
+  { id: 40, title: '魔法高塔', tag: '校园', cat: 'dl', genre: 'RPG', mode: '单人',
+    byline: '信息技术系计算机25301 · 李文豪 · 第一届智游杯初赛',
+    coverImg: '/games/mofa-gaota/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['智游杯', '敬请期待'],
+    desc: '桌面 exe 作品，含 AI 创作台账与截图。',
+    devlog: '暂无开发者日志。' },
+  { id: 41, title: '60Days', tag: '校园', cat: 'dl', genre: '生存', mode: '单人',
+    byline: '信息技术系计算机26301 · 蒋雪韬 · 第一届智游杯初赛',
+    coverImg: '/games/60days/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#185FA5', coverFg: '#E6F1FB',
+    tags: ['智游杯', '敬请期待'],
+    desc: '桌面 exe 作品，60 天生存挑战。',
+    devlog: '暂无开发者日志。' },
+  { id: 42, title: 'RuralFarm · 田园物语', tag: '校园', cat: 'dl', genre: '经营', mode: '单人',
+    byline: '信息技术系人工智能26303 · 郭淑琳 · 第一届智游杯初赛',
+    coverImg: '/games/rural-farm/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#085041', coverFg: '#5DCAA5',
+    tags: ['智游杯', '敬请期待'],
+    desc: '桌面 exe 作品，农场经营。',
+    devlog: '暂无开发者日志。' },
+  { id: 43, title: '逐光旅途', tag: '校园', cat: 'video', genre: '冒险', mode: '单人',
+    byline: '信息技术系计算机26301 · 刘家豪 · 第一届智游杯初赛',
+    coverImg: '/games/zhuguang-lvtu/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#712B13', coverFg: '#F0997B',
+    tags: ['智游杯', '敬请期待'],
+    desc: '剧情向冒险作品，含演示视频。',
+    devlog: '暂无开发者日志。' },
+  { id: 44, title: '异境回响', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
+    byline: '信息技术系计算机26301 · 马越 · 第一届智游杯初赛',
+    coverImg: '/games/yijing-huixiang/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#0C447C', coverFg: '#85B7EB',
+    tags: ['智游杯', '敬请期待'],
+    desc: '叙事作品，含简介与制作过程。',
+    devlog: '暂无开发者日志。' },
+  { id: 45, title: '铁誓 · 边陲余生', tag: '校园', cat: 'video', genre: '生存', mode: '单人',
+    byline: '信息技术系计算机26301 · 张煜埕 · 第一届智游杯初赛',
+    coverImg: '/games/tieshi-bianchui/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#27500A', coverFg: '#97C459',
+    tags: ['智游杯', '敬请期待'],
+    desc: '边陲生存题材，含演示视频。',
+    devlog: '暂无开发者日志。' },
+  { id: 46, title: '岸边的一天', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
+    byline: '信息技术系计算机26301 · 林健 · 第一届智游杯初赛',
+    coverImg: '/games/anbian/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#72243E', coverFg: '#ED93B1',
+    tags: ['智游杯', '敬请期待'],
+    desc: '叙事作品，含演示视频。',
+    devlog: '暂无开发者日志。' },
+  { id: 47, title: 'Flee', tag: '校园', cat: 'video', genre: '跑酷', mode: '单人',
+    byline: '信息技术系大数据26301 · 陈月娇 · 第一届智游杯初赛',
+    coverImg: '/games/flee/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['智游杯', '敬请期待'],
+    desc: '逃跑主题作品，含演示视频。',
+    devlog: '暂无开发者日志。' },
+  { id: 48, title: '霓虹断点', tag: '校园', cat: 'video', genre: '动作', mode: '单人',
+    byline: '信息技术系大数据26303 · 刘小雨 · 第一届智游杯初赛',
+    coverImg: '/games/hongdian/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['智游杯', '敬请期待'],
+    desc: '霓虹风动作作品，含演示视频。',
+    devlog: '暂无开发者日志。' },
+  { id: 49, title: '灵动小猫 · 星夜奇旅', tag: '校园', cat: 'video', genre: '冒险', mode: '单人',
+    byline: '信息技术系物联网26303 · 徐隆昊 · 第一届智游杯初赛',
+    coverImg: '/games/lingdong-xiaomao/cover.jpg',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#185FA5', coverFg: '#E6F1FB',
+    tags: ['智游杯', '敬请期待'],
+    desc: '猫咪主题冒险，含演示视频。',
+    devlog: '暂无开发者日志。' },
 ];
+
+/* ================= 本机数据持久化 =================
+   浏览量/小红花存 localStorage，刷新不丢。
+   注意：这是"本机数据"——每台设备各记各的；以后接上后端再换成全站共享。 */
+const STATS_KEY = 'ninth_stats_v1';
+let statsStore = {};
+try { statsStore = JSON.parse(localStorage.getItem(STATS_KEY)) || {}; } catch (e) { statsStore = {}; }
+function saveStats() {
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(statsStore)); } catch (e) {}
+}
+GAMES.forEach(g => {
+  const s = statsStore[g.id];
+  if (s) { g.views = s.v || 0; g.weekViews = s.w || 0; g.flowers = s.f || 0; g.myFlower = !!s.m; }
+});
+function recordStat(g) {
+  statsStore[g.id] = { v: g.views, w: g.weekViews, f: g.flowers, m: g.myFlower ? 1 : 0 };
+  saveStats();
+}
 
 /* SVG 小图标：小红花 / 小眼睛 */
 const FLOWER_ICON = '<svg width="13" height="13" viewBox="0 0 20 20" style="vertical-align:-2px;"><g fill="#E24B4A"><circle cx="10" cy="4" r="3.4"/><circle cx="15.7" cy="8.1" r="3.4"/><circle cx="13.5" cy="14.9" r="3.4"/><circle cx="6.5" cy="14.9" r="3.4"/><circle cx="4.3" cy="8.1" r="3.4"/></g><circle cx="10" cy="10" r="3.1" fill="#FAC775"/></svg>';
-const EYE_ICON = '<svg width="13" height="13" viewBox="0 0 20 20" style="vertical-align:-2px;" fill="none"><path d="M1.5 10 C4 5.5, 16 5.5, 18.5 10 C16 14.5, 4 14.5, 1.5 10 Z" stroke="#B4B2A9" stroke-width="1.6"/><circle cx="10" cy="10" r="2.6" fill="#B4B2A9"/></svg>';
+const EYE_ICON = '<svg width="13" height="13" viewBox="0 0 20 20" style="vertical-align:-2px;" fill="none"><path d="M1.5 10 C4 5.5, 16 5.5, 18.5 10 C16 14.5, 4 14.5, 1.5 10 Z" stroke="#C7C4BA" stroke-width="1.6"/><circle cx="10" cy="10" r="2.6" fill="#C7C4BA"/></svg>';
 
 /* ================= 视图切换 ================= */
+let curFilter = 'all';
 function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + name).classList.add('active');
-  document.querySelectorAll('.nav-tabs button').forEach(b => {
+  document.querySelectorAll('.nav-tabs button, .tabbar button').forEach(b => {
     b.classList.toggle('active', b.dataset.nav === name);
   });
+  // 回到首页/排行榜时重渲染，让小红花和浏览量显示最新值
+  if (name === 'home') renderGrid(curFilter);
+  if (name === 'rank') renderRankTable();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('[data-nav]').forEach(el => {
   el.addEventListener('click', () => showView(el.dataset.nav));
 });
 
-/* ================= 首页轮播（精选 / 新品推送） ================= */
+/* ================= 首页横幅（二次元大图） =================
+   当前只放铁道清新图一张（2026-11-22 主人定的）；以后加新图往数组里追加即可，
+   自动轮换 carStart() 保留未启用 */
 const CAROUSEL = [
-  { id: 1, badge: '本周精选 · 校园作品', cls: 'badge-teal' },
-  { id: 2, badge: '热门引进 · 经典经营', cls: 'badge-amber' },
-  { id: 6, badge: '新品上架 · 校园原创', cls: 'badge-blue' },
-  { id: 8, badge: '多人同乐 · 联网对战', cls: 'badge-teal' }
+  { id: 19, badge: '智游杯初赛 · 沉浸推理', cls: 'badge-teal', poster: '/covers/carousel-1.jpg' }
 ];
 let carIdx = 0, carTimer = null;
 
-function buildCoverFx(g) {
-  const colors = [g.coverFg, '#FAC775', '#97C459', '#ED93B1'];
-  const spots = [
-    { l: '16%', t: '60%', d: '0s' }, { l: '42%', t: '26%', d: '.5s' },
-    { l: '68%', t: '58%', d: '1s' }, { l: '86%', t: '28%', d: '1.5s' }
-  ];
-  let html = '<span class="fx-layer"><span class="fx-scan"></span>';
-  spots.forEach((s, i) => {
-    html += '<span class="fx-block" style="left:' + s.l + '; top:' + s.t + '; background:' + colors[i % colors.length] + '; animation-delay:' + s.d + ';"></span>';
-  });
-  return html + '<span class="fx-tag">预览 · 动态演示</span></span>';
-}
 function renderCarousel() {
   const item = CAROUSEL[carIdx];
   const g = GAMES.find(x => x.id === item.id);
@@ -561,23 +1395,23 @@ function renderCarousel() {
     badge.className = 'badge ' + item.cls;
     document.getElementById('carousel-title').textContent = '《' + g.title + '》 · ' + g.genre;
     document.getElementById('carousel-meta').textContent = g.byline.split('·').slice(0, 2).join('·') + ' · 点开即玩 · 已获小红花 ' + g.flowers.toLocaleString();
-    const cover = document.getElementById('carousel-cover');
-    cover.style.background = g.coverBg;
-    cover.style.color = g.coverFg;
-    cover.innerHTML = g.title + buildCoverFx(g);
+    document.getElementById('carousel-bg').src = item.poster;
     document.querySelectorAll('#carousel-dots .carousel-dot').forEach((d, i) => d.classList.toggle('active', i === carIdx));
     slide.style.opacity = '1';
   }, 180);
 }
 function carGo(delta) { carIdx = (carIdx + delta + CAROUSEL.length) % CAROUSEL.length; renderCarousel(); }
 function carStop() { if (carTimer) { clearInterval(carTimer); carTimer = null; } }
-function carStart() { carStop(); carTimer = setInterval(() => carGo(1), 5000); }
-document.getElementById('car-prev').addEventListener('click', e => { e.stopPropagation(); carGo(-1); carStart(); });
-document.getElementById('car-next').addEventListener('click', e => { e.stopPropagation(); carGo(1); carStart(); });
+function carStart() { carStop(); carTimer = setInterval(() => carGo(1), 5000); } /* 自动轮换功能保留，当前不启用 */
+document.getElementById('car-prev').addEventListener('click', e => { e.stopPropagation(); carGo(-1); });
+document.getElementById('car-next').addEventListener('click', e => { e.stopPropagation(); carGo(1); });
 const carBox = document.getElementById('carousel');
-carBox.addEventListener('mouseenter', carStop);
-carBox.addEventListener('mouseleave', carStart);
 carBox.addEventListener('click', () => openDetail(CAROUSEL[carIdx].id));
+if (CAROUSEL.length < 2) { /* 只有一张横幅时隐藏箭头和圆点 */
+  document.getElementById('car-prev').style.display = 'none';
+  document.getElementById('car-next').style.display = 'none';
+  document.getElementById('carousel-dots').style.display = 'none';
+}
 document.getElementById('carousel-play').addEventListener('click', e => {
   e.stopPropagation();
   openPlayModal(GAMES.find(x => x.id === CAROUSEL[carIdx].id));
@@ -588,26 +1422,56 @@ CAROUSEL.forEach((_, i) => {
   d.addEventListener('click', e => { e.stopPropagation(); carIdx = i; renderCarousel(); });
   document.getElementById('carousel-dots').appendChild(d);
 });
+function startCoverVid(el, src) {
+  let v = el.querySelector('.cover-vid');
+  if (!v) {
+    v = document.createElement('video');
+    v.className = 'cover-vid';
+    v.src = src; v.muted = true; v.loop = true;
+    v.playsInline = true; v.preload = 'none';
+    el.appendChild(v);
+  }
+  v.play().catch(() => {});
+}
+function stopCoverVid(el) {
+  const v = el.querySelector('.cover-vid');
+  if (v) v.pause();
+}
 function renderGrid(filter) {
+  curFilter = filter;
   const grid = document.getElementById('game-grid');
-  const list = GAMES.filter(g => filter === 'all' || g.tag === filter || (filter === '双人' && g.mode === '双人同屏'));
+  const list = GAMES.filter(g => filter === 'all' || g.cat === filter);
   grid.innerHTML = '';
   list.forEach(g => {
     const tagCls = g.tag === '校园' ? 'tag-school' : 'tag-import';
-    const modeTxt = g.mode === '双人同屏' ? ' · 双人' : (g.mode === '多人' ? ' · 多人' : '');
+    const modeTxt = g.mode === '双人同屏' ? '双人' : (g.mode === '多人' ? '多人' : '单人');
     const card = document.createElement('div');
     card.className = 'game-card';
+    const coverText = g.coverImg ? '' : '<span class="cover-title">' + g.title + '</span>';
+    const coverImg = g.coverImg ? '<img class="cover-img" src="' + g.coverImg + '" alt="' + g.title + '" loading="lazy">' : '';
     card.innerHTML =
-      '<div class="game-cover" style="background:' + g.coverBg + '; color:' + g.coverFg + ';">' + g.title + '</div>' +
+      '<div class="game-cover" style="background:' + g.coverBg + '; color:' + g.coverFg + ';">' + coverImg + coverText + '</div>' +
       '<div class="game-card-body">' +
-        '<div class="title">' + g.title + (g.featured ? '<span class="badge badge-teal" style="font-size:10px; padding:1px 6px;">精选</span>' : '') + '</div>' +
-        '<div class="meta"><span class="' + tagCls + '">' + g.tag + '</span>' + modeTxt + '</div>' +
-        '<div class="heat-row"><span class="h-item">' + FLOWER_ICON + g.flowers.toLocaleString() + '</span><span class="h-item">' + EYE_ICON + g.views.toLocaleString() + '</span></div>' +
+        '<div class="title">' + g.title + (g.featured ? '<span class="badge badge-teal" style="font-size:10px; padding:1px 6px; flex:none;">精选</span>' : '') + '</div>' +
+        '<div class="meta">' +
+          '<span class="' + tagCls + '">' + g.tag + '</span>' +
+          '<span class="dot"></span><span>' + g.genre + '</span>' +
+          '<span class="dot"></span><span>' + modeTxt + '</span>' +
+        '</div>' +
+        '<div class="heat-row">' +
+          '<span class="h-item" title="小红花">' + FLOWER_ICON + '<span class="num">' + g.flowers.toLocaleString() + '</span></span>' +
+          '<span class="h-item" title="浏览量">' + EYE_ICON + '<span class="num">' + g.views.toLocaleString() + '</span></span>' +
+        '</div>' +
       '</div>';
     card.addEventListener('click', () => openDetail(g.id));
+    if (g.previewVid) {
+      const coverEl = card.querySelector('.game-cover');
+      card.addEventListener('mouseenter', () => startCoverVid(coverEl, g.previewVid));
+      card.addEventListener('mouseleave', () => stopCoverVid(coverEl));
+    }
     grid.appendChild(card);
   });
-  if (!list.length) grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#888780; padding:40px 0;">这个筛选下暂时没有游戏</div>';
+  if (!list.length) grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#A9A69D; padding:40px 0;">这个筛选下暂时没有游戏</div>';
 }
 document.querySelectorAll('.filter-chip').forEach(chip => {
   chip.addEventListener('click', () => {
@@ -617,18 +1481,6 @@ document.querySelectorAll('.filter-chip').forEach(chip => {
   });
 });
 
-function renderRankList() {
-  const list = [...GAMES].sort((a, b) => b.views - a.views).slice(0, 5);
-  const box = document.getElementById('rank-list');
-  box.innerHTML = '';
-  list.forEach((g, i) => {
-    const item = document.createElement('div');
-    item.className = 'rank-item';
-    item.innerHTML = '<span class="rk-num">' + (i + 1) + '</span><span class="rk-name">' + g.title + '</span><span class="rk-hot">' + g.views.toLocaleString() + '</span>';
-    item.addEventListener('click', () => openDetail(g.id));
-    box.appendChild(item);
-  });
-}
 document.querySelectorAll('[data-open]').forEach(el => {
   el.addEventListener('click', () => openDetail(parseInt(el.dataset.open)));
 });
@@ -642,16 +1494,22 @@ function openDetail(id) {
   document.getElementById('crumb-tag').textContent = g.tag === '校园' ? '校园作品' : '引进游戏';
   document.getElementById('crumb-title').textContent = g.title;
   const cover = document.getElementById('detail-cover');
-  cover.style.background = g.coverBg;
-  cover.style.color = g.coverFg;
-  cover.textContent = g.title;
+  if (g.coverImg) {
+    cover.style.background = '#000 url(' + g.coverImg + ') center/cover no-repeat';
+    cover.textContent = '';
+  } else {
+    cover.style.background = g.coverBg;
+    cover.style.color = g.coverFg;
+    cover.textContent = g.title;
+  }
   document.getElementById('detail-title').textContent = g.title;
   document.getElementById('detail-badges').innerHTML =
     (g.tag === '校园' ? '<span class="badge badge-teal">校园作品</span>' : '<span class="badge badge-amber">引进游戏</span>') +
     (g.featured ? '<span class="badge badge-blue">本周精选</span>' : '');
   document.getElementById('detail-byline').textContent = g.byline;
   document.getElementById('detail-tags').innerHTML = g.tags.map(t => '<span class="tag-chip">' + t + '</span>').join('');
-  g.views++; // 游客每次点开，浏览数 +1（本机演示，刷新即重置）
+  g.views++; // 游客每次点开，浏览数 +1（存本机 localStorage，刷新不丢）
+  recordStat(g);
   document.getElementById('detail-stats').innerHTML =
     stat('总浏览量', g.views.toLocaleString()) +
     stat('本周浏览', g.weekViews.toLocaleString()) +
@@ -660,7 +1518,6 @@ function openDetail(id) {
   document.getElementById('detail-desc').textContent = g.desc;
   document.getElementById('devlog-text').textContent = g.devlog || '暂无日志。';
   renderFlowerBtn();
-  renderDetailHot();
   showView('detail');
 }
 function renderFlowerBtn() {
@@ -672,20 +1529,9 @@ document.getElementById('detail-flower').addEventListener('click', () => {
   if (!currentGame) return;
   currentGame.myFlower = !currentGame.myFlower;
   currentGame.flowers += currentGame.myFlower ? 1 : -1;
+  recordStat(currentGame);
   renderFlowerBtn();
 });
-function renderDetailHot() {
-  const list = [...GAMES].sort((a, b) => b.views - a.views).slice(0, 5);
-  const box = document.getElementById('detail-hot');
-  box.innerHTML = '';
-  list.forEach((x, i) => {
-    const item = document.createElement('div');
-    item.className = 'rank-item';
-    item.innerHTML = '<span class="rk-num">' + (i + 1) + '</span><span class="rk-name">' + x.title + '</span><span class="rk-hot">' + x.views.toLocaleString() + '</span>';
-    item.addEventListener('click', () => openDetail(x.id));
-    box.appendChild(item);
-  });
-}
 function stat(label, value, cls) {
   return '<div class="stat-card"><div class="label">' + label + '</div><div class="value ' + (cls || '') + '">' + value + '</div></div>';
 }
@@ -710,12 +1556,12 @@ function renderRankTable() {
     const tr = document.createElement('tr');
     tr.className = 'row-click';
     tr.innerHTML =
-      '<td class="rk-num" style="color:' + (i === 0 ? '#EF9F27' : i < 3 ? '#B4B2A9' : '#888780') + ';">' + (i + 1) + '</td>' +
+      '<td class="rk-num" style="color:' + (i === 0 ? '#EF9F27' : i < 3 ? '#C7C4BA' : '#A9A69D') + ';">' + (i + 1) + '</td>' +
       '<td>' + g.title + '</td>' +
-      '<td style="color:#B4B2A9;">' + g.genre + '</td>' +
+      '<td style="color:#C7C4BA;">' + g.genre + '</td>' +
       '<td>' + g.views.toLocaleString() + '</td>' +
       '<td style="color:#F09595;">' + g.flowers.toLocaleString() + '</td>' +
-      '<td style="color:#B4B2A9;">' + g.cleared.toLocaleString() + '</td>';
+      '<td style="color:#C7C4BA;">' + g.cleared.toLocaleString() + '</td>';
     tr.addEventListener('click', () => openDetail(g.id));
     body.appendChild(tr);
   });
@@ -723,22 +1569,58 @@ function renderRankTable() {
 
 /* ================= 游玩弹窗（游客模式，无计时记录） ================= */
 function openPlayModal(g) {
-  document.getElementById('modal-title').textContent = '《' + g.title + '》';
+  const box = document.getElementById('play-modal-box');
+  const ph = document.getElementById('modal-placeholder');
+  const gm = document.getElementById('modal-game');
+  const frame = document.getElementById('game-frame');
+  if (g.playUrl) {
+    document.getElementById('modal-title-playing').textContent = '正在游玩 · 《' + g.title + '》';
+    frame.src = g.playUrl;
+    document.getElementById('game-newtab').href = g.playUrl;
+    ph.style.display = 'none';
+    gm.style.display = 'block';
+    box.classList.add('playing');
+  } else {
+    document.getElementById('modal-title').textContent = '《' + g.title + '》';
+    ph.style.display = 'block';
+    gm.style.display = 'none';
+    frame.src = 'about:blank';
+    box.classList.remove('playing');
+  }
   document.getElementById('play-modal').classList.add('show');
 }
-document.getElementById('modal-close').addEventListener('click', () => {
+function closePlayModal() {
   document.getElementById('play-modal').classList.remove('show');
-});
+  document.getElementById('game-frame').src = 'about:blank'; // 关闭即卸载游戏，停掉后台进程
+}
+document.getElementById('modal-close').addEventListener('click', closePlayModal);
+document.getElementById('modal-close-top').addEventListener('click', closePlayModal);
 document.getElementById('play-modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
+  if (e.target === e.currentTarget) closePlayModal();
 });
+document.addEventListener('keydown', e => { // Esc 快捷关闭（鼠标被游戏抓住时按 Esc 先解锁指针，松开后此快捷键生效）
+  if (e.key === 'Escape' && document.getElementById('play-modal').classList.contains('show')) closePlayModal();
+});
+
+/* ================= 侧栏：站点数据 ================= */
+function renderSideStats() {
+  const box = document.getElementById('side-stats');
+  if (!box) return;
+  const rows = [
+    [GAMES.length, '部作品'],
+    [GAMES.filter(g => g.cat === 'play').length, '即点即玩'],
+    [GAMES.filter(g => g.cat === 'video' || g.cat === 'dl').length, '视频 / 下载']
+  ];
+  box.innerHTML = rows.map(r =>
+    '<div><div class="n">' + r[0] + '</div><div class="l">' + r[1] + '</div></div>'
+  ).join('');
+}
 
 /* ================= 初始化 ================= */
 renderCarousel();
-carStart();
 renderGrid('all');
-renderRankList();
 renderRankTable();
+renderSideStats();
 </script>
 </body>
 </html>
