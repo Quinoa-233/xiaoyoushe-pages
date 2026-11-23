@@ -185,42 +185,111 @@
     position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: cover; z-index: 0;
   }
-  /* 横幅文案排版：海报本身已有标题与副标题，此处只补"四项特色 + 一句主张" */
+  /* 横幅文案：标题 / 副标题 / 四项特色全部由页面渲染（海报本身已无文字），
+     字形只有一套，日间与夜间只换配色与光晕 */
   .banner-copy { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+  .banner-copy .bc-head { position: absolute; left: 4.8%; top: 9%; max-width: 78%; }
+  .banner-copy .bc-title {
+    font-size: clamp(26px, 5.4vw, 92px);
+    font-weight: 800; font-style: italic; line-height: 1.02;
+    letter-spacing: .01em; white-space: nowrap;
+    color: #F5F8FF; -webkit-text-stroke: .9px rgba(246,250,255,.55);
+    text-shadow:
+      0 2px 2px rgba(9,18,36,.5),
+      0 6px 20px rgba(10,24,52,.55),
+      0 0 36px rgba(86,146,226,.45),
+      0 0 76px rgba(58,110,190,.28);
+  }
+  .banner-copy .bc-sub {
+    display: inline-flex; align-items: center;
+    margin-top: clamp(7px, 1.1vw, 16px);
+    padding: clamp(4px, .55vw, 8px) clamp(11px, 1.1vw, 18px);
+    border: 1px solid rgba(226,238,255,.5);
+    background: rgba(12,26,50,.22);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+    font-size: clamp(10px, 1.12vw, 17px);
+    letter-spacing: .28em; text-indent: .28em;
+    color: rgba(242,247,255,.96);
+    text-shadow: 0 1px 3px rgba(8,18,38,.85), 0 0 10px rgba(10,26,52,.6);
+  }
   .banner-copy .bc-feats {
     position: absolute; left: 4.8%; top: 40%;
-    list-style: none; margin: 0; padding: 0;
-    display: flex; flex-direction: column; gap: clamp(10px, 1.5vw, 20px);
+    list-style: none; margin: 0 0 0 -10px; padding: 16px 44px 16px 10px;
+    border-radius: 16px;
+    /* 特色列表落在中景（树、房子）上，两侧主题各给一层极淡的承载雾，保证文字有底 */
+    background: radial-gradient(120% 120% at 0% 50%,
+      rgba(6,12,22,.62) 0%, rgba(6,12,22,.30) 46%, rgba(6,12,22,0) 78%);
+    display: flex; flex-direction: column; gap: clamp(10px, 1.4vw, 20px);
   }
   .banner-copy .bc-feats li { display: flex; align-items: center; gap: 12px; }
   .banner-copy .bc-ico {
-    width: clamp(26px, 2.6vw, 36px); height: clamp(26px, 2.6vw, 36px);
+    width: clamp(26px, 2.6vw, 38px); height: clamp(26px, 2.6vw, 38px);
     border: 1.5px solid rgba(255,255,255,.8); border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
     background: rgba(30,60,110,.3); flex: none;
   }
   .banner-copy .bc-feats b {
-    display: block; font-size: clamp(12px, 1.25vw, 16px); font-weight: 700; color: #fff;
+    display: block; font-size: clamp(12.5px, 1.3vw, 18px); font-weight: 700; color: #fff;
     text-shadow: 0 1px 3px rgba(15,35,75,.95), 0 0 8px rgba(15,35,75,.9), 0 0 20px rgba(15,35,75,.75);
   }
   .banner-copy .bc-feats i {
     display: block; margin-top: 2px; font-style: normal;
-    font-size: clamp(10px, .95vw, 12px); color: rgba(255,255,255,.92);
+    font-size: clamp(10.5px, 1vw, 13.5px); color: rgba(255,255,255,.9);
     text-shadow: 0 1px 3px rgba(15,35,75,.95), 0 0 8px rgba(15,35,75,.85), 0 0 18px rgba(15,35,75,.7);
   }
-  .banner-copy .bc-slogan {
-    position: absolute; left: 48%; top: 25%;
-    font-size: clamp(13px, 1.5vw, 21px); font-weight: 600; font-style: italic;
-    color: #fff; line-height: 1.55; letter-spacing: .06em;
-    text-shadow: 0 0 4px rgba(25,45,90,.95), 0 2px 8px rgba(25,45,90,.9), 0 0 20px rgba(25,45,90,.7);
+  /* —— 日间差分：亮底海报换深蓝字＋白描边光晕，边框、图标、箭头一起反色 —— */
+  body[data-theme="day"] .carousel::after {
+    background: linear-gradient(180deg, rgba(255,255,255,.06) 0%, transparent 42%, rgba(12,32,56,.18) 100%);
   }
-  @media (max-width: 900px) { .banner-copy { display: none; } }   /* 平板及以下：文案会撞上海报，只留图 */
-  /* 日间模式：海报是亮底，覆盖文案整组反色成深蓝，跟海报自带标题同一种语言 */
-  body[data-theme="day"] .banner-copy .bc-feats b { color: #12263F; text-shadow: 0 1px 2px rgba(255,255,255,.9), 0 0 10px rgba(255,255,255,.8); }
-  body[data-theme="day"] .banner-copy .bc-feats i { color: rgba(18,38,63,.86); text-shadow: 0 1px 2px rgba(255,255,255,.9), 0 0 8px rgba(255,255,255,.75); }
+  /* 日间海报的左半屏是树与房子，深蓝字直接压上去会糊；
+     给文案这一列铺一层晨雾一样的白，既是承载层，也符合白天画面的空气感 */
+  body[data-theme="day"] .banner-copy::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(100deg,
+      rgba(255,255,255,.52) 0%, rgba(255,255,255,.34) 18%,
+      rgba(255,255,255,.15) 33%, rgba(255,255,255,0) 46%);
+    /* 雾只压在文案所在的上半屏，草地与铁轨保持通透 */
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 56%, rgba(0,0,0,.32) 82%, transparent 96%);
+    mask-image: linear-gradient(180deg, #000 0%, #000 56%, rgba(0,0,0,.32) 82%, transparent 96%);
+  }
+  body[data-theme="day"] .banner-copy .bc-title {
+    color: #0E2138; -webkit-text-stroke: 1px rgba(255,255,255,.72);
+    text-shadow:
+      0 1px 0 rgba(255,255,255,.92),
+      0 2px 10px rgba(255,255,255,.9),
+      0 0 30px rgba(255,255,255,.8),
+      0 0 64px rgba(255,255,255,.55);
+  }
+  body[data-theme="day"] .banner-copy .bc-sub {
+    border-color: rgba(18,38,63,.45); background: rgba(255,255,255,.5); color: #0E2138;
+    text-shadow: 0 1px 2px rgba(255,255,255,.9);
+  }
+  body[data-theme="day"] .banner-copy .bc-feats {
+    background: radial-gradient(140% 125% at 0% 50%,
+      rgba(250,252,255,.94) 0%, rgba(250,252,255,.72) 42%, rgba(250,252,255,.24) 66%,
+      rgba(250,252,255,0) 84%);
+  }
+  body[data-theme="day"] .banner-copy .bc-feats b { color: #12263F; text-shadow: 0 1px 2px rgba(255,255,255,.95), 0 0 10px rgba(255,255,255,.85); }
+  body[data-theme="day"] .banner-copy .bc-feats i { color: rgba(18,38,63,.88); text-shadow: 0 1px 2px rgba(255,255,255,.9), 0 0 8px rgba(255,255,255,.8); }
   body[data-theme="day"] .banner-copy .bc-ico { border-color: rgba(18,38,63,.72); background: rgba(255,255,255,.62); }
   body[data-theme="day"] .banner-copy .bc-ico svg { stroke: #12263F; }
-  body[data-theme="day"] .banner-copy .bc-slogan { color: #12263F; text-shadow: 0 1px 2px rgba(255,255,255,.9), 0 0 12px rgba(255,255,255,.7); }
+  body[data-theme="day"] .carousel-arrow { background: rgba(255,255,255,.62); color: #12263F; }
+  body[data-theme="day"] .carousel-arrow:hover { background: rgba(255,255,255,.88); }
+  body[data-theme="day"] .carousel-dot { background: rgba(18,38,63,.3); }
+  body[data-theme="day"] .carousel-dot.active { background: #185FA5; }
+  /* 平板及以下：文案整组缩小保留（海报已无自带文字，标题不能跟着消失） */
+  @media (max-width: 900px) {
+    .banner-copy .bc-head { left: 5%; top: 9%; max-width: 92%; }
+    .banner-copy .bc-title { font-size: clamp(22px, 6vw, 40px); }
+    .banner-copy .bc-sub { font-size: clamp(10px, 2.3vw, 13px); letter-spacing: .18em; text-indent: .18em; margin-top: 7px; }
+    .banner-copy .bc-feats { display: none; }
+    /* 手机/平板上标题就压在天空里，不需要额外铺雾，保住插画的通透 */
+    body[data-theme="day"] .banner-copy::before { display: none; }
+  }
+  @media (max-width: 480px) {
+    .banner-copy .bc-head { top: 10%; }
+    .banner-copy .bc-sub { padding: 3px 9px; font-size: 10px; letter-spacing: .12em; text-indent: .12em; }
+  }
   .carousel-arrow {
     position: absolute; top: 50%; transform: translateY(-50%); z-index: 5;
     width: 34px; height: 58px; background: rgba(0,0,0,0.35); color: #F7F5F0;
@@ -748,13 +817,16 @@
       <div class="carousel-slide" id="carousel-slide">
         <img class="carousel-bg" id="carousel-bg" alt="">
         <div class="banner-copy">
+          <div class="bc-head">
+            <h1 class="bc-title">嘿！这里是第九艺术~</h1>
+            <p class="bc-sub">一个致力于游戏研发与创新的社团</p>
+          </div>
           <ul class="bc-feats">
             <li><span class="bc-ico"><svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 5.7L3 17.7 6.3 21l5.7-5.7a4.5 4.5 0 0 0 5.7-6l-2.6 2.6-2.7-2.7 2.6-2.9z"/></svg></span><span><b>独立游戏开发</b><i>从想法到实现</i></span></li>
             <li><span class="bc-ico"><svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="5"/><path d="M6 12h4M8 10v4"/><circle cx="16" cy="11" r="0.6" fill="#fff"/><circle cx="18.5" cy="13" r="0.6" fill="#fff"/></svg></span><span><b>原创作品</b><i>用游戏表达世界</i></span></li>
             <li><span class="bc-ico"><svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/></svg></span><span><b>技术探索</b><i>热爱 · 学习 · 分享</i></span></li>
             <li><span class="bc-ico"><svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16.2 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M21 20c0-2.6-1.6-4.7-3.9-5.5"/></svg></span><span><b>热爱共创</b><i>一起做有趣的事</i></span></li>
           </ul>
-          <div class="bc-slogan">游戏不止于生活<br>而是另一种可能</div>
         </div>
       </div>
     </div>
