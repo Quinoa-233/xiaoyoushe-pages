@@ -8,7 +8,7 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    /* 暗色背景：顶部青蓝光晕 + 细点阵纹理（参考即梦风格），纯 CSS */
+    /* 暗色背景：默认光晕渐变；可用底部切换器切换插画背景（预览） */
     background:
       radial-gradient(1300px 560px at 50% -6%, rgba(45, 140, 175, 0.26), transparent 64%),
       radial-gradient(850px 420px at 88% 12%, rgba(55, 110, 180, 0.11), transparent 60%),
@@ -22,6 +22,23 @@
     font-size: 13px;
     min-height: 100vh;
   }
+  body.bg-img {
+    background:
+      linear-gradient(180deg, rgba(10, 12, 18, 0.30) 0%, rgba(10, 12, 18, 0.52) 100%),
+      var(--bg-url) center top / cover no-repeat fixed;
+  }
+  /* 背景预览切换器 */
+  #bg-switch {
+    position: fixed; left: 10px; bottom: 10px; z-index: 90;
+    display: flex; gap: 6px;
+  }
+  #bg-switch button {
+    font-size: 11px; color: #B4B2A9;
+    background: rgba(16, 15, 20, 0.8);
+    border: 1px solid rgba(241,239,232,0.18);
+    border-radius: 6px; padding: 4px 10px;
+  }
+  #bg-switch button.active { color: #85B7EB; border-color: #378ADD; }
   a { color: inherit; text-decoration: none; }
   button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
 
@@ -30,7 +47,6 @@
     display: flex; align-items: center; gap: 24px;
     padding: 0 32px; height: 56px;
     background: rgba(16, 15, 20, 0.68);
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
     border-bottom: 1px solid rgba(241,239,232,0.1);
     position: sticky; top: 0; z-index: 50;
   }
@@ -286,7 +302,6 @@
   .me-main { flex: 1; min-width: 0; }
   .panel {
     background: rgba(18, 18, 23, 0.62);
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(241,239,232,0.1);
     border-radius: 12px; padding: 16px 18px; margin-bottom: 14px;
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
@@ -1213,6 +1228,39 @@ document.addEventListener('keydown', e => { // Esc 快捷关闭（鼠标被游�
 renderCarousel();
 renderGrid('all');
 renderRankTable();
+
+/* ================= 背景预览切换器（选定后可移除） ================= */
+(function () {
+  const BGS = [
+    { label: '光晕', url: '' },
+    { label: '夜海 A', url: '/covers/bg-a.jpg' },
+    { label: '水乡 B', url: '/covers/bg-b.jpg' },
+    { label: '烟火 C', url: '/covers/bg-c.jpg' }
+  ];
+  const box = document.createElement('div');
+  box.id = 'bg-switch';
+  const saved = localStorage.getItem('ninth_bg') || '';
+  function apply(url) {
+    if (url) {
+      document.body.classList.add('bg-img');
+      document.body.style.setProperty('--bg-url', 'url("' + url + '")');
+    } else {
+      document.body.classList.remove('bg-img');
+      document.body.style.removeProperty('--bg-url');
+    }
+    box.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.bg === url));
+    try { localStorage.setItem('ninth_bg', url); } catch (e) {}
+  }
+  BGS.forEach(({ label, url }) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.dataset.bg = url;
+    b.addEventListener('click', () => apply(url));
+    box.appendChild(b);
+  });
+  document.body.appendChild(box);
+  apply(saved);
+})();
 </script>
 </body>
 </html>
