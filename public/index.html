@@ -208,7 +208,9 @@
     padding: 18px 22px; gap: 16px; min-width: 0;
   }
   /* 海报本身就是 2x 图，按原始比例铺，禁止浏览器再重采样 */
-  .carousel-bg { image-rendering: -webkit-optimize-contrast; }
+  .carousel-bg { image-rendering: -webkit-optimize-contrast; transition: opacity .3s var(--ease), filter .3s var(--ease); }
+  /* 换图等待中的过渡态 */
+  .carousel.poster-loading .carousel-bg { opacity: .55; filter: saturate(.55); }
   .badge {
     display: inline-block; font-size: 11px; padding: 2px 10px; border-radius: 4px;
   }
@@ -2438,12 +2440,27 @@ function renderCarousel() {
   const img = document.getElementById('carousel-bg');
   if (!img || !item) return;
   applyPoster(img, currentTheme());
+  /* 慢网下换图要等一会儿，这期间把海报压暗一点，让人知道在换，不是点坏了 */
+  const box = document.getElementById('carousel');
+  const done = () => { if (box) box.classList.remove('poster-loading'); };
+  if (box) {
+    box.classList.add('poster-loading');
+    if (img.decode) img.decode().then(done, done);
+    else img.addEventListener('load', done, { once: true });
+    setTimeout(done, 6000);          // 兜底，别一直暗着
+  }
+  /* 当前这张加载完就悄悄把另一套拉进缓存：等用户真去点切换时基本是秒换 */
+  if (!warmed) {
+    img.addEventListener('load', () => { if (!warmed) { warmed = true; warmPoster(); } }, { once: true });
+  }
 }
-/* 页面闲下来就把另一套图预取进缓存，点切换时是瞬间换，不再"点了没反应" */
+let warmed = false;
+/* 页面闲下来再补一次（有些浏览器上 load 事件会被缓存命中直接跳过） */
 function warmPoster() {
   const other = currentTheme() === 'day' ? 'night' : 'day';
   const p = POSTERS[other];
   const im = new Image();
+  im.fetchPriority = 'low';
   im.setAttribute('srcset', p.small + ' 960w, ' + p.big + ' 1920w');
   im.setAttribute('sizes', POSTER_SIZES);
   im.src = p.big;

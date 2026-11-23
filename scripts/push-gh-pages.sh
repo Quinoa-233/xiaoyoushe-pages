@@ -35,6 +35,10 @@ git -c user.name="deploy-bot" -c user.email="deploy-bot@local" commit -q -m "dep
 ARGS=()
 [ -n "$SSL_BACKEND" ] && ARGS+=(-c "http.sslbackend=$SSL_BACKEND")
 [ -n "$SSL_CAINFO" ] && ARGS+=(-c "http.sslcainfo=$SSL_CAINFO")
-git "${ARGS[@]}" push -f "$REMOTE" gh-pages
+echo "推送中（${#ARGS[@]} 项 TLS 配置，CA=${SSL_CAINFO:-默认}）…"
+if ! git ${ARGS[@]+"${ARGS[@]}"} push -f "$REMOTE" gh-pages; then
+  echo "!! 推送失败，请检查上面的 git 报错" >&2
+  exit 1
+fi
 
 echo "已推送到 gh-pages 分支"
