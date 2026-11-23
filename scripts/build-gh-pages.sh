@@ -24,6 +24,9 @@ sed -i \
   -e "s|'/covers/|'covers/|g" \
   -e "s|'/games/|'games/|g" \
   -e "s|'/img/|'img/|g" \
+  -e 's|, /covers/|, covers/|g' \
+  -e 's|, /games/|, games/|g' \
+  -e 's|, /img/|, img/|g' \
   "$OUT/index.html"
 
 # _headers 是 Cloudflare Pages 专有文件，GitHub Pages 不认
@@ -31,5 +34,5 @@ rm -f "$OUT/_headers"
 
 echo "构建完成：$OUT"
 grep -c 'covers/' "$OUT/index.html" >/dev/null && echo "路径改写已执行"
-echo "残留根绝对路径检查（应为 0）:"
-grep -o '="/\(covers\|games\|img\)/\|'"'"'/\(covers\|games\|img\)/' "$OUT/index.html" | wc -l
+echo "残留根绝对路径检查（应为 0，含 srcset 里的第二项）:"
+grep -o '="/\(covers\|games\|img\)/\|'"'"'/\(covers\|games\|img\)/\|, /\(covers\|games\|img\)/' "$OUT/index.html" | wc -l
