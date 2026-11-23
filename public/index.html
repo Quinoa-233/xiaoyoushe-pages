@@ -445,12 +445,86 @@
   .breadcrumb span.link { cursor: pointer; }
   .breadcrumb span.link:hover { color: #C7C4BA; }
   .detail-head { display: flex; gap: 24px; align-items: flex-start; }
-  .detail-cover {
-    width: 260px; height: 146px; border-radius: 10px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
+  .detail-info { flex: 1; min-width: 0; }
+
+  /* ---- 详情页媒体区：steam 式的展示视频 + 缩略图 ---- */
+  .detail-media { flex: 0 0 clamp(430px, 43%, 680px); min-width: 0; }
+  .detail-media.no-demo { flex: 0 0 260px; }
+  .media-stage {
+    position: relative; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden;
+    background: #05070B; border: 1px solid var(--line-strong);
+    cursor: pointer;
+  }
+  .detail-media.no-demo .media-stage { cursor: default; }
+  .media-stage video, .media-stage .media-photo {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; display: none; background: #05070B;
+  }
+  .media-stage.show-video video { display: block; }
+  .media-stage.show-photo .media-photo { display: block; }
+  .media-fallback {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center;
     font-size: 20px; font-weight: 600; letter-spacing: 2px;
   }
-  .detail-info { flex: 1; min-width: 0; }
+  .media-stage.show-fallback .media-fallback { display: flex; }
+  .media-play {
+    position: absolute; left: 50%; top: 50%; z-index: 2;
+    width: 64px; height: 64px; border: 1px solid rgba(255, 255, 255, .22); border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 12, 18, .6); color: #fff;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, .45);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    transform: translate(-50%, -50%) scale(.92);
+    opacity: 0; pointer-events: none;
+    transition: opacity .18s var(--ease), transform .18s var(--ease), background .18s;
+  }
+  .media-play svg { margin-left: 3px; }
+  .media-stage.paused .media-play { opacity: 1; pointer-events: auto; }
+  .media-play:hover { background: rgba(55, 138, 221, .92); transform: translate(-50%, -50%) scale(1); }
+  .detail-media.no-demo .media-play { display: none; }
+  .media-bar {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+    height: 44px; padding: 0 10px; display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(180deg, rgba(5, 7, 11, 0), rgba(5, 7, 11, .84) 62%);
+    opacity: 0; transition: opacity .18s;
+  }
+  .media-stage:hover .media-bar, .media-stage.paused .media-bar { opacity: 1; }
+  .detail-media.no-demo .media-bar { display: none; }
+  .media-tag {
+    font-size: 11px; color: #A9D3F7; background: rgba(55, 138, 221, .24);
+    border-radius: 4px; padding: 2px 8px;
+  }
+  .media-dur { font-size: 11px; color: rgba(247, 245, 240, .72); }
+  .media-gap { flex: 1; }
+  .media-btn {
+    width: 26px; height: 26px; border: 0; border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 255, 255, .12); color: #F7F5F0;
+  }
+  .media-btn:hover { background: rgba(255, 255, 255, .24); }
+  .media-thumbs {
+    display: flex; gap: 6px; margin-top: 8px;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .media-thumbs::-webkit-scrollbar { display: none; }
+  .media-thumb {
+    position: relative; flex: 0 0 92px; aspect-ratio: 16 / 9;
+    border: 1px solid transparent; border-radius: 6px; overflow: hidden; cursor: pointer;
+    background: #0B0F16 center/cover no-repeat;
+    opacity: .55; transition: opacity .15s, border-color .15s;
+  }
+  .media-thumb:hover { opacity: .85; }
+  .media-thumb.on { opacity: 1; border-color: var(--accent); }
+  .media-thumb .tplay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #fff;
+  }
+  .media-thumb .tplay svg { filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .85)); }
+  .media-thumb .tlbl {
+    position: absolute; left: 4px; bottom: 2px; font-size: 10px; color: #F7F5F0;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+  }
   .detail-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .detail-title-row h2 { font-size: 19px; font-weight: 600; }
   .detail-byline { font-size: 12px; color: #C7C4BA; margin-top: 8px; }
@@ -622,7 +696,7 @@
   @media (max-width: 900px) {
     .game-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 14px; }
     .detail-head { flex-direction: column; gap: 16px; }
-    .detail-cover { width: 100%; height: auto; aspect-ratio: 16 / 9; }
+    .detail-media, .detail-media.no-demo { flex: none; width: 100%; }
     .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .carousel:hover { transform: none; }
     /* 平板宽度：顶栏收紧，避免品牌与导航折成两行 */
@@ -732,6 +806,9 @@
 
     /* 详情页 */
     .breadcrumb { font-size: 11.5px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .media-play { width: 50px; height: 50px; }
+    .media-thumb { flex: 0 0 78px; }
+    .media-bar { height: 38px; }
     .detail-title-row h2 { font-size: 18px; }
     .detail-title-row { gap: 8px; }
     .detail-byline { font-size: 11.5px; line-height: 1.6; }
@@ -880,7 +957,25 @@
   <section id="view-detail" class="view">
     <div class="breadcrumb"><span class="link" data-nav="home">首页</span> / <span id="crumb-tag"></span> / <span id="crumb-title" style="color:#C7C4BA;"></span></div>
     <div class="detail-head">
-      <div class="detail-cover" id="detail-cover"></div>
+      <div class="detail-media no-demo" id="detail-media">
+        <div class="media-stage show-photo" id="media-stage">
+          <video id="media-video" playsinline webkit-playsinline muted loop preload="none"></video>
+          <img class="media-photo" id="media-photo" alt="">
+          <div class="media-fallback" id="media-fallback"></div>
+          <button class="media-play" id="media-play" type="button" aria-label="播放演示视频">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2v13.6L19 12z"/></svg>
+          </button>
+          <div class="media-bar">
+            <span class="media-tag" id="media-tag">演示视频</span>
+            <span class="media-dur" id="media-dur"></span>
+            <span class="media-gap"></span>
+            <button class="media-btn" id="media-full" type="button" title="全屏播放" aria-label="全屏播放">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 15v5h-5M20 9V4h-5M4 15v5h5"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="media-thumbs" id="media-thumbs"></div>
+      </div>
       <div class="detail-info">
         <div class="detail-title-row">
           <h2 id="detail-title"></h2>
@@ -999,6 +1094,7 @@ const GAMES = [
     tags: ['解谜', '像素风', '钥匙收集', '时序门'],
     playUrl: 'https://echoes-demo.app.workbuddy.host/?sharecode=7O7FAGB4JM',
     coverImg: '/games/echoes/cover.jpg', previewVid: '/games/echoes/preview.mp4',
+    demo: true,
     desc: '一款像素风平台解谜游戏。你要在残影重叠的旧校舍里收集 8 枚钥匙，解开时序门的谜题，找到记忆消失的真相。共 8 关，另有隐藏结局。',
     devlog: '11 月 5 日：手感调优完成，SPEED 从 280 降到 240，多人反馈"一按就窜"的问题解决了。第 6 关两道 0.6 秒时序门放宽到 1.0 秒。\n11 月 1 日：新增钥匙全收集成就。\n10 月 28 日：网页版发布。'
   },
@@ -1009,6 +1105,7 @@ const GAMES = [
     tags: ['射击', '霓虹', '街机'],
     playUrl: '/games/neon-strike/',
     coverImg: '/games/neon-strike/cover.jpg', previewVid: '/games/neon-strike/preview.mp4',
+    demo: true,
     desc: '霓虹风格的太空射击，弹幕与得分一网打尽。',
     devlog: '暂无开发者日志。' },
   { id: 3, title: '星球清道夫 · 净土计划', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
@@ -1018,6 +1115,7 @@ const GAMES = [
     tags: ['休闲', '消除', '环保'],
     playUrl: '/games/planet-cleaner/',
     coverImg: '/games/planet-cleaner/cover.jpg', previewVid: '/games/planet-cleaner/preview.mp4',
+    demo: true,
     desc: '驾驶清扫船净化星球，还宇宙一片净土。',
     devlog: '暂无开发者日志。' },
   { id: 4, title: '鼠鼠大逃亡', tag: '校园', cat: 'play', genre: '跑酷', mode: '单人',
@@ -1027,6 +1125,7 @@ const GAMES = [
     tags: ['跑酷', '收集', '可爱'],
     playUrl: '/games/mouse-escape/',
     coverImg: '/games/mouse-escape/cover.jpg', previewVid: '/games/mouse-escape/preview.mp4',
+    demo: true,
     desc: '收集奶酪钻进小洞，躲避追击跑得越远越好。',
     devlog: '暂无开发者日志。' },
   { id: 5, title: '苍穹防线 · 飞机大战', tag: '校园', cat: 'play', genre: '射击', mode: '单人',
@@ -1036,6 +1135,7 @@ const GAMES = [
     tags: ['射击', '飞机', '弹幕'],
     playUrl: '/games/sky-defense/',
     coverImg: '/games/sky-defense/cover.jpg', previewVid: '/games/sky-defense/preview.mp4',
+    demo: true,
     desc: '经典飞机大战，守卫苍穹防线的每一寸天空。',
     devlog: '暂无开发者日志。' },
   { id: 6, title: '微光守护 · Glimmer Watch', tag: '校园', cat: 'play', genre: '生存', mode: '单人',
@@ -1045,6 +1145,7 @@ const GAMES = [
     tags: ['生存', '氛围', '像素'],
     playUrl: '/games/glimmer-watch/',
     coverImg: '/games/glimmer-watch/cover.jpg', previewVid: '/games/glimmer-watch/preview.mp4',
+    demo: true,
     desc: '在微光将熄的世界里撑过一个个垃圾日。',
     devlog: '暂无开发者日志。' },
   { id: 7, title: '第 4 厂 · 削土豆的人', tag: '校园', cat: 'play', genre: '叙事', mode: '单人',
@@ -1054,6 +1155,7 @@ const GAMES = [
     tags: ['叙事', '剧情', '模拟'],
     playUrl: '/games/factory-4/',
     coverImg: '/games/factory-4/cover.jpg', previewVid: '/games/factory-4/preview.mp4',
+    demo: true,
     desc: '供应总局的削皮车间，一个关于流水线的故事。',
     devlog: '暂无开发者日志。' },
   { id: 8, title: '成语猎人', tag: '校园', cat: 'play', genre: '教育', mode: '单人',
@@ -1063,6 +1165,7 @@ const GAMES = [
     tags: ['教育', '成语', '答题'],
     playUrl: '/games/idiom-hunter/',
     coverImg: '/games/idiom-hunter/cover.jpg', previewVid: '/games/idiom-hunter/preview.mp4',
+    demo: true,
     desc: '用成语当武器狩猎题目，边玩边涨词汇量。',
     devlog: '暂无开发者日志。' },
   { id: 9, title: '萌味餐厅 · 3D厨房', tag: '校园', cat: 'play', genre: '经营', mode: '单人',
@@ -1090,6 +1193,7 @@ const GAMES = [
     tags: ['休闲', '农场', '收集'],
     playUrl: '/games/carrot-hunter/',
     coverImg: '/games/carrot-hunter/cover.jpg', previewVid: '/games/carrot-hunter/preview.mp4',
+    demo: true,
     desc: '在田地里追捕萝卜，轻松愉快的收集小游戏。',
     devlog: '暂无开发者日志。' },
   { id: 12, title: '警笛之下 · Under the Siren', tag: '校园', cat: 'play', genre: '解谜', mode: '单人',
@@ -1099,6 +1203,7 @@ const GAMES = [
     tags: ['解谜', '悬疑', '剧情'],
     playUrl: '/games/under-siren/',
     coverImg: '/games/under-siren/cover.jpg', previewVid: '/games/under-siren/preview.mp4',
+    demo: true,
     desc: '警报响起之后，真相藏在警笛声下面。',
     devlog: '暂无开发者日志。' },
   { id: 13, title: '汽车大逃杀 · 公路关卡战', tag: '校园', cat: 'play', genre: '竞速', mode: '单人',
@@ -1108,6 +1213,7 @@ const GAMES = [
     tags: ['竞速', '对战', '关卡'],
     playUrl: '/games/car-battle/',
     coverImg: '/games/car-battle/cover.jpg', previewVid: '/games/car-battle/preview.mp4',
+    demo: true,
     desc: '公路关卡制大逃杀，方向盘上见真章。',
     devlog: '暂无开发者日志。' },
   { id: 14, title: '星际突击', tag: '校园', cat: 'play', genre: '射击', mode: '单人',
@@ -1126,6 +1232,7 @@ const GAMES = [
     tags: ['休闲', '海洋', '养成'],
     playUrl: '/games/fish-swim/',
     coverImg: '/games/fish-swim/cover.jpg', previewVid: '/games/fish-swim/preview.mp4',
+    demo: true,
     desc: '带着桂圆鱼畅游深海，躲避天敌收集食物。',
     devlog: '暂无开发者日志。' },
   { id: 16, title: '雪岭速降 SNOWLINE RUSH', tag: '校园', cat: 'play', genre: '跑酷', mode: '单人',
@@ -1153,6 +1260,7 @@ const GAMES = [
     tags: ['格斗', '对战', '算力'],
     playUrl: '/games/ai-battle/',
     coverImg: '/games/ai-battle/cover.jpg', previewVid: '/games/ai-battle/preview.mp4',
+    demo: true,
     desc: '把算力当武力，AI 娘们在擂台上一决高下。',
     devlog: '暂无开发者日志。' },
   { id: 19, title: '迷雾画廊', tag: '校园', cat: 'play', genre: '解谜', mode: '单人',
@@ -1180,6 +1288,7 @@ const GAMES = [
     tags: ['休闲', '太空', '清扫'],
     playUrl: '/games/moon-sweeper/',
     coverImg: '/games/moon-sweeper/cover.jpg', previewVid: '/games/moon-sweeper/preview.mp4',
+    demo: true,
     desc: '在月面上清扫太空垃圾，化身月球环卫工。',
     devlog: '暂无开发者日志。' },
   { id: 22, title: '星火拾荒者 · SPARK SCAVENGER', tag: '校园', cat: 'play', genre: '动作', mode: '单人',
@@ -1189,6 +1298,7 @@ const GAMES = [
     tags: ['动作', '拾荒', '末日'],
     playUrl: '/games/spark-scavenger/',
     coverImg: '/games/spark-scavenger/cover.jpg', previewVid: '/games/spark-scavenger/preview.mp4',
+    demo: true,
     desc: '末日废土拾荒求生，收集星火点亮文明。',
     devlog: '暂无开发者日志。' },
   { id: 23, title: '传感器守护者 · 仓库布防', tag: '校园', cat: 'play', genre: '塔防', mode: '单人',
@@ -1234,6 +1344,7 @@ const GAMES = [
     tags: ['教育', '四大名著', '答题'],
     playUrl: '/games/sea-battle/',
     coverImg: '/games/sea-battle/cover.jpg', previewVid: '/games/sea-battle/preview.mp4',
+    demo: true,
     desc: '四大名著答题闯关，在海底一路杀到龙宫。',
     devlog: '暂无开发者日志。' },
   { id: 28, title: 'Q版泡泡堂 · 水球大作战', tag: '校园', cat: 'play', genre: '对战', mode: '单人',
@@ -1243,6 +1354,7 @@ const GAMES = [
     tags: ['对战', '泡泡堂', '水球'],
     playUrl: '/games/water-bomb/',
     coverImg: '/games/water-bomb/cover.jpg', previewVid: '/games/water-bomb/preview.mp4',
+    demo: true,
     desc: 'Q 版水球大乱斗，经典泡泡堂的清新复刻。',
     devlog: '暂无开发者日志。' },
   { id: 29, title: '孤剑试炼 · Lone Blade Trials', tag: '校园', cat: 'play', genre: '动作', mode: '单人',
@@ -1252,6 +1364,7 @@ const GAMES = [
     tags: ['动作', '武侠', '试炼'],
     playUrl: '/games/lone-blade/',
     coverImg: '/games/lone-blade/cover.jpg', previewVid: '/games/lone-blade/preview.mp4',
+    demo: true,
     desc: '一人一剑闯试炼，武侠动作 v0.8。',
     devlog: '暂无开发者日志。' },
   { id: 30, title: '星际逃亡', tag: '校园', cat: 'video', genre: '策略', mode: '单人',
@@ -1313,6 +1426,7 @@ const GAMES = [
   { id: 37, title: '渊途铸甲 · 像素地牢', tag: '校园', cat: 'play', genre: 'Roguelike', mode: '单人',
     byline: '信息技术系人工智能25302 · 杨子钦 · 第一届智游杯初赛',
     coverImg: '/games/yuantu-zhujia/cover.jpg', previewVid: '/games/yuantu-zhujia/preview.mp4',
+    demo: true,
     playUrl: 'https://yuantu-zhuajia.app.workbuddy.host/?sharecode=I2G776G7R4',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#27500A', coverFg: '#97C459',
@@ -1362,6 +1476,7 @@ const GAMES = [
   { id: 43, title: '逐光旅途', tag: '校园', cat: 'play', genre: '动作闯关', mode: '单人',
     byline: '信息技术系计算机26301 · 刘家豪 · 第一届智游杯初赛',
     coverImg: '/games/zhuguang-lvtu/cover.jpg', previewVid: '/games/zhuguang-lvtu/preview.mp4',
+    demo: true,
     playUrl: 'https://zhuguang-journey.app.workbuddy.host/?sharecode=J2ZVJDYKH5',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#712B13', coverFg: '#F0997B',
@@ -1379,6 +1494,7 @@ const GAMES = [
   { id: 45, title: '铁誓 · 边陲余生', tag: '校园', cat: 'play', genre: '生存 RPG', mode: '单人',
     byline: '信息技术系计算机26301 · 张煜埕 · 第一届智游杯初赛',
     coverImg: '/games/tieshi-bianchui/cover.jpg', previewVid: '/games/tieshi-bianchui/preview.mp4',
+    demo: true,
     playUrl: 'https://iron-oath.app.workbuddy.host/?sharecode=N3LVXXYARA',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#27500A', coverFg: '#97C459',
@@ -1388,6 +1504,7 @@ const GAMES = [
   { id: 46, title: '岸边的一天', tag: '校园', cat: 'play', genre: '钓鱼养成', mode: '单人',
     byline: '信息技术系计算机26301 · 林健 · 第一届智游杯初赛',
     coverImg: '/games/anbian/cover.jpg', previewVid: '/games/anbian/preview.mp4',
+    demo: true,
     playUrl: 'https://riverside-fishing.app.workbuddy.host/?sharecode=CO25JAK4TP',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#72243E', coverFg: '#ED93B1',
@@ -1421,6 +1538,7 @@ const GAMES = [
   { id: 50, title: '文明战棋 · 六边形回合制', tag: '校园', cat: 'play', genre: '策略战棋', mode: '单人',
     byline: '信息技术系大数据25301 · 王惟鹏 · 第一届智游杯初赛',
     coverImg: '/games/wenming-zhanqi/cover.jpg', previewVid: '/games/wenming-zhanqi/preview.mp4',
+    demo: true,
     playUrl: 'https://civ-mvp.app.workbuddy.host/?sharecode=MJVBPB2RJR',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#633806', coverFg: '#EF9F27',
@@ -1430,6 +1548,7 @@ const GAMES = [
   { id: 51, title: '新宿决战 · 术式对决', tag: '校园', cat: 'play', genre: '动作对战', mode: '单人',
     byline: '信息技术系云计算25301 · 贾昀锴 · 第一届智游杯初赛',
     coverImg: '/games/juzhen-jueji/cover.jpg', previewVid: '/games/juzhen-jueji/preview.mp4',
+    demo: true,
     playUrl: 'https://xkt-d4g0e5uxs792b655e-1482562258.tcloudbaseapp.com/%E7%9F%A9%E9%98%B5%E6%A8%A1%E5%9E%8B%E6%B5%8B%E8%AF%951/index.html',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#26215C', coverFg: '#AFA9EC',
@@ -1460,6 +1579,129 @@ function recordStat(g) {
 const FLOWER_ICON = '<svg width="13" height="13" viewBox="0 0 20 20" style="vertical-align:-2px;"><g fill="#E24B4A"><circle cx="10" cy="4" r="3.4"/><circle cx="15.7" cy="8.1" r="3.4"/><circle cx="13.5" cy="14.9" r="3.4"/><circle cx="6.5" cy="14.9" r="3.4"/><circle cx="4.3" cy="8.1" r="3.4"/></g><circle cx="10" cy="10" r="3.1" fill="#FAC775"/></svg>';
 const EYE_ICON = '<svg width="13" height="13" viewBox="0 0 20 20" style="vertical-align:-2px;" fill="none"><path d="M1.5 10 C4 5.5, 16 5.5, 18.5 10 C16 14.5, 4 14.5, 1.5 10 Z" stroke="#C7C4BA" stroke-width="1.6"/><circle cx="10" cy="10" r="2.6" fill="#C7C4BA"/></svg>';
 
+/* ================= 详情页媒体区（演示视频 + 截图） =================
+   只有带 demo: true 的作品开启；其余仍是原来的 260×146 封面图。 */
+const M = {
+  wrap: document.getElementById('detail-media'),
+  stage: document.getElementById('media-stage'),
+  video: document.getElementById('media-video'),
+  photo: document.getElementById('media-photo'),
+  fallback: document.getElementById('media-fallback'),
+  playBtn: document.getElementById('media-play'),
+  thumbs: document.getElementById('media-thumbs'),
+  dur: document.getElementById('media-dur'),
+  full: document.getElementById('media-full')
+};
+let mediaItems = [], mediaIdx = 0;
+
+function mediaDir(g) {
+  const m = String(g.previewVid || '').match(/\/games\/([^/]+)\//);
+  return m ? '/games/' + m[1] + '/' : '';
+}
+function fmtDur(sec) {
+  if (!isFinite(sec) || sec <= 0) return '';
+  const t = Math.round(sec);
+  return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+}
+function mediaMode(mode) {
+  M.stage.classList.remove('show-video', 'show-photo', 'show-fallback');
+  M.stage.classList.add('show-' + mode);
+}
+function pauseMedia() {
+  if (M.video && !M.video.paused) M.video.pause();
+}
+function renderMedia(g) {
+  pauseMedia();
+  M.video.removeAttribute('src');
+  M.video.removeAttribute('poster');
+  M.video.load();
+  M.thumbs.innerHTML = '';
+  mediaItems = []; mediaIdx = 0;
+  M.dur.textContent = '';
+  M.fallback.style.background = g.coverBg || '#20222B';
+  M.fallback.style.color = g.coverFg || '#F7F5F0';
+  M.fallback.textContent = g.title;
+  if (g.coverImg) M.photo.src = g.coverImg;
+
+  const dir = mediaDir(g);
+  const demo = !!(g.demo && g.previewVid && dir);
+  M.wrap.classList.toggle('no-demo', !demo);
+  if (!demo) {
+    mediaMode(g.coverImg ? 'photo' : 'fallback');
+    return;
+  }
+
+  const poster = dir + 'shot-1.jpg'; // 用真实游戏帧当海报，封面有的是拼贴图，放大后看不清
+  mediaItems = [
+    { type: 'video', src: g.previewVid, poster: poster, label: '演示视频' },
+    { type: 'photo', src: dir + 'shot-2.jpg', label: '游戏画面' }
+  ];
+  if (g.coverImg) mediaItems.push({ type: 'photo', src: g.coverImg, label: '封面' });
+
+  mediaItems.forEach((it, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'media-thumb';
+    b.title = it.label;
+    b.style.backgroundImage = 'url("' + (it.type === 'video' ? (it.poster || it.src) : it.src) + '")';
+    b.innerHTML = (it.type === 'video'
+      ? '<span class="tplay"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2v13.6L19 12z"/></svg></span>'
+      : '') + '<span class="tlbl">' + it.label + '</span>';
+    b.addEventListener('click', () => selectMedia(i, true));
+    M.thumbs.appendChild(b);
+  });
+  selectMedia(0, false);
+}
+function selectMedia(i, autoplay) {
+  const it = mediaItems[i];
+  if (!it) return;
+  mediaIdx = i;
+  Array.from(M.thumbs.children).forEach((el, k) => el.classList.toggle('on', k === i));
+  if (it.type === 'video') {
+    mediaMode('video');
+    if (M.video.getAttribute('src') !== it.src) {
+      M.video.setAttribute('src', it.src);
+      if (it.poster) M.video.setAttribute('poster', it.poster);
+      M.video.load();
+    }
+    if (autoplay) {
+      M.stage.classList.remove('paused');
+      M.video.play().catch(() => M.stage.classList.add('paused'));
+    } else {
+      M.stage.classList.add('paused');
+    }
+  } else {
+    pauseMedia();
+    mediaMode('photo');
+    M.photo.src = it.src;
+    M.stage.classList.remove('paused');
+  }
+}
+M.video.addEventListener('play', () => M.stage.classList.remove('paused'));
+M.video.addEventListener('pause', () => {
+  if (M.stage.classList.contains('show-video')) M.stage.classList.add('paused');
+});
+M.video.addEventListener('loadedmetadata', () => { M.dur.textContent = fmtDur(M.video.duration); });
+M.video.addEventListener('ended', () => M.stage.classList.add('paused'));
+M.stage.addEventListener('click', (e) => {
+  if (e.target.closest('.media-btn') || e.target.closest('.media-play')) return;
+  if (!M.stage.classList.contains('show-video')) return;
+  if (M.video.paused) M.video.play().catch(() => {});
+  else M.video.pause();
+});
+M.playBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  M.video.play().catch(() => {});
+});
+M.full.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (M.stage.classList.contains('show-video') && M.video.webkitEnterFullscreen) {
+    M.video.webkitEnterFullscreen();
+  } else if (M.stage.requestFullscreen) {
+    M.stage.requestFullscreen().catch(() => {});
+  }
+});
+
 /* ================= 视图切换 ================= */
 let curFilter = 'all';
 function showView(name) {
@@ -1471,6 +1713,7 @@ function showView(name) {
   // 回到首页/排行榜时重渲染，让小红花和浏览量显示最新值
   if (name === 'home') renderGrid(curFilter);
   if (name === 'rank') renderRankTable();
+  if (name !== 'detail') pauseMedia();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('[data-nav]').forEach(el => {
@@ -1574,15 +1817,7 @@ function openDetail(id) {
   currentGame = g;
   document.getElementById('crumb-tag').textContent = g.tag === '校园' ? '校园作品' : '引进游戏';
   document.getElementById('crumb-title').textContent = g.title;
-  const cover = document.getElementById('detail-cover');
-  if (g.coverImg) {
-    cover.style.background = '#000 url(' + g.coverImg + ') center/cover no-repeat';
-    cover.textContent = '';
-  } else {
-    cover.style.background = g.coverBg;
-    cover.style.color = g.coverFg;
-    cover.textContent = g.title;
-  }
+  renderMedia(g);
   document.getElementById('detail-title').textContent = g.title;
   document.getElementById('detail-badges').innerHTML =
     (g.tag === '校园' ? '<span class="badge badge-teal">校园作品</span>' : '<span class="badge badge-amber">引进游戏</span>') +
@@ -1650,6 +1885,7 @@ function renderRankTable() {
 
 /* ================= 游玩弹窗（游客模式，无计时记录） ================= */
 function openPlayModal(g) {
+  pauseMedia(); // 进游戏时停掉详情页的演示视频，别白占解码
   const box = document.getElementById('play-modal-box');
   const ph = document.getElementById('modal-placeholder');
   const gm = document.getElementById('modal-game');
