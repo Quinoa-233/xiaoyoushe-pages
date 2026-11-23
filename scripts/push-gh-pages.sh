@@ -19,7 +19,10 @@ SSL_CAINFO=$(git config --local http.sslcainfo || true)
 # Windows 路径里的反斜杠在 bash 里打不开证书文件，统一换成正斜杠
 SSL_CAINFO="${SSL_CAINFO//\\//}"
 
-TMP=$(mktemp -d)
+# 临时仓库放在项目内（沙箱/权限对系统临时目录写入限制较多，放外面会静默中断）
+TMP="$ROOT/.tmp_ghpages"
+rm -rf "$TMP"
+mkdir -p "$TMP"
 trap 'rm -rf "$TMP"' EXIT
 
 cp -R dist/. "$TMP"/

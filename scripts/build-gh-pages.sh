@@ -35,4 +35,7 @@ rm -f "$OUT/_headers"
 echo "构建完成：$OUT"
 grep -c 'covers/' "$OUT/index.html" >/dev/null && echo "路径改写已执行"
 echo "残留根绝对路径检查（应为 0，含 srcset 里的第二项）:"
-grep -o '="/\(covers\|games\|img\)/\|'"'"'/\(covers\|games\|img\)/\|, /\(covers\|games\|img\)/' "$OUT/index.html" | wc -l
+# 注意：脚本开了 pipefail，grep 无匹配时会返回 1，会让「检查通过」变成整体失败，
+# 所以这里必须兜住退出码，否则上一层的 push 脚本会在 set -e 下静默中断。
+RESIDUAL=$( { grep -o '="/\(covers\|games\|img\)/\|'"'"'/\(covers\|games\|img\)/\|, /\(covers\|games\|img\)/' "$OUT/index.html" | wc -l; } || true )
+echo "$RESIDUAL"

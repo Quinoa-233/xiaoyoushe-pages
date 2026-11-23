@@ -22,3 +22,4 @@ wrangler.toml
 .work_slim/
 .tmp_probe/
 *.zip
+.tmp_ghpages/
