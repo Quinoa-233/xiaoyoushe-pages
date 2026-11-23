@@ -78,12 +78,6 @@
     border-radius: 4px; padding: 2px 8px;
   }
 
-  /* Q版吉祥物三人组：贴纸风，放大立在右下角页面背景里（黑底 lighten 融合） */
-  .mascots {
-    position: fixed; right: 8px; bottom: 0; width: min(48vw, 680px);
-    mix-blend-mode: lighten;
-    pointer-events: none; z-index: 0;
-  }
   main { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; position: relative; z-index: 1; }
   .view { display: none; }
   .view.active { display: block; }
@@ -382,7 +376,6 @@
 </head>
 <body>
 
-<img class="mascots" src="/covers/mascots.jpg" alt="">
 <header class="topbar">
   <div class="logo">第九艺术<small>校园游戏平台</small></div>
   <nav class="nav-tabs">
