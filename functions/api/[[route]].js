@@ -22,10 +22,19 @@ const DAY = () => {
 
 const enc = new TextEncoder();
 
+/* 允许镜像站（香港对象存储 / 其他托管）跨域调用本接口。
+   鉴权走 Authorization: Bearer <token>，不使用 Cookie，所以放开 * 是安全的。 */
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
+  'access-control-allow-headers': 'authorization, content-type',
+  'access-control-max-age': '86400',
+};
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS },
   });
 }
 
@@ -146,6 +155,11 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/^\/api\/?/, '').replace(/\/$/, '');
   const method = request.method;
+
+  // 跨域预检：镜像站在别的域名下调接口时会先发 OPTIONS
+  if (method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS });
+  }
 
   if (!env.DB) {
     return json({ ok: false, error: 'D1_NOT_BOUND', message: '还没绑定 D1 数据库（Cloudflare Pages → Settings → Functions → D1 bindings，变量名填 DB）' }, 503);

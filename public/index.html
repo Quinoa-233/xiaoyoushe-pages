@@ -1836,6 +1836,12 @@ const TOKEN_KEY = 'ninth_token';
 const Cloud = { on: false, token: null, me: null, games: {}, reason: '' };
 try { Cloud.token = localStorage.getItem(TOKEN_KEY) || null; } catch (e) {}
 
+/* 镜像站（香港对象存储等纯静态托管）没有后端，登录/送花/统计统一打回 Cloudflare。
+   在 pages.dev 和本地调试时留空，走同源相对路径。 */
+const API_ORIGIN = 'https://xiaoyoushe.pages.dev';
+const API_BASE = /(^|\.)pages\.dev$/.test(location.hostname) || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+  ? '' : API_ORIGIN;
+
 function api(path, body) {
   const init = { method: body === undefined ? 'GET' : 'POST', headers: {} };
   if (body !== undefined) {
@@ -1843,7 +1849,7 @@ function api(path, body) {
     init.body = JSON.stringify(body);
   }
   if (Cloud.token) init.headers.authorization = 'Bearer ' + Cloud.token;
-  return fetch('/api/' + path, init)
+  return fetch(API_BASE + '/api/' + path, init)
     .then(r => r.json().then(j => ({ status: r.status, body: j })).catch(() => ({ status: r.status, body: {} })))
     .catch(() => ({ status: 0, body: { ok: false, error: 'NETWORK' } }));
 }
