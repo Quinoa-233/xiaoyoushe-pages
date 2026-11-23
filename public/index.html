@@ -109,6 +109,48 @@
   }
   .search-box:focus { border-color: rgba(133,183,235,.55); background: rgba(255,255,255,.07); }
   .search-box::placeholder { color: #A9A69D; }
+  /* 搜索结果下拉 */
+  .search-wrap { position: relative; }
+  .search-panel {
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 80;
+    width: 320px; max-height: 62vh; overflow-y: auto;
+    background: #14161D; border: 1px solid var(--line-strong); border-radius: 10px;
+    box-shadow: 0 18px 42px rgba(0,0,0,.55);
+    padding: 6px; display: none;
+  }
+  .search-panel.show { display: block; }
+  .search-sec { font-size: 10.5px; color: #8C9199; letter-spacing: .08em; padding: 8px 10px 4px; }
+  .search-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px; border-radius: 7px; cursor: pointer;
+  }
+  .search-row:hover, .search-row.active { background: rgba(255,255,255,.07); }
+  .search-row .sr-thumb {
+    width: 40px; height: 23px; border-radius: 4px; flex: none;
+    background: #0B0F16 center/cover no-repeat; overflow: hidden;
+  }
+  .search-row .sr-main { min-width: 0; flex: 1; }
+  .search-row .sr-title { font-size: 12.5px; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .search-row .sr-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .search-row .sr-avatar {
+    width: 26px; height: 26px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; background: rgba(55,138,221,.22); color: #A9D3F7;
+  }
+  .search-empty { padding: 14px 10px; font-size: 12px; color: var(--text-3); text-align: center; }
+  /* 作者筛选条 */
+  .author-bar {
+    display: none; align-items: center; gap: 10px;
+    margin-bottom: 14px; padding: 9px 12px;
+    background: rgba(55,138,221,.1); border: 1px solid rgba(55,138,221,.32);
+    border-radius: 8px; font-size: 12.5px; color: #D5E6F8;
+  }
+  .author-bar.show { display: flex; }
+  .author-bar .ab-x {
+    margin-left: auto; border: 0; background: transparent; color: #A9D3F7;
+    cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 5px;
+  }
+  .author-bar .ab-x:hover { background: rgba(255,255,255,.1); }
   /* 日间 / 夜间切换 */
   .theme-toggle {
     flex: 0 0 auto;
@@ -658,6 +700,70 @@
   .rank-table .rk-num { font-weight: 600; width: 40px; }
 
   /* ===== 占位页 ===== */
+  /* ===== 登录 / 个人中心 ===== */
+  .auth-mask {
+    position: fixed; inset: 0; z-index: 120; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(5,7,11,.72); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  }
+  .auth-mask.show { display: flex; }
+  .auth-card {
+    width: 360px; max-width: calc(100vw - 32px);
+    background: #16181F; border: 1px solid var(--line-strong); border-radius: 14px;
+    padding: 22px 22px 20px; box-shadow: 0 24px 60px rgba(0,0,0,.6);
+  }
+  .auth-card h3 { font-size: 16px; font-weight: 600; }
+  .auth-card .auth-sub { font-size: 12px; color: var(--text-3); margin-top: 6px; line-height: 1.6; }
+  .auth-tabs { display: flex; gap: 18px; margin: 16px 0 14px; border-bottom: 1px solid var(--line); }
+  .auth-tabs button {
+    font-size: 13px; color: var(--text-3); padding: 8px 2px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .auth-tabs button.on { color: var(--text-1); border-bottom-color: var(--accent); }
+  .auth-field { margin-bottom: 10px; }
+  .auth-field label { display: block; font-size: 11.5px; color: var(--text-3); margin-bottom: 5px; }
+  .auth-field input {
+    width: 100%; background: rgba(255,255,255,.05); border: 1px solid var(--line-strong);
+    border-radius: 8px; padding: 9px 12px; color: var(--text-1); font-size: 13px; outline: none;
+  }
+  .auth-field input:focus { border-color: rgba(133,183,235,.55); background: rgba(255,255,255,.07); }
+  .auth-err { font-size: 12px; color: #F09595; min-height: 18px; margin: 4px 0 8px; }
+  .auth-card .btn-primary { width: 100%; padding: 10px 0; text-align: center; }
+  .auth-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+  .auth-foot a { font-size: 11.5px; color: var(--text-3); cursor: pointer; }
+  .auth-foot a:hover { color: var(--text-2); }
+
+  .me-wrap { max-width: 720px; }
+  .me-card {
+    background: rgba(24,24,30,.72); border: 1px solid var(--line);
+    border-radius: 12px; padding: 20px; margin-bottom: 16px;
+  }
+  .me-head { display: flex; align-items: center; gap: 14px; }
+  .me-avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 600; background: rgba(55,138,221,.22); color: #A9D3F7;
+  }
+  .me-name { font-size: 15px; font-weight: 600; }
+  .me-meta { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+  .me-rows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+  .me-row { background: rgba(255,255,255,.04); border-radius: 9px; padding: 12px 14px; }
+  .me-row .k { font-size: 11.5px; color: var(--text-3); }
+  .me-row .v { font-size: 18px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .me-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .me-hint { font-size: 12px; color: var(--text-3); line-height: 1.7; }
+  .quota-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.1); overflow: hidden; margin-top: 10px; }
+  .quota-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #E24B4A, #F09595); }
+
+  /* 轻提示 */
+  #toast {
+    position: fixed; left: 50%; bottom: 40px; transform: translate(-50%, 12px);
+    z-index: 200; background: rgba(20,22,29,.96); border: 1px solid var(--line-strong);
+    color: var(--text-1); font-size: 13px; padding: 10px 16px; border-radius: 9px;
+    opacity: 0; pointer-events: none; transition: opacity .2s var(--ease), transform .2s var(--ease);
+    box-shadow: 0 14px 34px rgba(0,0,0,.5); max-width: 80vw;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
   .todo-page { text-align: center; padding: 90px 0; }
   .todo-page h3 { font-size: 16px; font-weight: 600; color: #C7C4BA; }
   .todo-page p { font-size: 12px; color: #A9A69D; margin-top: 10px; }
@@ -879,7 +985,10 @@
     <button data-nav="studio">创作中心</button>
   </nav>
   <div class="spacer"></div>
-  <input class="search-box" placeholder="搜索游戏或同学（即将上线）" disabled>
+  <div class="search-wrap">
+    <input class="search-box" id="search-input" placeholder="搜索游戏或同学" autocomplete="off">
+    <div class="search-panel" id="search-panel"></div>
+  </div>
   <button class="theme-toggle" id="theme-toggle" title="切换日间 / 夜间" aria-label="切换日间夜间模式">
     <svg class="ico-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.4v2.2M12 19.4v2.2M2.4 12h2.2M19.4 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/></svg>
     <svg class="ico-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.6 8.6 0 0 1 9.5 3.5a8.6 8.6 0 1 0 11 11z"/></svg>
@@ -919,15 +1028,17 @@
             <button class="filter-chip" data-filter="dl">桌面 / 手机版</button>
           </div>
         </div>
+        <div class="author-bar" id="author-bar">
+          <span id="author-bar-text"></span>
+          <button class="ab-x" id="author-bar-x">清除筛选 ✕</button>
+        </div>
         <div class="game-grid" id="game-grid"></div>
       </div>
       <div class="sidebar">
         <div class="sidebar-inner">
           <div class="side-card">
             <h4>新品速递</h4>
-            <div class="news-item" data-open="17">回声花园 · 昨日上架<span class="new-flag">NEW</span></div>
-            <div class="news-item" data-open="29">孤剑试炼 · 3 天前</div>
-            <div class="news-item" data-open="24">黄昏轮回 · 上周</div>
+            <div id="news-list"></div>
           </div>
           <div class="side-card">
             <h4>站点数据</h4>
@@ -1013,12 +1124,45 @@
 
   <!-- ===== 个人中心（游客模式） ===== -->
   <section id="view-me" class="view">
-    <div class="todo-page">
-      <h3>游客模式 · 无需登录</h3>
-      <p>当前可以自由浏览和试玩全部游戏，热度来自所有游客的浏览与小红花。</p>
-      <p>游玩时长、成就徽章、好友动态等记录功能将在后续版本开放。</p>
-    </div>
+    <div class="me-wrap" id="me-page"></div>
   </section>
+
+  <!-- 登录 / 注册 -->
+  <div class="auth-mask" id="auth-mask">
+    <div class="auth-card">
+      <h3 id="auth-title">登录校游社</h3>
+      <div class="auth-sub">用学号登录，送花和游玩记录会存到服务器上。</div>
+      <div class="auth-tabs">
+        <button id="auth-tab-login" class="on">登录</button>
+        <button id="auth-tab-register">首次注册</button>
+      </div>
+      <div class="auth-field">
+        <label>学号</label>
+        <input id="auth-sid" inputmode="numeric" placeholder="例如 2025301xxx" autocomplete="username">
+      </div>
+      <div class="auth-field">
+        <label>密码</label>
+        <input id="auth-pw" type="password" placeholder="至少 6 位" autocomplete="current-password">
+      </div>
+      <div id="auth-reg-extra" style="display:none;">
+        <div class="auth-field">
+          <label>昵称（可不填）</label>
+          <input id="auth-nick" placeholder="显示在个人中心" maxlength="20">
+        </div>
+        <div class="auth-field">
+          <label>班级（可不填）</label>
+          <input id="auth-cls" placeholder="例如 计算机26301" maxlength="30">
+        </div>
+      </div>
+      <div class="auth-err" id="auth-err"></div>
+      <button class="btn-primary" id="auth-submit">登录</button>
+      <div class="auth-foot">
+        <a id="auth-guest">先随便逛逛</a>
+        <a id="auth-switch">没有账号？去注册</a>
+      </div>
+    </div>
+  </div>
+  <div id="toast"></div>
 
   <!-- ===== 社区 / 创作中心 占位 ===== -->
   <section id="view-community" class="view">
@@ -1089,6 +1233,7 @@ const GAMES = [
   {
     id: 1, title: '第七号样本：残影', tag: '校园', cat: 'play', genre: '平台解谜', mode: '单人',
     byline: '人工智能26303 · 赵文珺 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
     coverBg: '#085041', coverFg: '#5DCAA5', featured: true,
     tags: ['解谜', '像素风', '钥匙收集', '时序门'],
@@ -1100,6 +1245,7 @@ const GAMES = [
   },
   { id: 2, title: 'NEON STRIKE · 霓虹突击', tag: '校园', cat: 'play', genre: '动作射击', mode: '单人',
     byline: '云计算25301 · 路顺 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#085041', coverFg: '#5DCAA5',
     tags: ['射击', '霓虹', '街机'],
@@ -1110,6 +1256,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 3, title: '星球清道夫 · 净土计划', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
     byline: '云计算25302 · 尹源鑫 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#712B13', coverFg: '#F0997B',
     tags: ['休闲', '消除', '环保'],
@@ -1120,6 +1267,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 4, title: '鼠鼠大逃亡', tag: '校园', cat: 'play', genre: '跑酷', mode: '单人',
     byline: '云计算25302 · 张学通 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#0C447C', coverFg: '#85B7EB',
     tags: ['跑酷', '收集', '可爱'],
@@ -1130,6 +1278,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 5, title: '苍穹防线 · 飞机大战', tag: '校园', cat: 'play', genre: '射击', mode: '单人',
     byline: '云计算25302 · 王佳旭 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#27500A', coverFg: '#97C459',
     tags: ['射击', '飞机', '弹幕'],
@@ -1140,6 +1289,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 6, title: '微光守护 · Glimmer Watch', tag: '校园', cat: 'play', genre: '生存', mode: '单人',
     byline: '云计算25302 · 王文翰 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#72243E', coverFg: '#ED93B1',
     tags: ['生存', '氛围', '像素'],
@@ -1150,6 +1300,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 7, title: '第 4 厂 · 削土豆的人', tag: '校园', cat: 'play', genre: '叙事', mode: '单人',
     byline: '云计算25302 · 王津 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#26215C', coverFg: '#AFA9EC',
     tags: ['叙事', '剧情', '模拟'],
@@ -1160,6 +1311,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 8, title: '成语猎人', tag: '校园', cat: 'play', genre: '教育', mode: '单人',
     byline: '云计算25302 · 邱文龙 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#633806', coverFg: '#EF9F27',
     tags: ['教育', '成语', '答题'],
@@ -1170,6 +1322,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 9, title: '萌味餐厅 · 3D厨房', tag: '校园', cat: 'play', genre: '经营', mode: '单人',
     byline: '云计算26302 · 张子涵 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#185FA5', coverFg: '#E6F1FB',
     tags: ['经营', '3D', '模拟'],
@@ -1179,6 +1332,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 10, title: '擂茶小馆', tag: '校园', cat: 'play', genre: '经营', mode: '单人',
     byline: '人工智能25301 · 刘晓晴 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#085041', coverFg: '#5DCAA5',
     tags: ['经营', '美食', '传统文化'],
@@ -1188,6 +1342,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 11, title: '萝卜猎手', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
     byline: '人工智能25302 · 周文博 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#712B13', coverFg: '#F0997B',
     tags: ['休闲', '农场', '收集'],
@@ -1198,6 +1353,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 12, title: '警笛之下 · Under the Siren', tag: '校园', cat: 'play', genre: '解谜', mode: '单人',
     byline: '人工智能25302 · 张云鹏 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#0C447C', coverFg: '#85B7EB',
     tags: ['解谜', '悬疑', '剧情'],
@@ -1208,6 +1364,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 13, title: '汽车大逃杀 · 公路关卡战', tag: '校园', cat: 'play', genre: '竞速', mode: '单人',
     byline: '人工智能25302 · 张占磊 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#27500A', coverFg: '#97C459',
     tags: ['竞速', '对战', '关卡'],
@@ -1218,6 +1375,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 14, title: '星际突击', tag: '校园', cat: 'play', genre: '射击', mode: '单人',
     byline: '人工智能26301 · 赵宏奥 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#72243E', coverFg: '#ED93B1',
     tags: ['射击', '太空', '街机'],
@@ -1227,6 +1385,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 15, title: '小鱼快游 · 桂圆鱼', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
     byline: '人工智能26302 · 于慧源 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#26215C', coverFg: '#AFA9EC',
     tags: ['休闲', '海洋', '养成'],
@@ -1237,6 +1396,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 16, title: '雪岭速降 SNOWLINE RUSH', tag: '校园', cat: 'play', genre: '跑酷', mode: '单人',
     byline: '大数据25301 · 李昊坤 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#633806', coverFg: '#EF9F27',
     tags: ['跑酷', '滑雪', 'AI自适应'],
@@ -1246,6 +1406,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 17, title: '回声花园 · Echo Garden', tag: '校园', cat: 'play', genre: '模拟', mode: '单人',
     byline: '大数据25302 · 张熠阳 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#185FA5', coverFg: '#E6F1FB',
     tags: ['模拟', '治愈', '种花'],
@@ -1255,6 +1416,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 18, title: 'AI 娘格斗 · 算力擂台', tag: '校园', cat: 'play', genre: '格斗', mode: '单人',
     byline: '大数据26301 · 孙凯文 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#085041', coverFg: '#5DCAA5',
     tags: ['格斗', '对战', '算力'],
@@ -1265,6 +1427,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 19, title: '迷雾画廊', tag: '校园', cat: 'play', genre: '解谜', mode: '单人',
     byline: '大数据26301 · 李静怡 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#712B13', coverFg: '#F0997B',
     tags: ['解谜', '推理', 'AI沉浸'],
@@ -1274,6 +1437,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 20, title: '星界远征', tag: '校园', cat: 'play', genre: '冒险', mode: '单人',
     byline: '大数据26303 · 张永康 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#0C447C', coverFg: '#85B7EB',
     tags: ['冒险', '探索', '星际'],
@@ -1283,6 +1447,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 21, title: '月面清道夫 · Moon Sweeper', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
     byline: '大数据26303 · 李晨洁 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#27500A', coverFg: '#97C459',
     tags: ['休闲', '太空', '清扫'],
@@ -1293,6 +1458,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 22, title: '星火拾荒者 · SPARK SCAVENGER', tag: '校园', cat: 'play', genre: '动作', mode: '单人',
     byline: '物联网26303 · 程振一 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#72243E', coverFg: '#ED93B1',
     tags: ['动作', '拾荒', '末日'],
@@ -1303,6 +1469,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 23, title: '传感器守护者 · 仓库布防', tag: '校园', cat: 'play', genre: '塔防', mode: '单人',
     byline: '物联网26303 · 陈子涵 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#26215C', coverFg: '#AFA9EC',
     tags: ['塔防', '策略', '仓库'],
@@ -1312,6 +1479,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 24, title: '黄昏轮回 · 英灵试炼', tag: '校园', cat: 'play', genre: 'RPG', mode: '单人',
     byline: '计算机25301 · 崔皓泽 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#633806', coverFg: '#EF9F27',
     tags: ['RPG', 'Roguelike', '北欧'],
@@ -1321,6 +1489,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 25, title: '残域余烬：归途', tag: '校园', cat: 'play', genre: '生存', mode: '单人',
     byline: '计算机26301 · 徐茂恒 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#185FA5', coverFg: '#E6F1FB',
     tags: ['生存', '营地', '末日'],
@@ -1330,6 +1499,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 26, title: '地牢逃途', tag: '校园', cat: 'play', genre: 'RPG', mode: '单人',
     byline: '计算机26301 · 谢宸琳 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#085041', coverFg: '#5DCAA5',
     tags: ['RPG', '地牢', '可玩'],
@@ -1339,6 +1509,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 27, title: '海底大作战 · 答题闯关', tag: '校园', cat: 'play', genre: '教育', mode: '单人',
     byline: '计算机26302 · 李国盛 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#712B13', coverFg: '#F0997B',
     tags: ['教育', '四大名著', '答题'],
@@ -1349,6 +1520,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 28, title: 'Q版泡泡堂 · 水球大作战', tag: '校园', cat: 'play', genre: '对战', mode: '单人',
     byline: '计算机26302 · 李恒达 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#0C447C', coverFg: '#85B7EB',
     tags: ['对战', '泡泡堂', '水球'],
@@ -1359,6 +1531,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 29, title: '孤剑试炼 · Lone Blade Trials', tag: '校园', cat: 'play', genre: '动作', mode: '单人',
     byline: '计算机26302 · 李金坤 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#27500A', coverFg: '#97C459',
     tags: ['动作', '武侠', '试炼'],
@@ -1369,6 +1542,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 30, title: '星际逃亡', tag: '校园', cat: 'video', genre: '策略', mode: '单人',
     byline: '信息技术系云计算25301 · 尹相洁 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/xingji-taowang/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#72243E', coverFg: '#ED93B1',
@@ -1377,6 +1551,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 31, title: '死仓', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
     byline: '信息技术系云计算25302 · 尹领 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/sicang/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#26215C', coverFg: '#AFA9EC',
@@ -1385,6 +1560,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 32, title: '果冻合成大作战 · 马卡龙', tag: '校园', cat: 'video', genre: '休闲', mode: '单人',
     byline: '信息技术系云计算25301 · 李虹洁 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/guodong-hecheng/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#633806', coverFg: '#EF9F27',
@@ -1393,22 +1569,25 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 33, title: '心动的声音', tag: '校园', cat: 'video', genre: '音游', mode: '单人',
     byline: '信息技术系云计算25301 · 兰文轩 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/xindong-shengyin/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#185FA5', coverFg: '#E6F1FB',
     tags: ['智游杯', '敬请期待'],
     desc: '声音主题作品，含演示视频与简介。',
     devlog: '暂无开发者日志。' },
-  { id: 34, title: '未命名作品', tag: '校园', cat: 'video', genre: '其他', mode: '单人',
+  { id: 34, title: '一剑江湖', tag: '校园', cat: 'video', genre: '武侠 Roguelike', mode: '单人',
     byline: '信息技术系云计算25301 · 高梓祺 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/gaofuzhi-demo/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#085041', coverFg: '#5DCAA5',
-    tags: ['智游杯', '敬请期待'],
-    desc: '含演示视频与作品简介。',
-    devlog: '暂无开发者日志。' },
+    tags: ['水墨', '武侠', 'Roguelike', '横版动作'],
+    desc: '水墨武侠 Roguelike 横版动作，故事从「一剑入山庄，救回师妹」起笔。剑术近身或法术远程二选一，沿七程三十处机缘的分支地图前行，在战斗、奇遇、货铺与黑市之间取舍。兵器会真正改写弹道形态，六式连段配闪避与随行灵体。作者提交的演示站链接已失效，暂时只能看演示视频。',
+    devlog: '作者自述：全站纯静态，手机与电脑皆可直接游玩；提交时附的临时隧道地址已过期。' },
   { id: 35, title: '蓝色鲸鱼小姐', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
     byline: '信息技术系云计算26302 · 李佳晓 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/lanse-jingyu/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#712B13', coverFg: '#F0997B',
@@ -1417,6 +1596,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 36, title: '疾风闪避', tag: '校园', cat: 'video', genre: '跑酷', mode: '单人',
     byline: '信息技术系云计算26301 · 张文 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/jifeng-shanbi/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#0C447C', coverFg: '#85B7EB',
@@ -1425,6 +1605,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 37, title: '渊途铸甲 · 像素地牢', tag: '校园', cat: 'play', genre: 'Roguelike', mode: '单人',
     byline: '信息技术系人工智能25302 · 杨子钦 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/yuantu-zhujia/cover.jpg', previewVid: '/games/yuantu-zhujia/preview.mp4',
     demo: true,
     playUrl: 'https://yuantu-zhuajia.app.workbuddy.host/?sharecode=I2G776G7R4',
@@ -1435,6 +1616,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 38, title: '接糖果 Catch', tag: '校园', cat: 'video', genre: '休闲', mode: '单人',
     byline: '信息技术系人工智能25303 · 元欣宇 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/jie-tangguo/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#72243E', coverFg: '#ED93B1',
@@ -1443,6 +1625,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 39, title: '经验地牢 · 二次开发', tag: '校园', cat: 'dl', genre: 'RPG', mode: '单人',
     byline: '信息技术系人工智能25302 · 张凌宇 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/jingyan-dilao/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#26215C', coverFg: '#AFA9EC',
@@ -1451,6 +1634,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 40, title: '魔法高塔', tag: '校园', cat: 'dl', genre: 'RPG', mode: '单人',
     byline: '信息技术系计算机25301 · 李文豪 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/mofa-gaota/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#633806', coverFg: '#EF9F27',
@@ -1459,6 +1643,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 41, title: '60Days', tag: '校园', cat: 'dl', genre: '生存', mode: '单人',
     byline: '信息技术系计算机26301 · 蒋雪韬 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/60days/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#185FA5', coverFg: '#E6F1FB',
@@ -1467,6 +1652,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 42, title: 'RuralFarm · 田园物语', tag: '校园', cat: 'dl', genre: '经营', mode: '单人',
     byline: '信息技术系人工智能26303 · 郭淑琳 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/rural-farm/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#085041', coverFg: '#5DCAA5',
@@ -1475,6 +1661,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 43, title: '逐光旅途', tag: '校园', cat: 'play', genre: '动作闯关', mode: '单人',
     byline: '信息技术系计算机26301 · 刘家豪 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/zhuguang-lvtu/cover.jpg', previewVid: '/games/zhuguang-lvtu/preview.mp4',
     demo: true,
     playUrl: 'https://zhuguang-journey.app.workbuddy.host/?sharecode=J2ZVJDYKH5',
@@ -1485,6 +1672,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 44, title: '异境回响', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
     byline: '信息技术系计算机26301 · 马越 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/yijing-huixiang/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#0C447C', coverFg: '#85B7EB',
@@ -1493,6 +1681,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 45, title: '铁誓 · 边陲余生', tag: '校园', cat: 'play', genre: '生存 RPG', mode: '单人',
     byline: '信息技术系计算机26301 · 张煜埕 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/tieshi-bianchui/cover.jpg', previewVid: '/games/tieshi-bianchui/preview.mp4',
     demo: true,
     playUrl: 'https://iron-oath.app.workbuddy.host/?sharecode=N3LVXXYARA',
@@ -1503,6 +1692,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 46, title: '岸边的一天', tag: '校园', cat: 'play', genre: '钓鱼养成', mode: '单人',
     byline: '信息技术系计算机26301 · 林健 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/anbian/cover.jpg', previewVid: '/games/anbian/preview.mp4',
     demo: true,
     playUrl: 'https://riverside-fishing.app.workbuddy.host/?sharecode=CO25JAK4TP',
@@ -1513,6 +1703,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 47, title: 'Flee', tag: '校园', cat: 'video', genre: '跑酷', mode: '单人',
     byline: '信息技术系大数据26301 · 陈月娇 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/flee/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#26215C', coverFg: '#AFA9EC',
@@ -1521,6 +1712,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 48, title: '霓虹断点', tag: '校园', cat: 'video', genre: '动作', mode: '单人',
     byline: '信息技术系大数据26303 · 刘小雨 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/hongdian/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#633806', coverFg: '#EF9F27',
@@ -1529,6 +1721,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 49, title: '灵动小猫 · 星夜奇旅', tag: '校园', cat: 'video', genre: '冒险', mode: '单人',
     byline: '信息技术系物联网26303 · 徐隆昊 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/lingdong-xiaomao/cover.jpg',
     views: 0, weekViews: 0, flowers: 0, cleared: 0,
     coverBg: '#185FA5', coverFg: '#E6F1FB',
@@ -1537,6 +1730,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 50, title: '文明战棋 · 六边形回合制', tag: '校园', cat: 'play', genre: '策略战棋', mode: '单人',
     byline: '信息技术系大数据25301 · 王惟鹏 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/wenming-zhanqi/cover.jpg', previewVid: '/games/wenming-zhanqi/preview.mp4',
     demo: true,
     playUrl: 'https://civ-mvp.app.workbuddy.host/?sharecode=MJVBPB2RJR',
@@ -1547,6 +1741,7 @@ const GAMES = [
     devlog: '暂无开发者日志。' },
   { id: 51, title: '新宿决战 · 术式对决', tag: '校园', cat: 'play', genre: '动作对战', mode: '单人',
     byline: '信息技术系云计算25301 · 贾昀锴 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
     coverImg: '/games/juzhen-jueji/cover.jpg', previewVid: '/games/juzhen-jueji/preview.mp4',
     demo: true,
     playUrl: 'https://xkt-d4g0e5uxs792b655e-1482562258.tcloudbaseapp.com/%E7%9F%A9%E9%98%B5%E6%A8%A1%E5%9E%8B%E6%B5%8B%E8%AF%951/index.html',
@@ -1555,6 +1750,56 @@ const GAMES = [
     tags: ['动作', 'BOSS 战', '技能搭配', '1.6.17'],
     desc: '操控五条悟挑战三轮小怪，最后面对宿傩。困难以上会追加魔虚罗与嵌合兽，宿傩进三阶段后拖时间已经没用了。击败三阶段后还有剧情 CG，「向南」难度通关五次会解锁隐藏关卡。',
     devlog: '暂无开发者日志。' },
+  { id: 52, title: '斗兽棋 · 兽战', tag: '校园', cat: 'play', genre: '棋类', mode: '单人',
+    byline: '信息技术系大数据26303 · 王浩名 · 第一届智游杯初赛',
+    addedAt: '2026-11-23',
+    coverImg: '/games/doushouqi/cover.jpg',
+    playUrl: 'https://a697a1a1fef1e8bb6.app.workbuddy.host/?sharecode=3URWBU2HCZ',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
+    coverBg: '#1F3A2C', coverFg: '#9BD5A8',
+    tags: ['棋类', '丛林棋', '回合制', '五分钟一局'],
+    desc: '经典的丛林棋：八种动物按大小吃子，只有老鼠能下河、狮子老虎能跳河，进了对方兽穴就赢。棋盘小、回合快，输赢多半在开局那几步换子。',
+    devlog: '暂无开发者日志。' },
+  { id: 53, title: '农场物语 · Tile Farm', tag: '校园', cat: 'play', genre: '经营养成', mode: '单人',
+    byline: '信息技术系计算机26301 · 吴昌朔 · 第一届智游杯初赛',
+    addedAt: '2026-11-23',
+    coverImg: '/games/nongchang-wuyu/cover.jpg',
+    playUrl: 'https://isometric-farm.app.workbuddy.host/?sharecode=BDXRHECZ6S',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
+    coverBg: '#3B2E12', coverFg: '#E4C07A',
+    tags: ['Phaser3', '等轴测', '种田', '村民好感'],
+    desc: 'Phaser3 做的等轴测田园经营：翻地、播种、浇水、收获，村民会在自家门前自己种地，还能刷好感、接任务、下矿。自带新手引导和菜单读档。',
+    devlog: '暂无开发者日志。' },
+  { id: 54, title: '深渊回响 · 俯视角肉鸽', tag: '校园', cat: 'play', genre: 'Roguelike', mode: '单人',
+    byline: '信息技术系计算机26301 · 罗嘉林 · 第一届智游杯初赛',
+    addedAt: '2026-11-23',
+    coverImg: '/games/shenyuan-huixiang/cover.jpg',
+    playUrl: 'https://abyssal-echo-17695.app.workbuddy.host/?sharecode=NEHPMEZAYL',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
+    coverBg: '#2A1030', coverFg: '#C9A0E8',
+    tags: ['动作肉鸽', '双摇杆射击', '10 职业', '无尽模式'],
+    desc: '清场、挑门、捡枪、注魔，一层层往深渊下潜。10 职业、20 幕 100 层、20 个 Boss、23 把武器。撤离信标亮起时，是见好就收还是再赌一层。WASD 移动、鼠标射击、空格冲刺。',
+    devlog: '暂无开发者日志。' },
+  { id: 55, title: '字味小馆', tag: '校园', cat: 'play', genre: '文字解谜', mode: '单人',
+    byline: '信息技术系计算机26302 · 张智博 · 第一届智游杯初赛',
+    addedAt: '2026-11-23',
+    coverImg: '/games/ziwei-xiaoguan/cover.jpg',
+    playUrl: 'https://app-fowi6dz9cm4h.miaoda.online/',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
+    coverBg: '#4A2B21', coverFg: '#F0B79A',
+    tags: ['汉字', '偏旁拼字', '模拟经营'],
+    desc: '用偏旁拼字的点菜小游戏：客人点的字被拆成部件摆在推车上，拼对了才上得了菜。偏旁数量有限，还得算着先给哪桌。',
+    devlog: '暂无开发者日志。' },
+  { id: 56, title: '节奏音游', tag: '校园', cat: 'play', genre: '音乐', mode: '单人',
+    byline: '信息技术系云计算26301 · 肖祥荣 · 第一届智游杯初赛',
+    addedAt: '2026-11-23',
+    coverImg: '/games/jiezou-yinyou/cover.jpg',
+    playUrl: 'https://snake-game-56862.app.workbuddy.host/?sharecode=C2NXOQXTNH',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
+    coverBg: '#12203A', coverFg: '#8FC4F0',
+    tags: ['音游', '节奏', '竖屏可玩'],
+    desc: '体量很小的网页音游，跟着节拍踩准拍点。手机上竖屏能玩，电脑也能开。',
+    devlog: '暂无开发者日志。' }
 ];
 
 /* ================= 本机数据持久化 =================
@@ -1574,6 +1819,219 @@ function recordStat(g) {
   statsStore[g.id] = { v: g.views, w: g.weekViews, f: g.flowers, m: g.myFlower ? 1 : 0 };
   saveStats();
 }
+
+/* ================= 云端：学号登录 / 小红花额度 / 点击与时长 ================= */
+const TOKEN_KEY = 'ninth_token';
+const Cloud = { on: false, token: null, me: null, games: {}, reason: '' };
+try { Cloud.token = localStorage.getItem(TOKEN_KEY) || null; } catch (e) {}
+
+function api(path, body) {
+  const init = { method: body === undefined ? 'GET' : 'POST', headers: {} };
+  if (body !== undefined) {
+    init.headers['content-type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  if (Cloud.token) init.headers.authorization = 'Bearer ' + Cloud.token;
+  return fetch('/api/' + path, init)
+    .then(r => r.json().then(j => ({ status: r.status, body: j })).catch(() => ({ status: r.status, body: {} })))
+    .catch(() => ({ status: 0, body: { ok: false, error: 'NETWORK' } }));
+}
+function saveToken(t) {
+  Cloud.token = t || null;
+  try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+}
+function fmtDuration(sec) {
+  const s = Math.round(sec || 0);
+  if (s < 60) return s + ' 秒';
+  if (s < 3600) return Math.floor(s / 60) + ' 分钟';
+  const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+  return h + ' 小时' + (m ? ' ' + m + ' 分' : '');
+}
+function applyCloudStats() {
+  if (!Cloud.on) return;
+  GAMES.forEach(g => {
+    const st = Cloud.games[g.id];
+    if (!st) return;
+    g.views = st.clicks || 0;
+    g.weekViews = st.weekClicks || 0;
+    g.flowers = st.flowers || 0;
+    g.seconds = st.seconds || 0;
+  });
+  if (Cloud.me) {
+    const mine = Cloud.me.myFlowers || [];
+    GAMES.forEach(g => { g.myFlower = mine.includes(g.id); });
+  }
+}
+async function initCloud() {
+  const r = await api('summary');
+  if (r.status === 200 && r.body && r.body.ok) {
+    Cloud.on = true;
+    Cloud.games = r.body.games || {};
+    Cloud.me = r.body.me || null;
+    applyCloudStats();
+    return true;
+  }
+  Cloud.on = false;
+  Cloud.reason = (r.body && (r.body.message || r.body.error)) || '后端还没接上';
+  return false;
+}
+function toast(msg, ms) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('show'), ms || 2200);
+}
+
+/* ---- 登录 / 注册 ---- */
+let authMode = 'login';
+function paintAuth() {
+  const isLogin = authMode === 'login';
+  document.getElementById('auth-tab-login').classList.toggle('on', isLogin);
+  document.getElementById('auth-tab-register').classList.toggle('on', !isLogin);
+  document.getElementById('auth-title').textContent = isLogin ? '登录校游社' : '注册新账号';
+  document.getElementById('auth-reg-extra').style.display = isLogin ? 'none' : 'block';
+  document.getElementById('auth-submit').textContent = isLogin ? '登录' : '注册并登录';
+  document.getElementById('auth-switch').textContent = isLogin ? '没有账号？去注册' : '已经有账号？去登录';
+  document.getElementById('auth-err').textContent = '';
+}
+function openAuth(mode) {
+  authMode = mode || 'login';
+  paintAuth();
+  document.getElementById('auth-mask').classList.add('show');
+  setTimeout(() => document.getElementById('auth-sid').focus(), 60);
+}
+function closeAuth() {
+  document.getElementById('auth-mask').classList.remove('show');
+}
+async function submitAuth() {
+  const sid = document.getElementById('auth-sid').value.trim();
+  const pw = document.getElementById('auth-pw').value;
+  const err = document.getElementById('auth-err');
+  err.textContent = '';
+  if (!/^[0-9A-Za-z]{4,20}$/.test(sid)) { err.textContent = '学号填 4–20 位数字或字母'; return; }
+  if (pw.length < 6) { err.textContent = '密码至少 6 位'; return; }
+  const btn = document.getElementById('auth-submit');
+  btn.disabled = true;
+  const payload = { sid, password: pw };
+  if (authMode !== 'login') {
+    payload.nickname = document.getElementById('auth-nick').value.trim();
+    payload.cls = document.getElementById('auth-cls').value.trim();
+  }
+  const r = await api(authMode === 'login' ? 'login' : 'register', payload);
+  btn.disabled = false;
+  if (r.status === 0) { err.textContent = '连不上服务器，检查一下网络或后端是否已部署'; return; }
+  if (!r.body || !r.body.ok) {
+    err.textContent = (r.body && (r.body.error === 'D1_NOT_BOUND' ? '后端数据库还没绑定' : r.body.error)) || '出错了，再试一次';
+    if (r.body && r.body.error === 'D1_NOT_BOUND') err.textContent = '后端数据库还没绑定，先看部署说明';
+    return;
+  }
+  saveToken(r.body.token);
+  Cloud.me = r.body.user;
+  Cloud.on = true;
+  await initCloud();
+  closeAuth();
+  renderMe();
+  renderTopAvatar();
+  if (currentGame) renderFlowerBtn();
+  toast('欢迎，' + (Cloud.me.nickname || Cloud.me.sid));
+}
+async function doLogout() {
+  await api('logout', {});
+  saveToken(null);
+  Cloud.me = null;
+  GAMES.forEach(g => { g.myFlower = false; });
+  renderMe();
+  renderTopAvatar();
+  if (currentGame) renderFlowerBtn();
+  toast('已退出登录');
+}
+
+/* ---- 个人中心 ---- */
+function renderMe() {
+  const box = document.getElementById('me-page');
+  if (!box) return;
+  if (!Cloud.me) {
+    box.innerHTML =
+      '<div class="me-card">' +
+        '<div class="me-head">' +
+          '<div class="me-avatar">客</div>' +
+          '<div><div class="me-name">游客模式</div>' +
+          '<div class="me-meta">' + (Cloud.on ? '登录后可以送小红花、记录游玩时长' : '云端还没接上，当前是本地记录') + '</div></div>' +
+        '</div>' +
+        '<div class="me-actions">' +
+          '<button class="btn-primary" id="me-login">学号登录</button>' +
+          (Cloud.on ? '<button class="btn-ghost" id="me-register">首次注册</button>' : '') +
+        '</div>' +
+        '<p class="me-hint" style="margin-top:14px;">登录后：每个账号每天 10 朵小红花，给喜欢的作品；每款游戏的点击次数与游玩时长会计入全站统计。</p>' +
+      '</div>' +
+      (Cloud.on ? '' : '<div class="me-card"><p class="me-hint">后端未连接：' + (Cloud.reason || '') + '</p></div>');
+    const b1 = document.getElementById('me-login');
+    if (b1) b1.addEventListener('click', () => openAuth('login'));
+    const b2 = document.getElementById('me-register');
+    if (b2) b2.addEventListener('click', () => openAuth('register'));
+    return;
+  }
+  const me = Cloud.me;
+  const left = Math.max(0, (me.dailyLimit || 10) - (me.todayFlowers || 0));
+  const mine = GAMES.filter(g => authorName(g) === (me.nickname || '')).length;
+  box.innerHTML =
+    '<div class="me-card">' +
+      '<div class="me-head">' +
+        '<div class="me-avatar">' + (me.nickname || me.sid).slice(0, 1) + '</div>' +
+        '<div><div class="me-name">' + (me.nickname || ('学号 ' + me.sid)) + '</div>' +
+        '<div class="me-meta">' + (me.cls ? me.cls + ' · ' : '') + '学号 ' + me.sid + '</div></div>' +
+      '</div>' +
+      '<div class="me-rows">' +
+        '<div class="me-row"><div class="k">今天剩余小红花</div><div class="v">' + left + ' / ' + (me.dailyLimit || 10) + '</div></div>' +
+        '<div class="me-row"><div class="k">今天已送出</div><div class="v">' + (me.todayFlowers || 0) + '</div></div>' +
+        '<div class="me-row"><div class="k">我的作品</div><div class="v">' + mine + ' 部</div></div>' +
+      '</div>' +
+      '<div class="quota-bar"><i style="width:' + Math.round((me.todayFlowers || 0) / (me.dailyLimit || 10) * 100) + '%"></i></div>' +
+      '<div class="me-actions">' +
+        '<button class="btn-ghost" id="me-logout">退出登录</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="me-card"><p class="me-hint">送花规则：每个账号每天 10 朵，同一款作品当天只能送 1 朵，隔天可以再送。点开作品就算一次点击，在弹窗里玩的时间会计入游玩时长。</p></div>';
+  document.getElementById('me-logout').addEventListener('click', doLogout);
+}
+function renderTopAvatar() {
+  const el = document.querySelector('.avatar');
+  if (!el) return;
+  if (Cloud.me) {
+    el.textContent = (Cloud.me.nickname || Cloud.me.sid).slice(0, 1);
+    el.title = (Cloud.me.nickname || Cloud.me.sid) + ' · 个人中心';
+  } else {
+    el.textContent = '客';
+    el.title = '游客模式';
+  }
+}
+
+/* ---- 游玩时长上报 ---- */
+let playTimer = null, playStart = 0, playGameId = null;
+function flushPlay() {
+  if (!playGameId || !Cloud.on) { playStart = Date.now(); return; }
+  const sec = Math.round((Date.now() - playStart) / 1000);
+  playStart = Date.now();
+  if (sec >= 5) api('play', { gameId: playGameId, seconds: sec });
+}
+function startPlayTimer(g) {
+  stopPlayTimer();
+  if (!Cloud.on) return;
+  playGameId = g.id;
+  playStart = Date.now();
+  playTimer = setInterval(flushPlay, 20000);
+}
+function stopPlayTimer() {
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  if (playGameId) flushPlay();
+  playGameId = null;
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) flushPlay();
+  else playStart = Date.now();
+});
 
 /* SVG 小图标：小红花 / 小眼睛 */
 const FLOWER_ICON = '<svg width="13" height="13" viewBox="0 0 20 20" style="vertical-align:-2px;"><g fill="#E24B4A"><circle cx="10" cy="4" r="3.4"/><circle cx="15.7" cy="8.1" r="3.4"/><circle cx="13.5" cy="14.9" r="3.4"/><circle cx="6.5" cy="14.9" r="3.4"/><circle cx="4.3" cy="8.1" r="3.4"/></g><circle cx="10" cy="10" r="3.1" fill="#FAC775"/></svg>';
@@ -1704,20 +2162,50 @@ M.full.addEventListener('click', (e) => {
 
 /* ================= 视图切换 ================= */
 let curFilter = 'all';
-function showView(name) {
+let authorFilter = '';   // 只看某位同学的作品
+
+/* ================= 视图切换 + 浏览器历史 =================
+   首页/排行榜/详情/游玩 都记一条 history，浏览器 ← 回到上一屏，而不是跳出站外。 */
+function paintView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.getElementById('view-' + name).classList.add('active');
+  const el = document.getElementById('view-' + name);
+  if (el) el.classList.add('active');
   document.querySelectorAll('.nav-tabs button, .tabbar button').forEach(b => {
     b.classList.toggle('active', b.dataset.nav === name);
   });
   // 回到首页/排行榜时重渲染，让小红花和浏览量显示最新值
-  if (name === 'home') renderGrid(curFilter);
+  if (name === 'home') { renderGrid(curFilter); renderNews(); }
   if (name === 'rank') renderRankTable();
+  if (name === 'me') renderMe();
   if (name !== 'detail') pauseMedia();
   window.scrollTo(0, 0);
 }
+function showView(name, opts) {
+  opts = opts || {};
+  paintView(name);
+  if (!opts.fromHistory) {
+    try { history.pushState({ v: name }, '', '#' + name); } catch (e) {}
+  }
+}
 document.querySelectorAll('[data-nav]').forEach(el => {
   el.addEventListener('click', () => showView(el.dataset.nav));
+});
+
+window.addEventListener('popstate', (e) => {
+  const st = e.state || { v: 'home' };
+  if (st.v === 'play') return;                     // 已经在这一层
+  if (document.getElementById('play-modal').classList.contains('show')) {
+    closePlayModal({ fromHistory: true });
+    if (st.v === 'detail') return;                 // 弹窗关掉正好是详情页
+  }
+  if (st.v === 'detail' && st.id) {
+    // 已经在这一页就别重复 openDetail，否则浏览数会被点一次算两次
+    const same = currentGame && currentGame.id === st.id &&
+      document.getElementById('view-detail').classList.contains('active');
+    if (!same) openDetail(st.id, { fromHistory: true });
+    return;
+  }
+  paintView(st.v || 'home');
 });
 
 /* ================= 首页横幅（日间 / 夜间双图） ================= */
@@ -1764,7 +2252,8 @@ function stopCoverVid(el) {
 function renderGrid(filter) {
   curFilter = filter;
   const grid = document.getElementById('game-grid');
-  const list = GAMES.filter(g => filter === 'all' || g.cat === filter);
+  let list = GAMES.filter(g => filter === 'all' || g.cat === filter);
+  if (authorFilter) list = list.filter(g => authorName(g) === authorFilter);
   grid.innerHTML = '';
   list.forEach(g => {
     const tagCls = g.tag === '校园' ? 'tag-school' : 'tag-import';
@@ -1811,7 +2300,8 @@ document.querySelectorAll('[data-open]').forEach(el => {
 
 /* ================= 详情页 ================= */
 let currentGame = null;
-function openDetail(id) {
+function openDetail(id, opts) {
+  opts = opts || {};
   const g = GAMES.find(x => x.id === id);
   if (!g) return;
   currentGame = g;
@@ -1827,25 +2317,51 @@ function openDetail(id) {
   g.views++; // 游客每次点开，浏览数 +1（存本机 localStorage，刷新不丢）
   recordStat(g);
   document.getElementById('detail-stats').innerHTML =
-    stat('总浏览量', g.views.toLocaleString()) +
-    stat('本周浏览', g.weekViews.toLocaleString()) +
+    stat('累计点击', g.views.toLocaleString()) +
+    stat('本周点击', g.weekViews.toLocaleString()) +
     stat('小红花', g.flowers.toLocaleString(), 'pink') +
-    stat('通关人数', g.cleared.toLocaleString() + ' 人');
+    stat('累计游玩', fmtDuration(g.seconds));
+  if (Cloud.on) {
+    api('click', { gameId: g.id }).then(r => {
+      if (r.body && r.body.ok && typeof r.body.clicks === 'number') g.views = r.body.clicks;
+    });
+  }
   document.getElementById('detail-desc').textContent = g.desc;
   document.getElementById('devlog-text').textContent = g.devlog || '暂无日志。';
   renderFlowerBtn();
-  showView('detail');
+  showView('detail', { fromHistory: opts.fromHistory });
+  if (!opts.fromHistory) {
+    try { history.replaceState({ v: 'detail', id: g.id }, '', '#game-' + g.id); } catch (e) {}
+  }
 }
 function renderFlowerBtn() {
   const g = currentGame;
   document.getElementById('detail-flower-count').textContent = g.flowers.toLocaleString();
   document.getElementById('detail-flower').classList.toggle('on', !!g.myFlower);
 }
-document.getElementById('detail-flower').addEventListener('click', () => {
-  if (!currentGame) return;
-  currentGame.myFlower = !currentGame.myFlower;
-  currentGame.flowers += currentGame.myFlower ? 1 : -1;
-  recordStat(currentGame);
+document.getElementById('detail-flower').addEventListener('click', async () => {
+  const g = currentGame;
+  if (!g) return;
+  if (Cloud.on && !Cloud.me) { openAuth('login'); toast('先登录才能送小红花'); return; }
+  if (Cloud.on && Cloud.me) {
+    const want = !g.myFlower;
+    const r = await api('flower', { gameId: g.id, on: want });
+    if (!r.body || !r.body.ok) {
+      if (r.body && r.body.code === 'QUOTA') toast('今天的 10 朵已经送完了，明天再来');
+      else if (r.status === 401) { Cloud.me = null; openAuth('login'); }
+      else toast((r.body && r.body.error) || '送花失败');
+      return;
+    }
+    g.myFlower = want;
+    g.flowers = r.body.flowers;
+    Cloud.me = r.body.me;
+    renderFlowerBtn();
+    if (want) toast('送出一朵小红花 · 今天还剩 ' + Math.max(0, (Cloud.me.dailyLimit || 10) - (Cloud.me.todayFlowers || 0)) + ' 朵');
+    return;
+  }
+  g.myFlower = !g.myFlower;
+  g.flowers += g.myFlower ? 1 : -1;
+  recordStat(g);
   renderFlowerBtn();
 });
 function stat(label, value, cls) {
@@ -1861,6 +2377,163 @@ document.querySelectorAll('.detail-tabs button').forEach(btn => {
     btn.classList.add('active');
     document.querySelector('[data-dpanel="' + btn.dataset.dtab + '"]').classList.add('active');
   });
+});
+
+/* ================= 作者 / 同学 ================= */
+function authorName(g) {
+  const p = String(g.byline || '').split('·');
+  return p.length > 1 ? p[1].trim() : '';
+}
+function authorClass(g) {
+  const p = String(g.byline || '').split('·');
+  return p.length > 1 ? p[0].trim() : '';
+}
+function studentsIndex() {
+  const map = new Map();
+  GAMES.forEach(g => {
+    const n = authorName(g);
+    if (!n) return;
+    if (!map.has(n)) map.set(n, { name: n, cls: authorClass(g), games: [] });
+    map.get(n).games.push(g);
+  });
+  return [...map.values()].sort((a, b) => b.games.length - a.games.length || a.name.localeCompare(b.name, 'zh'));
+}
+const STUDENTS = studentsIndex();
+function setAuthorFilter(name) {
+  authorFilter = name || '';
+  const bar = document.getElementById('author-bar');
+  if (!authorFilter) {
+    bar.classList.remove('show');
+  } else {
+    const stu = STUDENTS.find(s => s.name === authorFilter);
+    const n = GAMES.filter(g => authorName(g) === authorFilter).length;
+    document.getElementById('author-bar-text').textContent =
+      '只看 ' + authorFilter + (stu && stu.cls ? ' · ' + stu.cls : '') + ' 的 ' + n + ' 部作品';
+    bar.classList.add('show');
+  }
+  renderGrid(curFilter);
+}
+document.getElementById('author-bar-x').addEventListener('click', () => setAuthorFilter(''));
+
+/* ================= 新品速递（按上架时间，每次回首页轮换一批） ================= */
+const NEWS_PER = 4;
+const NEWS_POOL = 12;
+let newsPage = 0;
+function relDay(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return '';
+  const now = new Date();
+  const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((t0 - d) / 86400000);
+  if (days <= 0) return '今天上架';
+  if (days === 1) return '昨天上架';
+  if (days < 7) return days + ' 天前';
+  return (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日上架';
+}
+function renderNews() {
+  const pool = [...GAMES]
+    .sort((a, b) => String(b.addedAt || '').localeCompare(String(a.addedAt || '')) || b.id - a.id)
+    .slice(0, NEWS_POOL);
+  const total = pool.length;
+  if (!total) return;
+  const per = Math.min(NEWS_PER, total);
+  const start = (newsPage * per) % total;
+  const picks = [];
+  for (let i = 0; i < per; i++) picks.push(pool[(start + i) % total]);
+  newsPage++;
+  const box = document.getElementById('news-list');
+  box.innerHTML = picks.map(g => {
+    const when = relDay(g.addedAt);
+    const short = String(g.title).split(' · ')[0];
+    return '<div class="news-item" data-gid="' + g.id + '" title="' + g.title + '">' +
+      short + ' · ' + when + (when === '今天上架' ? '<span class="new-flag">NEW</span>' : '') + '</div>';
+  }).join('');
+  box.querySelectorAll('.news-item').forEach(el => {
+    el.addEventListener('click', () => openDetail(parseInt(el.dataset.gid, 10)));
+  });
+}
+
+/* ================= 搜索：游戏 + 同学 ================= */
+const searchInput = document.getElementById('search-input');
+const searchPanel = document.getElementById('search-panel');
+let searchHits = [];
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+function runSearch(q) {
+  const kw = q.trim().toLowerCase();
+  if (!kw) return { games: [], students: [] };
+  const games = GAMES.filter(g =>
+    (g.title + ' ' + g.genre + ' ' + (g.tags || []).join(' ') + ' ' + g.byline).toLowerCase().includes(kw)
+  ).slice(0, 5);
+  const students = STUDENTS.filter(s =>
+    (s.name + ' ' + s.cls).toLowerCase().includes(kw)
+  ).slice(0, 4);
+  return { games, students };
+}
+function renderSearch(q) {
+  const { games, students } = runSearch(q);
+  searchHits = games.map(g => ({ type: 'game', id: g.id }));
+  if (!q.trim()) {
+    searchPanel.classList.remove('show');
+    searchPanel.innerHTML = '';
+    return;
+  }
+  let html = '';
+  if (games.length) {
+    html += '<div class="search-sec">游戏</div>' + games.map((g, i) => {
+      const thumb = g.coverImg ? 'background-image:url(\'' + g.coverImg + '\')' : 'background:' + g.coverBg;
+      return '<div class="search-row' + (i === 0 ? ' active' : '') + '" data-kind="game" data-id="' + g.id + '">' +
+        '<div class="sr-thumb" style="' + thumb + '"></div>' +
+        '<div class="sr-main"><div class="sr-title">' + esc(g.title) + '</div>' +
+        '<div class="sr-sub">' + esc(g.genre) + ' · ' + esc(authorName(g)) + '</div></div></div>';
+    }).join('');
+  }
+  if (students.length) {
+    html += '<div class="search-sec">同学</div>' + students.map(s =>
+      '<div class="search-row" data-kind="student" data-name="' + esc(s.name) + '">' +
+      '<div class="sr-avatar">' + esc(s.name.slice(0, 1)) + '</div>' +
+      '<div class="sr-main"><div class="sr-title">' + esc(s.name) + '</div>' +
+      '<div class="sr-sub">' + esc(s.cls) + ' · ' + s.games.length + ' 部作品</div></div></div>'
+    ).join('');
+  }
+  if (!html) html = '<div class="search-empty">没有找到「' + esc(q.trim()) + '」相关的内容</div>';
+  searchPanel.innerHTML = html;
+  searchPanel.classList.add('show');
+  searchPanel.querySelectorAll('.search-row').forEach(row => {
+    row.addEventListener('mousedown', (ev) => {
+      ev.preventDefault();
+      if (row.dataset.kind === 'game') {
+        closeSearch();
+        openDetail(parseInt(row.dataset.id, 10));
+      } else {
+        closeSearch();
+        setAuthorFilter(row.dataset.name);
+        showView('home');
+      }
+    });
+  });
+}
+function closeSearch() {
+  searchPanel.classList.remove('show');
+  searchPanel.innerHTML = '';
+  searchInput.blur();
+}
+searchInput.addEventListener('input', () => renderSearch(searchInput.value));
+searchInput.addEventListener('focus', () => { if (searchInput.value.trim()) renderSearch(searchInput.value); });
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeSearch(); return; }
+  if (e.key === 'Enter') {
+    const first = searchPanel.querySelector('.search-row');
+    if (first) first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  }
+});
+document.addEventListener('mousedown', (e) => {
+  if (!searchPanel.contains(e.target) && e.target !== searchInput) {
+    searchPanel.classList.remove('show');
+  }
 });
 
 /* ================= 排行榜 ================= */
@@ -1884,7 +2557,8 @@ function renderRankTable() {
 }
 
 /* ================= 游玩弹窗（游客模式，无计时记录） ================= */
-function openPlayModal(g) {
+function openPlayModal(g, opts) {
+  opts = opts || {};
   pauseMedia(); // 进游戏时停掉详情页的演示视频，别白占解码
   const box = document.getElementById('play-modal-box');
   const ph = document.getElementById('modal-placeholder');
@@ -1905,10 +2579,25 @@ function openPlayModal(g) {
     box.classList.remove('playing');
   }
   document.getElementById('play-modal').classList.add('show');
+  if (g.playUrl) startPlayTimer(g);
+  if (!opts.fromHistory) {
+    try { history.pushState({ v: 'play', id: g.id }, '', '#play-' + g.id); } catch (e) {}
+  }
 }
-function closePlayModal() {
+function closePlayModal(opts) {
+  opts = opts || {};
+  stopPlayTimer();
   document.getElementById('play-modal').classList.remove('show');
-  document.getElementById('game-frame').src = 'about:blank'; // 关闭即卸载游戏，停掉后台进程
+  // 直接换掉 iframe 元素来卸载游戏：改 src 会往浏览器历史里塞一条记录，按 ← 时会白跳一次
+  const oldFrame = document.getElementById('game-frame');
+  if (oldFrame) {
+    const fresh = oldFrame.cloneNode(false);
+    fresh.removeAttribute('src');
+    oldFrame.parentNode.replaceChild(fresh, oldFrame);
+  }
+  if (!opts.fromHistory && history.state && history.state.v === 'play') {
+    history.back();   // 让 history 和界面保持一致，按 ← 也不会再跳一次
+  }
 }
 document.getElementById('modal-close').addEventListener('click', closePlayModal);
 document.getElementById('modal-close-top').addEventListener('click', closePlayModal);
@@ -1917,6 +2606,23 @@ document.getElementById('play-modal').addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => { // Esc 快捷关闭（鼠标被游戏抓住时按 Esc 先解锁指针，松开后此快捷键生效）
   if (e.key === 'Escape' && document.getElementById('play-modal').classList.contains('show')) closePlayModal();
+});
+
+/* ================= 登录弹窗事件 ================= */
+document.getElementById('auth-tab-login').addEventListener('click', () => { authMode = 'login'; paintAuth(); });
+document.getElementById('auth-tab-register').addEventListener('click', () => { authMode = 'register'; paintAuth(); });
+document.getElementById('auth-switch').addEventListener('click', () => { authMode = authMode === 'login' ? 'register' : 'login'; paintAuth(); });
+document.getElementById('auth-guest').addEventListener('click', closeAuth);
+document.getElementById('auth-submit').addEventListener('click', submitAuth);
+document.getElementById('auth-mask').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeAuth();
+});
+['auth-sid', 'auth-pw', 'auth-nick', 'auth-cls'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitAuth(); });
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('auth-mask').classList.contains('show')) closeAuth();
 });
 
 /* ================= 侧栏：站点数据 ================= */
@@ -1940,6 +2646,16 @@ applyTheme(savedTheme);
 renderGrid('all');
 renderRankTable();
 renderSideStats();
+renderNews();
+renderMe();
+renderTopAvatar();
+initCloud().then(ok => {
+  if (ok) { renderGrid(curFilter); renderRankTable(); renderSideStats(); }
+  renderMe();
+  renderTopAvatar();
+});
+// 首页也算历史里的一层，这样第一次按 ← 也有地方可回
+try { history.replaceState({ v: 'home' }, '', location.pathname + location.search); } catch (e) {}
 </script>
 </body>
 </html>
