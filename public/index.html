@@ -1047,7 +1047,8 @@
   }
   .sf-inner {
     max-width: var(--page-max); margin: 0 auto; padding: 26px var(--page-pad) 30px;
-    display: grid; grid-template-columns: 1fr auto; gap: 18px 24px; align-items: start;
+    /* 基线对齐：右侧链接与左侧「第九艺术」同一基线，字号不同也不会一高一低 */
+    display: grid; grid-template-columns: 1fr auto; gap: 18px 24px; align-items: baseline;
   }
   .sf-logo { font-size: 14px; font-weight: 600; color: #85B7EB; letter-spacing: 1px; }
   .sf-logo span { font-size: 11px; font-weight: 400; color: var(--text-3); margin-left: 8px; letter-spacing: 0; }
@@ -1302,7 +1303,7 @@
       <header class="contact-hero">
         <span class="ct-kicker">CONTACT · 联系我们</span>
         <h2>想说的话，都放在群里说</h2>
-        <p>本站不设社区、评论与私信功能，所有交流统一在 QQ 群进行 —— 这是唯一合规、也最容易被回复的渠道。</p>
+        <p>本站不设社区、评论与私信功能，所有交流统一在 QQ 群进行。</p>
       </header>
 
       <div class="contact-grid">
