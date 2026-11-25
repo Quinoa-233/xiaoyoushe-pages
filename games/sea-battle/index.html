@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>海底大作战 · 四大名著答题闯关</title>
+<!--
+============================================================
+ 资源生成规格（用户原样提供，作为后续接入混元3D / GLB·FBX 的输入）
+------------------------------------------------------------
+ [潜艇] 生成6款不同外观的3D潜艇，适合海底场景，带有发射炮弹的结构，
+        金属质感，科幻风格，尺寸适合游戏场景使用
+ [BOSS] 生成巨齿鲨王3D模型，深海风格，带有攻击动画，身体有金属装甲，
+        眼睛发光，尺寸是潜艇的3倍
+ [场景] 生成3D海底场景，包含礁石、水母、珊瑚等海洋生物，
+        分浅海、深海、深渊三个层级，每个层级有不同的光照和氛围
+ [风格参照] 人物和场景可以参照动画片海底小纵队
+------------------------------------------------------------
+ 合规边界：仅借鉴通用美术语言（圆润Q版比例 / 大眼高光 / 明亮卡通海洋
+ 配色 / 科普探险氛围 / 低多边形卡通渲染），不使用任何具体角色造型、
+ 名称、标识或专属配色组合。原型内所有模型均为程序化几何占位，
+ 需人工精修与合规确认后方可商用替换。
+ 替换点：drawSub() / drawBoss() / drawSceneProps() 三处渲染函数。
+============================================================
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#04121e;
+  font-family:"Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
+  -webkit-user-select:none;user-select:none;touch-action:none}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hide{display:none!important}
+.glass{background:rgba(6,32,50,.62);border:1px solid rgba(140,240,255,.28);
+  box-shadow:0 6px 26px rgba(0,20,40,.35),inset 0 1px 0 rgba(255,255,255,.12);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:14px}
+#hud{position:absolute;inset:0;pointer-events:none;color:#eaffff}
+#hud .top{position:absolute;top:14px;left:16px;right:16px;display:flex;
+  align-items:flex-start;justify-content:space-between;gap:12px}
+.scorecard{width:190px;padding:10px 14px 12px;flex:0 0 auto}
+.scorecard .lv{font-size:11px;color:#8fe8e0;letter-spacing:1px;margin-bottom:2px}
+.scorecard .num{font-size:40px;font-weight:800;line-height:1.05;
+  color:#fff;text-shadow:0 0 16px rgba(90,240,230,.75);font-variant-numeric:tabular-nums}
+.scorecard .cap{font-size:9px;letter-spacing:3px;color:#7fc9d6;margin-top:1px}
+.scorecard .mini{margin-top:8px;padding-top:8px;border-top:1px solid rgba(140,240,255,.18);
+  display:grid;grid-template-columns:1fr 1fr;gap:3px 6px;font-size:10px;color:#a8d8e2}
+.scorecard .mini b{color:#eaffff;font-size:11px}
+.qbox{flex:1 1 auto;max-width:560px;padding:11px 20px 13px;text-align:center}
+.qbox .qmeta{font-size:10px;letter-spacing:2px;color:#7fd6e6;margin-bottom:5px}
+.qbox .qtext{font-size:19px;font-weight:700;line-height:1.4;color:#fff;
+  text-shadow:0 2px 10px rgba(0,0,0,.4)}
+.qbox .qhint{font-size:10px;color:#8fc4d0;margin-top:6px}
+.chips{width:172px;flex:0 0 auto;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.chip{background:rgba(6,32,50,.62);border:1px solid rgba(140,240,255,.25);
+  border-radius:20px;padding:5px 13px;font-size:11px;color:#d8f8ff;white-space:nowrap}
+.chip.warn{background:rgba(190,50,60,.55);border-color:rgba(255,140,140,.6);color:#fff}
+#bossWrap{position:absolute;top:104px;left:50%;transform:translateX(-50%);
+  width:min(420px,70vw);text-align:center}
+#bossWrap .bn{font-size:14px;font-weight:800;letter-spacing:3px;color:#ffd9d9;
+  text-shadow:0 0 14px rgba(255,70,70,.8);margin-bottom:6px}
+#bossWrap .track{height:12px;border-radius:8px;background:rgba(4,18,30,.8);
+  border:1px solid rgba(255,140,140,.5);overflow:hidden}
+#bossWrap .track i{display:block;height:100%;width:100%;border-radius:6px;
+  background:linear-gradient(90deg,#ff4d5e,#ff9a5e);transition:width .25s ease}
+#bossWrap .bt{font-size:10px;color:#ffc9c9;margin-top:5px;letter-spacing:1px}
+#feedback{position:absolute;top:33%;left:50%;transform:translate(-50%,-50%);
+  font-size:28px;font-weight:900;letter-spacing:2px;opacity:0;transition:opacity .2s;
+  text-shadow:0 3px 18px rgba(0,0,0,.6);white-space:nowrap}
+#banner{position:absolute;top:44%;left:50%;transform:translate(-50%,-50%);
+  font-size:34px;font-weight:900;letter-spacing:6px;color:#fff;
+  text-shadow:0 0 28px rgba(90,230,255,.9),0 4px 14px rgba(0,0,0,.6);white-space:nowrap}
+#crosshair{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;
+  pointer-events:none;border:1px solid rgba(160,255,245,.8);border-radius:50%;
+  box-shadow:0 0 10px rgba(90,240,230,.6)}
+#crosshair:after{content:"";position:absolute;left:11px;top:11px;width:4px;height:4px;
+  border-radius:50%;background:#b6fff4}
+#pad{position:absolute;left:26px;bottom:26px;width:112px;height:112px;border-radius:50%;
+  background:rgba(6,40,60,.4);border:2px solid rgba(150,240,255,.35);
+  box-shadow:inset 0 0 24px rgba(90,220,240,.15);touch-action:none}
+#stick{position:absolute;left:34px;top:34px;width:44px;height:44px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#8ff6ea,#20a7b8);
+  box-shadow:0 0 18px rgba(80,240,230,.65);pointer-events:none}
+#fire{position:absolute;right:30px;bottom:38px;width:88px;height:88px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#7ff0dd,#12879c);
+  border:2px solid rgba(190,255,250,.6);color:#04303d;font-size:15px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 24px rgba(70,230,220,.5);touch-action:none}
+#fire:active{transform:scale(.93)}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 45%,rgba(6,48,70,.72),rgba(2,12,24,.94));
+  overflow:auto;padding:20px}
+.card{width:min(880px,94vw);max-height:92vh;overflow:auto;padding:26px 30px 28px;
+  border-radius:20px;background:rgba(5,28,46,.88);border:1px solid rgba(130,235,255,.3);
+  box-shadow:0 20px 70px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.1);color:#eaffff}
+.card h1{font-size:30px;letter-spacing:4px;text-align:center;
+  text-shadow:0 0 24px rgba(80,230,240,.6)}
+.card .sub{text-align:center;font-size:12px;color:#8fc9d8;letter-spacing:2px;margin:8px 0 20px}
+.card h2{font-size:15px;color:#7ff0e0;letter-spacing:2px;margin:18px 0 10px;
+  border-left:3px solid #4fd8e8;padding-left:9px}
+.subs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.subcard{border:1px solid rgba(130,220,240,.25);border-radius:12px;padding:11px 12px;
+  background:rgba(10,50,70,.5);cursor:pointer;transition:.16s}
+.subcard:hover{border-color:rgba(150,250,255,.7);transform:translateY(-2px)}
+.subcard.on{border-color:#6ff5e2;background:rgba(30,110,130,.55);
+  box-shadow:0 0 18px rgba(80,240,220,.28)}
+.subcard .nm{font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px}
+.dot{width:13px;height:13px;border-radius:50%;box-shadow:0 0 9px currentColor}
+.subcard .st{font-size:10px;color:#a5d5e0;margin-top:7px;line-height:1.7}
+.btn{display:block;margin:20px auto 0;padding:12px 44px;border:none;border-radius:30px;
+  background:linear-gradient(90deg,#31c9c0,#37a7e8);color:#032b39;font-size:16px;
+  font-weight:900;letter-spacing:3px;cursor:pointer;box-shadow:0 8px 24px rgba(50,200,210,.35)}
+.btn:hover{filter:brightness(1.12)}
+.btn.ghost{background:transparent;border:1px solid rgba(150,235,255,.5);
+  color:#bff2ff;box-shadow:none;font-size:12px;letter-spacing:1px;padding:8px 20px;margin-top:12px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}
+.stat{text-align:center;padding:16px 8px;border-radius:12px;
+  background:rgba(12,60,82,.55);border:1px solid rgba(130,225,240,.22)}
+.stat b{display:block;font-size:30px;color:#fff;text-shadow:0 0 16px rgba(90,240,230,.6)}
+.stat span{font-size:11px;color:#9ad2de;letter-spacing:1px}
+.spec{font-size:12px;line-height:1.9;color:#c9eaf2}
+.spec code{background:rgba(10,60,80,.7);border:1px solid rgba(130,225,240,.22);
+  border-radius:5px;padding:1px 6px;color:#8ff2e4;font-size:11px}
+.spec .note{margin-top:14px;padding:11px 13px;border-radius:9px;
+  background:rgba(255,180,80,.09);border:1px solid rgba(255,190,90,.3);color:#ffdfae;font-size:11px}
+.kv{display:grid;grid-template-columns:80px 1fr;gap:6px 12px;font-size:12px;color:#c9eaf2}
+.kv b{color:#7ff0e0}
+.tips{text-align:center;font-size:11px;color:#7fb6c4;margin-top:14px;line-height:1.9}
+@media(max-width:720px){
+  .card h1{font-size:22px}.subs{grid-template-columns:repeat(2,1fr)}
+  .scorecard{width:130px;padding:8px 10px}.scorecard .num{font-size:28px}
+  .scorecard .mini{grid-template-columns:1fr;font-size:9px}
+  .qbox{padding:8px 10px}.qbox .qtext{font-size:14px}.qhint{display:none}
+  .chips{width:auto}.chip{font-size:9px;padding:4px 8px}
+  #hud .top{top:8px;left:8px;right:8px;gap:6px}
+  #pad{width:92px;height:92px;left:16px;bottom:16px}
+  #stick{left:28px;top:28px;width:36px;height:36px}
+  #fire{width:72px;height:72px;right:18px;bottom:24px;font-size:13px}
+}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud" class="hide">
+  <div class="top">
+    <div class="scorecard glass">
+      <div class="lv" id="hLv">浅海 · 第 1 关</div>
+      <div class="num" id="hScore">000</div>
+      <div class="cap">SCORE</div>
+      <div class="mini">
+        <div>最高连击 <b id="hCombo">0</b></div>
+        <div>正确率 <b id="hAcc">0%</b></div>
+        <div>潜艇耐久 <b id="hHp">100</b></div>
+        <div>本题 <b id="hQn">1</b></div>
+      </div>
+    </div>
+    <div class="qbox glass">
+      <div class="qmeta" id="hQMeta">第 1 题 · 四大名著</div>
+      <div class="qtext" id="hQText">准备开始</div>
+      <div class="qhint">变道对准你认为正确的选项球，向前开炮</div>
+    </div>
+    <div class="chips">
+      <span class="chip" id="hPhase">答题阶段</span>
+      <span class="chip" id="hTime">22s</span>
+      <span class="chip" id="hNeed">0 / 4</span>
+      <span class="chip" id="hDist">下潜 0 m · 7 m/s</span>
+    </div>
+  </div>
+  <div id="bossWrap" class="hide">
+    <div class="bn" id="hBossName">巨齿鲨王</div>
+    <div class="track"><i id="hBossFill"></i></div>
+    <div class="bt">击破正确选项球 → 对 BOSS 造成重创</div>
+  </div>
+  <div id="feedback"></div>
+  <div id="banner" class="hide"></div>
+</div>
+
+<div id="pad" class="hide"><div id="stick"></div></div>
+<div id="fire" class="hide">发射</div>
+<div id="crosshair" class="hide"></div>
+<div id="overlay"></div>
+
+<script>
+"use strict";
+/* ============================ 基础工具 ============================ */
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b) => v<a?a:(v>b?b:v);
+const lerp = (a,b,t) => a+(b-a)*t;
+const rnd = (a,b) => a+Math.random()*(b-a);
+const TAU = Math.PI*2;
+function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0; const t=a[i];a[i]=a[j];a[j]=t;} return a; }
+function rr(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+/* ============================ 题库（四大名著 48 题） ============================
+   字段：[题干, 四个选项, 正确项索引, 书目, 难度(1易/2中/3难), 解析]            */
+const BANK = [
+ ["刘姥姥是哪部名著中的人物？",["西游记","水浒传","三国演义","红楼梦"],3,"综合",1,"刘姥姥三进荣国府，见《红楼梦》。"],
+ ["“桃园三结义”出自哪部名著？",["三国演义","水浒传","红楼梦","西游记"],0,"综合",1,"《三国演义》第一回，刘关张结义。"],
+ ["“武松打虎”的故事出自？",["西游记","水浒传","三国演义","红楼梦"],1,"综合",1,"武松于景阳冈打虎，见《水浒传》。"],
+ ["“大闹天宫”出自哪部名著？",["水浒传","三国演义","西游记","红楼梦"],2,"综合",1,"孙悟空大闹天宫，见《西游记》。"],
+ ["“三顾茅庐”出自哪部名著？",["红楼梦","三国演义","水浒传","西游记"],1,"综合",1,"刘备三请诸葛亮，见《三国演义》。"],
+ ["“鲁提辖拳打镇关西”出自？",["水浒传","西游记","三国演义","红楼梦"],0,"综合",2,"鲁达（鲁智深）三拳打死镇关西。"],
+ ["“真假美猴王”出自哪部名著？",["三国演义","西游记","水浒传","红楼梦"],1,"综合",2,"六耳猕猴与孙悟空难辨真假。"],
+ ["“黛玉葬花”出自哪部名著？",["红楼梦","水浒传","西游记","三国演义"],0,"综合",1,"《葬花吟》为林黛玉所作。"],
+
+ ["《三国演义》的作者是？",["施耐庵","罗贯中","吴承恩","曹雪芹"],1,"三国演义",1,"元末明初罗贯中著。"],
+ ["被称为“卧龙”的是谁？",["庞统","诸葛亮","司马懿","周瑜"],1,"三国演义",1,"诸葛亮号卧龙，庞统号凤雏。"],
+ ["关羽使用的兵器是？",["丈八蛇矛","青龙偃月刀","方天画戟","双股剑"],1,"三国演义",1,"青龙偃月刀又名冷艳锯。"],
+ ["“既生瑜，何生亮”是谁的感叹？",["周瑜","曹操","孙权","刘备"],0,"三国演义",2,"周瑜临终之语。"],
+ ["空城计是谁设下的？",["司马懿","诸葛亮","赵云","姜维"],1,"三国演义",2,"诸葛亮以空城退司马懿。"],
+ ["“三国”指魏、蜀和？",["吴","晋","梁","楚"],0,"三国演义",1,"魏、蜀、吴三分天下。"],
+ ["曹操的字是？",["玄德","孟德","云长","翼德"],1,"三国演义",2,"曹操字孟德，小字阿瞒。"],
+ ["长坂坡单骑救主的是谁？",["赵云","张飞","马超","黄忠"],0,"三国演义",2,"赵云于长坂坡救出阿斗。"],
+ ["“七擒孟获”的是谁？",["刘备","诸葛亮","周瑜","陆逊"],1,"三国演义",2,"诸葛亮南征，七擒七纵。"],
+ ["“过五关斩六将”的是谁？",["张飞","关羽","赵云","马超"],1,"三国演义",3,"关羽千里走单骑。"],
+
+ ["《水浒传》的作者是？",["罗贯中","施耐庵","吴承恩","冯梦龙"],1,"水浒传",1,"施耐庵著，罗贯中或有参订。"],
+ ["梁山好汉共有一百零八将，其中天罡星多少位？",["36","72","48","54"],0,"水浒传",3,"三十六天罡、七十二地煞。"],
+ ["武松打虎的地点是？",["景阳冈","快活林","十字坡","梁山泊"],0,"水浒传",1,"武松在景阳冈醉打猛虎。"],
+ ["“倒拔垂杨柳”的是谁？",["武松","鲁智深","李逵","林冲"],1,"水浒传",1,"鲁智深倒拔垂杨柳。"],
+ ["宋江的绰号是？",["豹子头","及时雨","行者","黑旋风"],1,"水浒传",1,"宋江号及时雨、呼保义。"],
+ ["林冲的绰号是？",["豹子头","青面兽","花和尚","智多星"],0,"水浒传",1,"林冲号豹子头，东京八十万禁军教头。"],
+ ["吴用的绰号是？",["智多星","神行太保","浪里白条","小李广"],0,"水浒传",2,"吴用号智多星，梁山军师。"],
+ ["李逵惯用的兵器是？",["双斧","长枪","朴刀","禅杖"],0,"水浒传",2,"李逵使两把板斧。"],
+ ["武松的绰号是？",["行者","花和尚","及时雨","玉麒麟"],0,"水浒传",2,"血溅鸳鸯楼后扮作行者。"],
+ ["梁山泊最终的首领是？",["晁盖","宋江","卢俊义","吴用"],1,"水浒传",2,"晁盖死后宋江坐第一把交椅。"],
+
+ ["《西游记》的作者是？",["施耐庵","吴承恩","罗贯中","蒲松龄"],1,"西游记",1,"明代吴承恩著。"],
+ ["孙悟空诞生于？",["花果山仙石","东海龙宫","灵台方寸山","天宫"],0,"西游记",1,"花果山仙石迸裂而生。"],
+ ["孙悟空的兵器是？",["九齿钉耙","如意金箍棒","降妖宝杖","方天画戟"],1,"西游记",1,"定海神针，重一万三千五百斤。"],
+ ["猪八戒被贬下凡前是？",["卷帘大将","天蓬元帅","弼马温","托塔天王"],1,"西游记",2,"天蓬元帅因醉酒戏嫦娥被贬。"],
+ ["唐僧的坐骑是？",["白龙马","青牛","金毛犼","白象"],0,"西游记",1,"西海龙王三太子化身白龙马。"],
+ ["孙悟空被如来压在哪座山下？",["太行山","五行山","花果山","火焰山"],1,"西游记",2,"五行山（后称两界山）下五百年。"],
+ ["取经路上共经历多少难？",["七十二难","八十一难","九十九难","四十九难"],1,"西游记",1,"九九八十一难方成正果。"],
+ ["火焰山中，孙悟空向谁借芭蕉扇？",["牛魔王","铁扇公主","红孩儿","玉面狐狸"],1,"西游记",2,"铁扇公主又名罗刹女。"],
+ ["教孙悟空七十二变的是？",["唐僧","菩提祖师","观音菩萨","太上老君"],1,"西游记",2,"灵台方寸山斜月三星洞菩提祖师。"],
+ ["“三打白骨精”中白骨精先后变了几次人形？",["一次","两次","三次","四次"],2,"西游记",3,"村姑、老妇、老翁三次变化。"],
+
+ ["《红楼梦》又称？",["石头记","金瓶梅","镜花缘","聊斋志异"],0,"红楼梦",1,"《红楼梦》初名《石头记》。"],
+ ["《红楼梦》前八十回的作者是？",["高鹗","曹雪芹","脂砚斋","程伟元"],1,"红楼梦",1,"曹雪芹著前八十回，高鹗续后四十回。"],
+ ["贾宝玉出生时口中所含的是？",["通灵宝玉","金锁","夜明珠","玉如意"],0,"红楼梦",1,"女娲补天所余顽石幻化。"],
+ ["《葬花吟》是谁所作？",["薛宝钗","林黛玉","史湘云","王熙凤"],1,"红楼梦",2,"“质本洁来还洁去”出自葬花吟。"],
+ ["林黛玉在大观园中的居所是？",["蘅芜苑","潇湘馆","怡红院","稻香村"],1,"红楼梦",2,"潇湘馆千竿翠竹掩映。"],
+ ["薛宝钗在大观园中的居所是？",["潇湘馆","蘅芜苑","秋爽斋","栊翠庵"],1,"红楼梦",3,"蘅芜苑藤蔓香草环绕。"],
+ ["王熙凤被下人背地称作？",["凤辣子","林姑娘","宝二奶奶","史大姑娘"],0,"红楼梦",2,"贾母戏称“凤辣子”。"],
+ ["“金陵十二钗”指的是十二位？",["丫鬟","小姐与少妇","尼姑","戏子"],1,"红楼梦",3,"正册十二位贵族女子。"],
+ ["“撕扇子作千金一笑”的是谁？",["袭人","晴雯","鸳鸯","平儿"],1,"红楼梦",3,"晴雯撕扇，宝玉称千金难买一笑。"],
+ ["“木石前盟”指的是谁与谁？",["宝玉与宝钗","宝玉与黛玉","黛玉与宝钗","湘云与宝玉"],1,"红楼梦",3,"与“金玉良缘”相对。"]
+];
+
+/* ============================ 潜艇（6 款） ============================ */
+const SUBS = [
+ {name:"白鲸号",   c1:"#f2fdff",c2:"#57d8e8",wing:"delta",thr:2,speed:1.00,power:1.00,hp:100,tag:"均衡 · 标准型"},
+ {name:"赤鳍号",   c1:"#ffe9dc",c2:"#ff7f5c",wing:"sweep",thr:2,speed:1.14,power:0.95,hp:90, tag:"高速 · 轻装型"},
+ {name:"金鳞号",   c1:"#fff7dc",c2:"#ffc44d",wing:"delta",thr:3,speed:0.92,power:1.18,hp:110,tag:"重炮 · 装甲型"},
+ {name:"幽蓝号",   c1:"#e3f0ff",c2:"#5b90ff",wing:"fin",  thr:2,speed:1.06,power:1.00,hp:100,tag:"灵敏 · 探测型"},
+ {name:"紫珊瑚号", c1:"#f5e8ff",c2:"#b57cff",wing:"sweep",thr:2,speed:1.10,power:0.98,hp:95, tag:"灵动 · 隐匿型"},
+ {name:"青苔号",   c1:"#e8fff4",c2:"#3fd6a0",wing:"fin",  thr:3,speed:0.95,power:1.10,hp:105,tag:"耐久 · 科考型"}
+];
+
+/* ============================ 关卡 / BOSS ============================ */
+const LEVELS = [
+ {name:"浅海",depth:"0 – 200 m",need:4,time:22,speed:7.0,top:"#1a8cad",bot:"#8fe6dc",water:"#0c4f6b",accent:"#7ff0e0",ray:.13},
+ {name:"深海",depth:"200 – 1000 m",need:5,time:19,speed:9.0,top:"#0a3a72",bot:"#1d7fa8",water:"#072a55",accent:"#5fc8ff",ray:.08},
+ {name:"深渊",depth:"1000 m 以下",need:6,time:16,speed:11.0,top:"#0a1640",bot:"#3a1f68",water:"#120a34",accent:"#b57cff",ray:.05}
+];
+const BOSSES = [
+ {name:"巨齿鲨王",     hp:300,color:"#93b0c6",type:"shark", desc:"金属装甲 · 发光眼 · 巨口利齿"},
+ {name:"深渊大王乌贼", hp:450,color:"#c25fa4",type:"squid", desc:"巨型触手 · 弱点标识 · 墨汁弹"},
+ {name:"幽渊灯笼鲸王", hp:600,color:"#7260c4",type:"whale", desc:"深渊诱饵灯 · 装甲巨口 · 震荡波"}
+];
+const BALL_COLORS = ["#ff7ac6","#ffc94d","#4fc3f7","#b57cff"];
+
+/* ============================ 音频（WebAudio 程序化，无外部资源） ============================ */
+const Sfx = {
+  ac:null,
+  init(){ if(!this.ac){ try{ this.ac = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+         if(this.ac && this.ac.state==="suspended") this.ac.resume(); },
+  tone(f0,f1,dur,type,vol){ if(!this.ac) return; const t=this.ac.currentTime;
+    const o=this.ac.createOscillator(), g=this.ac.createGain();
+    o.type=type||"sine"; o.frequency.setValueAtTime(f0,t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(30,f1),t+dur);
+    g.gain.setValueAtTime(vol||.09,t); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(g); g.connect(this.ac.destination); o.start(t); o.stop(t+dur+.02); },
+  shoot(){ this.tone(760,240,.10,"triangle",.055); },
+  right(){ this.tone(520,880,.16,"sine",.10); setTimeout(()=>this.tone(760,1180,.18,"sine",.08),70); },
+  wrong(){ this.tone(240,90,.28,"sawtooth",.075); },
+  heavy(){ this.tone(180,55,.34,"square",.09); setTimeout(()=>this.tone(420,120,.22,"triangle",.07),60); },
+  boss(){ this.tone(110,58,.7,"sawtooth",.11); },
+  clear(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>this.tone(f,f*1.3,.22,"sine",.08),i*110)); },
+  hit(){ this.tone(140,60,.22,"square",.07); }
+};
+
+/* ============================ 3D 投影与画布 ============================ */
+const cv=$("cv"), ctx=cv.getContext("2d");
+let W=0,H=0,DPR=1;
+const CAM={x:0,y:2.2,z:-9,f:520,horizon:.58};
+function resize(){ DPR=Math.min(window.devicePixelRatio||1,2);
+  W=window.innerWidth; H=window.innerHeight;
+  cv.width=Math.floor(W*DPR); cv.height=Math.floor(H*DPR);
+  cv.style.width=W+"px"; cv.style.height=H+"px";
+  ctx.setTransform(DPR,0,0,DPR,0,0); }
+window.addEventListener("resize",resize); resize();
+function project(x,y,z){ const dz=z-CAM.z; if(dz<0.5) return null;
+  const s=CAM.f/dz; return {x:W/2+(x-CAM.x)*s, y:H*CAM.horizon-(y-CAM.y)*s, s:s, z:z}; }
+function fog(z){ return clamp(1-(z-2)/40,.16,1); }
+function glow(x,y,r,color,alpha){ const g=ctx.createRadialGradient(x,y,0,x,y,r);
+  g.addColorStop(0,color); g.addColorStop(1,"rgba(0,0,0,0)");
+  ctx.globalAlpha=alpha; ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,TAU); ctx.fill(); ctx.globalAlpha=1; }
+
+/* ============ 四航道跑酷场景：自动前进 + 每个答案独占一条航道 ============ */
+const LANE_W=2.2;      // 单条航道宽度
+const BALL_Y=3.25, BALL_Z=10.2, BALL_XS=[-3.3,-1.1,1.1,3.3]; // 4 条道中心 = 4 个选项球位置
+const LANE=BALL_XS[3]+LANE_W/2;              // 四航道总半宽 4.4：礁石/珊瑚只能在 |x| >= LANE 之外
+const LANE_EDGES=[-LANE,-LANE_W,0,LANE_W,LANE]; // 5 条分道线
+const Z_FAR=40, Z_NEAR=1.2;   // 场景循环区间：越过近端就回收到远端
+// 炮弹一律沿 +z 射向球平面，不再朝鼠标任意方向斜飞
+const rocks=[],corals=[],jellies=[],bubbles=[],rays=[],streaks=[];
+function sideX(extra){ return (Math.random()<.5?-1:1)*(LANE+extra+rnd(0,4.2)); }
+function jellyX(){ const hi=Math.random()<.22;   // 少量水母飘在航道正上方，不占通行空间
+  return hi?rnd(-2.5,2.5):sideX(.2); }
+function buildScene(){
+  rocks.length=corals.length=jellies.length=bubbles.length=rays.length=streaks.length=0;
+  for(let i=0;i<26;i++) rocks.push({x:sideX(.8),z:rnd(Z_NEAR,Z_FAR),w:rnd(1.6,4.2),h:rnd(.6,1.9),t:rnd(0,TAU)});
+  for(let i=0;i<30;i++) corals.push({x:sideX(.4),z:rnd(Z_NEAR,Z_FAR),h:rnd(.8,2.6),t:rnd(0,TAU),c:Math.random()<.5?"#c78bff":"#ff9ecb"});
+  for(let i=0;i<34;i++) jellies.push({x:jellyX(),y:rnd(1.0,7.0),z:rnd(Z_NEAR,Z_FAR),r:rnd(.32,.72),t:rnd(0,TAU),sp:rnd(.3,.8)});
+  for(let i=0;i<60;i++) bubbles.push({x:rnd(-14,14),y:rnd(0,8),z:rnd(Z_NEAR,Z_FAR),r:rnd(.03,.10),sp:rnd(.35,1.1)});
+  for(let i=0;i<46;i++) streaks.push({x:rnd(-11,11),y:rnd(.4,7),z:rnd(Z_NEAR,Z_FAR),len:rnd(.6,1.8)});
+  for(let i=0;i<5;i++) rays.push({x:rnd(-12,12),w:rnd(1.4,3.6),t:rnd(0,TAU)});
+}
+buildScene();
+/* 每帧让场景向后掠过，越界回收到远端；回收时重新随机，但始终守在航道两侧 */
+function scrollScene(dt){
+  const playing=(G.state==="play"||G.state==="clear");
+  const v=playing?LEVELS[G.level].speed:LEVELS[0].speed;
+  G.speed=v; G.travel+=v*dt;
+  const dz=v*dt;
+  const wrapped=o=>{ if(o.z<Z_NEAR){ o.z+=Z_FAR-Z_NEAR+rnd(1,6); return true; } return false; };
+  for(const o of rocks){ o.z-=dz;o.t+=dt*.35;
+    if(wrapped(o)){o.x=sideX(.8);o.w=rnd(1.6,4.2);o.h=rnd(.6,1.9);} }
+  for(const o of corals){ o.z-=dz;o.t+=dt*.8;
+    if(wrapped(o)){o.x=sideX(.4);o.h=rnd(.8,2.6);o.c=Math.random()<.5?"#c78bff":"#ff9ecb";} }
+  for(const o of jellies){ o.z-=dz;o.t+=dt*o.sp;
+    if(wrapped(o)){o.x=jellyX();o.y=o.x>-LANE&&o.x<LANE?rnd(5.4,7.2):rnd(1.0,6.2);} }
+  for(const o of bubbles){ o.z-=dz;o.y+=o.sp*dt;
+    if(o.y>8.5)o.y=0;
+    if(wrapped(o)){o.x=rnd(-14,14);o.y=rnd(0,4);} }
+  for(const o of streaks){ o.z-=dz*2.1;   // 速度线掠过得更快，强化冲刺感
+    if(wrapped(o)){o.x=rnd(-11,11);o.y=rnd(.4,7);o.len=rnd(.6,1.8);} }
+  for(const r of rays) r.t+=dt;
+}
+
+/* ============================ 游戏状态 ============================ */
+const G={
+ state:"menu",phase:"quiz",level:0,sub:0,
+ score:0,total:0,levelScore:0,hp:100,maxhp:100,
+ combo:0,maxCombo:0,correct:0,answered:0,qn:0,
+ queue:[],used:[],q:null,balls:[],bullets:[],ebullets:[],parts:[],
+ timeLeft:0,between:0,boss:null,need:4,qLocked:false,
+ fbT:0,fbText:"",fbColor:"",bannerT:0,
+ px:0,py:2.6,pz:1.5,tilt:0,mx:window.innerWidth/2,my:window.innerHeight*.45,
+ aimx:0,aimy:BALL_Y,aimz:10,aimTarget:BALL_XS[0],mouseCtl:false,
+ joy:{x:0,y:0},firing:false,cool:0,t:0,shake:0,
+ travel:0,speed:LEVELS[0].speed
+};
+function sub(){ return SUBS[G.sub]; }
+
+/* ============================ 抽题（加权 + 不重复窗口） ============================ */
+function diffW(d){ const tab=[[0,.70,.30,.02],[0,.40,.40,.20],[0,.20,.40,.40]]; return tab[G.level][d]||.02; }
+function buildQueue(){
+  const pool=BANK.map((q,i)=>({q:q,i:i})).filter(o=>G.used.indexOf(o.i)<0);
+  const arr=pool.map(o=>({o:o,k:Math.pow(Math.random(),1/Math.max(.01,diffW(o.q[4])))}))
+                .sort((a,b)=>b.k-a.k).map(x=>x.o);
+  G.queue=arr.map(o=>o.i);
+}
+function takeQ(){ if(!G.queue.length) buildQueue();
+  const i=G.queue.shift(); G.used.push(i);
+  if(G.used.length>BANK.length-10) G.used.splice(0,10);
+  return BANK[i]; }
+
+/* ============================ 流程控制 ============================ */
+function startGame(){ Sfx.init(); G.state="play";
+  G.score=0;G.total=0;G.level=0;G.maxCombo=0;G.travel=0;
+  $("overlay").classList.add("hide"); $("hud").classList.remove("hide");
+  $("pad").classList.remove("hide"); $("fire").classList.remove("hide");
+  $("crosshair").classList.remove("hide");
+  startLevel(0); }
+function startLevel(n){ G.level=n; G.speed=LEVELS[n].speed; G.phase="quiz";
+  G.levelScore=0;G.hp=sub().hp;G.maxhp=sub().hp;
+  G.combo=0;G.correct=0;G.answered=0;G.qn=0;
+  G.need=LEVELS[n].need;
+  G.balls=[];G.bullets=[];G.ebullets=[];G.parts=[];G.boss=null;
+  G.between=0;G.timeLeft=LEVELS[n].time;
+  $("bossWrap").classList.add("hide");
+  banner(LEVELS[n].name+" · "+LEVELS[n].depth,1.5);
+  newQuestion(); syncHUD(); }
+function newQuestion(){
+  G.q=takeQ(); G.qn++;
+  const order=shuffle([0,1,2,3]);
+  G.balls=order.map((oi,k)=>({oi:oi,text:G.q[1][oi],correct:oi===G.q[2],
+    x:BALL_XS[k],y:BALL_Y,z:BALL_Z,ph:rnd(0,TAU),
+    alive:true,hitT:0,color:BALL_COLORS[k]}));
+  G.timeLeft=LEVELS[G.level].time; G.between=0; G.qLocked=false;
+  $("hQMeta").textContent="第 "+G.qn+" 题 · "+G.q[3];
+  $("hQText").textContent=G.q[0];
+  syncHUD();
+}
+function banner(txt,dur){ $("banner").textContent=txt; $("banner").classList.remove("hide");
+  G.bannerT=dur||1.4; }
+function feedback(txt,color){ G.fbText=txt;G.fbColor=color;G.fbT=1.15;
+  const e=$("feedback"); e.textContent=txt; e.style.color=color; e.style.opacity="1"; }
+function startBoss(){
+  const b=BOSSES[G.level]; G.phase="boss";
+  G.boss={name:b.name,type:b.type,color:b.color,hp:b.hp,maxhp:b.hp,
+    x:0,y:3.7,z:27,appear:1,hit:0,atk:1.6,t:0};
+  $("hBossName").textContent=b.name; $("bossWrap").classList.remove("hide");
+  banner("BOSS 登场 · "+b.name,1.8); Sfx.boss();
+  newQuestion(); syncHUD();
+}
+function bossDamage(){
+  if(!G.boss||G.boss.appear>.55) return;
+  const dmg=Math.ceil(BOSSES[G.level].hp/LEVELS[G.level].need*sub().power);
+  G.boss.hp=Math.max(0,G.boss.hp-dmg); G.boss.hit=.42; G.shake=.28;
+  Sfx.heavy(); spawnBurst(G.boss.x,G.boss.y,G.boss.z,"#ff6b6b",26);
+  if(G.boss.hp<=0){ setTimeout(()=>{ if(G.state==="play") levelClear(); },700); }
+  syncHUD();
+}
+function onHit(ball){
+  if(!ball.alive||G.qLocked) return;   // 一题只判定一次：拦截在途炮弹的重复命中
+  G.qLocked=true; ball.alive=false; ball.hitT=.6;
+  G.answered++; spawnBurst(ball.x,ball.y,ball.z,ball.color,20);
+  if(ball.correct){
+    G.correct++; G.combo++; G.maxCombo=Math.max(G.maxCombo,G.combo);
+    const gain=100+Math.min(G.combo,5)*10;
+    G.score=Math.max(0,G.score+gain); G.levelScore+=gain;
+    feedback("回答正确  +"+gain,"#8ffbe0"); Sfx.right();
+    if(G.phase==="boss"){ bossDamage(); G.between=1.05; }
+    else G.between=.9;
+  }else{
+    G.combo=0; G.score=Math.max(0,G.score-50); G.levelScore-=50;
+    feedback("答错了  −50   正确答案："+G.q[1][G.q[2]],"#ff9a9a"); Sfx.wrong();
+    G.between=1.3;
+  }
+  syncHUD();
+}
+function timeUp(){ if(G.qLocked) return; G.qLocked=true;
+  G.answered++; G.combo=0;
+  G.score=Math.max(0,G.score-30); G.levelScore-=30;
+  feedback("时间到！正确答案："+G.q[1][G.q[2]],"#ffd27a"); Sfx.wrong();
+  G.between=1.2; syncHUD(); }
+function nextStep(){
+  if(G.phase==="quiz"&&G.correct>=G.need){ startBoss(); return; }
+  if(G.phase==="boss"&&G.boss&&G.boss.hp<=0){ levelClear(); return; }
+  newQuestion();
+}
+function levelClear(){ if(G.state!=="play") return;
+  G.state="clear"; G.total+=G.levelScore; Sfx.clear();
+  $("hud").classList.add("hide"); $("pad").classList.add("hide");
+  $("fire").classList.add("hide"); $("crosshair").classList.add("hide");
+  $("overlay").classList.remove("hide");
+  const last=G.level>=LEVELS.length-1;
+  $("overlay").innerHTML='<div class="card"><h1>'+(last?"全海域通关！":"关卡完成")+'</h1>'+
+    '<div class="sub">'+LEVELS[G.level].name+' · '+BOSSES[G.level].name+' 已被击退</div>'+
+    '<div class="stats"><div class="stat"><b>'+G.levelScore+'</b><span>本关得分</span></div>'+
+    '<div class="stat"><b>'+(G.answered?Math.round(G.correct/G.answered*100):0)+'%</b><span>答题正确率</span></div>'+
+    '<div class="stat"><b>'+G.total+'</b><span>累计总分</span></div></div>'+
+    '<div class="tips">本关共作答 '+G.answered+' 题 · 答对 '+G.correct+' 题 · 最高连击 '+G.maxCombo+'</div>'+
+    (last?'<button class="btn" data-act="menu">返回主菜单</button>':
+     '<button class="btn" data-act="next">继续下潜 → '+LEVELS[G.level+1].name+'</button>')+
+    '</div>';
+}
+function gameOver(){ if(G.state!=="play") return;
+  G.state="over"; Sfx.wrong();
+  $("hud").classList.add("hide"); $("pad").classList.add("hide");
+  $("fire").classList.add("hide"); $("crosshair").classList.add("hide");
+  $("overlay").classList.remove("hide");
+  $("overlay").innerHTML='<div class="card"><h1>潜艇失去动力</h1>'+
+    '<div class="sub">'+LEVELS[G.level].name+' · 耐久归零</div>'+
+    '<div class="stats"><div class="stat"><b>'+G.levelScore+'</b><span>本关得分</span></div>'+
+    '<div class="stat"><b>'+(G.answered?Math.round(G.correct/G.answered*100):0)+'%</b><span>答题正确率</span></div>'+
+    '<div class="stat"><b>'+G.correct+'</b><span>答对题数</span></div></div>'+
+    '<div class="tips">提示：优先读题再变道，错误选项球会扣分并中断连击</div>'+
+    '<button class="btn" data-act="retry">重试本关</button>'+
+    '<button class="btn ghost" data-act="menu">返回主菜单</button></div>';
+}
+function syncHUD(){
+  const L=LEVELS[G.level];
+  $("hLv").textContent=L.name+" · 第 "+(G.level+1)+" 关";
+  $("hScore").textContent=String(G.score).padStart(3,"0");
+  $("hCombo").textContent=G.maxCombo;
+  $("hAcc").textContent=(G.answered?Math.round(G.correct/G.answered*100):0)+"%";
+  $("hHp").textContent=Math.max(0,Math.round(G.hp));
+  $("hQn").textContent=G.qn;
+  $("hPhase").textContent=G.phase==="boss"?"BOSS 战":"答题阶段";
+  $("hNeed").textContent=(G.phase==="boss"?"BOSS "+(G.boss?Math.round(G.boss.hp):0):Math.min(G.correct,G.need)+" / "+G.need);
+  if(G.boss){ $("hBossFill").style.width=(G.boss.hp/G.boss.maxhp*100)+"%"; }
+}
+function spawnBurst(x,y,z,color,n){
+  for(let i=0;i<n;i++) G.parts.push({x:x,y:y,z:z,
+    vx:rnd(-3.2,3.2),vy:rnd(-2.6,3.4),vz:rnd(-2,2),
+    life:rnd(.45,.95),max:1,color:color,r:rnd(.04,.13)});
+}
+
+/* ============================ 输入 ============================ */
+const keys={};
+window.addEventListener("keydown",e=>{ keys[e.code]=true;
+  if(/^(KeyA|KeyD|ArrowLeft|ArrowRight)$/.test(e.code)) G.mouseCtl=false;
+  if(e.code==="Space"){ e.preventDefault(); Sfx.init(); shoot(); } });
+window.addEventListener("keyup",e=>{ keys[e.code]=false; });
+cv.addEventListener("pointermove",e=>{
+  G.mx=e.clientX; G.my=e.clientY; G.mouseCtl=true;
+  const c=$("crosshair"); c.style.left=e.clientX+"px"; c.style.top=e.clientY+"px";
+});
+cv.addEventListener("pointerdown",e=>{ Sfx.init(); G.mx=e.clientX;G.my=e.clientY; G.mouseCtl=true; shoot(); });
+const pad=$("pad"),stick=$("stick");
+let padId=null,padCx=0,padCy=0;
+pad.addEventListener("pointerdown",e=>{ e.preventDefault(); padId=e.pointerId;
+  const r=pad.getBoundingClientRect(); padCx=r.left+r.width/2;padCy=r.top+r.height/2;
+  pad.setPointerCapture(e.pointerId); moveStick(e); });
+pad.addEventListener("pointermove",e=>{ if(e.pointerId===padId) moveStick(e); });
+function moveStick(e){ const dx=e.clientX-padCx,dy=e.clientY-padCy,max=36;
+  const d=Math.hypot(dx,dy)||1, k=Math.min(1,d/max);
+  G.mouseCtl=false;                    // 摇杆接管横向，瞄准改按潜艇所在航道吸附
+  G.joy.x=dx/d*k; G.joy.y=dy/d*k;
+  stick.style.transform="translate("+(G.joy.x*max)+"px,"+(G.joy.y*max)+"px)"; }
+function endPad(e){ if(e.pointerId===padId){ padId=null;G.joy.x=0;G.joy.y=0;stick.style.transform="translate(0,0)"; } }
+pad.addEventListener("pointerup",endPad); pad.addEventListener("pointercancel",endPad);
+const fireBtn=$("fire");
+fireBtn.addEventListener("pointerdown",e=>{ e.preventDefault(); Sfx.init(); G.firing=true; fireBtn.setPointerCapture(e.pointerId); });
+fireBtn.addEventListener("pointerup",()=>{G.firing=false;});
+fireBtn.addEventListener("pointercancel",()=>{G.firing=false;});
+
+/* 瞄准：吸附到 4 条航道之一。
+   有鼠标/点屏输入时按鼠标横向反算，否则按潜艇当前所在航道取最近的球；
+   只取球平面的 x，不用鼠标 y —— 修掉触屏发射键把炮弹打到球上方去的 bug。 */
+function aimTargetX(ax){
+  const ref=G.mouseCtl?ax:G.px;
+  const a=clamp(ref,BALL_XS[0]-1.2,BALL_XS[3]+1.2);
+  let tx=BALL_XS[0],best=1e9;
+  for(const o of G.balls){ if(!o.alive) continue;
+    const d=Math.abs(o.x-a); if(d<best){best=d;tx=o.x;} }
+  return tx;
+}
+/* 射击：炮弹沿本航道正前方（+z）出膛，vz 恒为 26，绝不朝鼠标任意方向斜飞。
+   鼠标/点屏＝瞬间变到目标航道后直射；键盘/摇杆＝小幅横向提前量修正（|vx| <= 3.6）。
+   vy 只让炮弹在飞到球平面时与球同高。 */
+function shoot(){
+  if(G.state!=="play"||G.cool>0||G.between>0||G.qLocked||!G.balls.length) return;
+  const sp=sub(); G.cool=.20/sp.power;
+  const v=26, sz=G.pz+.55, sy=G.py;          // 炮口在艇首正前方
+  const t=Math.max(.08,(BALL_Z-sz)/v);        // 飞到球平面的耗时
+  const planeDz=G.aimz-CAM.z;
+  const ax=CAM.x+(G.mx-W/2)*planeDz/CAM.f;    // 按本次点击位置即时反算，不等下一帧
+  const tx=aimTargetX(ax); G.aimTarget=tx;    // 高亮即时跟随本次点击
+  const sx=G.mouseCtl?clamp(tx,-(LANE-.45),LANE-.45):G.px;
+  if(G.mouseCtl) G.px=sx;                     // 变道与出膛同步，首炮不会打空
+  const vx=clamp((tx-sx)/t,-9,9), vy=(BALL_Y-sy)/t;
+  G.bullets.push({x:sx,y:sy,z:sz,vx:vx,vy:vy,vz:v,life:1.6,trail:[]});
+  Sfx.shoot();
+}
+
+/* ============================ 每帧更新 ============================ */
+function update(dt){
+  G.t+=dt;
+  if(G.shake>0) G.shake=Math.max(0,G.shake-dt*1.6);
+  if(G.bannerT>0){ G.bannerT-=dt; if(G.bannerT<=0) $("banner").classList.add("hide"); }
+  if(G.fbT>0){ G.fbT-=dt; if(G.fbT<=0){ $("feedback").style.opacity="0"; }
+               else if(G.fbT<.35) $("feedback").style.opacity=String(G.fbT/.35); }
+  // 自动向前下潜：场景持续向后掠过（菜单态也在跑，作为动态背景）
+  scrollScene(dt);
+  const de=$("hDist");
+  if(de) de.textContent="下潜 "+Math.round(G.travel*10)+" m · "+G.speed.toFixed(0)+" m/s";
+  if(G.state!=="play") return;
+
+  // 瞄准：反算到球平面后吸附到 4 条航道之一；aimy 不再驱动弹道
+  const dz=G.aimz-CAM.z;
+  G.aimx=CAM.x+(G.mx-W/2)*dz/CAM.f;
+  G.aimy=CAM.y-(G.my-H*CAM.horizon)*dz/CAM.f;
+  G.aimTarget=aimTargetX(G.aimx);
+
+  // 移动：鼠标/点屏＝平滑变到目标航道；键盘/摇杆接管时按连续位移
+  const spd=6.2*sub().speed;
+  let mx=G.joy.x, my=-G.joy.y;
+  if(keys.KeyA||keys.ArrowLeft) mx-=1; if(keys.KeyD||keys.ArrowRight) mx+=1;
+  if(keys.KeyW||keys.ArrowUp) my+=1;  if(keys.KeyS||keys.ArrowDown) my-=1;
+  const ml=Math.hypot(mx,my); if(ml>1){mx/=ml;my/=ml;}
+  const manual=Math.abs(mx)>.05;
+  if(manual) G.mouseCtl=false;
+  const limit=LANE-.45;                       // 四航道内横向活动范围
+  if(G.mouseCtl&&!manual){
+    G.px=lerp(G.px,clamp(G.aimTarget,-limit,limit),Math.min(1,dt*14));
+  }else{
+    G.px=clamp(G.px+mx*spd*dt,-limit,limit);
+  }
+  G.py=clamp(G.py+my*spd*dt,.9,5.0);
+  const tiltTarget=G.mouseCtl&&!manual?clamp(G.aimTarget-G.px,-1,1):clamp(mx,-1,1);
+  G.tilt=lerp(G.tilt,tiltTarget,dt*5);
+  CAM.x=lerp(CAM.x,G.px*.12,dt*2.2);  // 只做轻微跟随，保持四航道构图稳定
+
+  // 发射
+  if(G.cool>0) G.cool-=dt;
+  if((G.firing||keys.Space||keys.KeyJ)&&G.between<=0) shoot();
+
+  // 出题间隔 / 倒计时（间隔期仍更新炮弹与粒子，画面不冻结）
+  if(G.between>0){
+    G.between-=dt;
+    if(G.between<=0){ G.balls=[]; G.bullets=[]; nextStep(); }
+  }else{
+    G.timeLeft-=dt;
+    const tc=$("hTime"); tc.textContent=Math.max(0,Math.ceil(G.timeLeft))+"s";
+    tc.classList.toggle("warn",G.timeLeft<6);
+    if(G.timeLeft<=0) timeUp();
+  }
+
+  // 炮弹
+  for(let i=G.bullets.length-1;i>=0;i--){ const b=G.bullets[i];
+    b.trail.push({x:b.x,y:b.y,z:b.z}); if(b.trail.length>7) b.trail.shift();
+    b.x+=b.vx*dt;b.y+=b.vy*dt;b.z+=b.vz*dt;b.life-=dt;
+    let hit=false;
+    for(const o of G.balls){ if(!o.alive) continue;
+      const d=Math.hypot(b.x-o.x,b.y-(o.y+Math.sin(G.t*1.6+o.ph)*.16),b.z-o.z);
+      if(d<1.0){ onHit(o); hit=true; break; } }
+    if(hit||b.life<=0||b.z>34||Math.abs(b.x)>20||b.y<-.5||b.y>11){
+      if(hit) spawnBurst(b.x,b.y,b.z,"#b6fff4",8);
+      G.bullets.splice(i,1); }
+  }
+  // 碎片
+  for(let i=G.parts.length-1;i>=0;i--){ const p=G.parts[i];
+    p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.vy-=2.4*dt;p.life-=dt;
+    if(p.life<=0) G.parts.splice(i,1); }
+  for(const o of G.balls) if(o.hitT>0) o.hitT-=dt;
+
+  // BOSS
+  if(G.boss){ const B=G.boss; B.t+=dt; B.hit=Math.max(0,B.hit-dt);
+    B.appear=Math.max(0,B.appear-dt*.85);
+    B.z=lerp(B.z,16+Math.sin(B.t*.8)*1.2,dt*1.7); B.x=Math.sin(B.t*.7)*1.5;  // 在前方陪跑
+    B.y=3.7+Math.sin(B.t*1.1)*.35;
+    B.atk-=dt;
+    if(B.atk<=0&&B.appear<.4&&B.hp>0){
+      B.atk=2.6-G.level*.32;
+      const dx=G.px-B.x,dy=G.py-B.y,dz=G.pz-B.z,l=Math.hypot(dx,dy,dz)||1,v=9.5;
+      G.ebullets.push({x:B.x,y:B.y,z:B.z,vx:dx/l*v,vy:dy/l*v,vz:dz/l*v,life:5});
+    }
+  }
+  for(let i=G.ebullets.length-1;i>=0;i--){ const e=G.ebullets[i];
+    e.x+=e.vx*dt;e.y+=e.vy*dt;e.z+=e.vz*dt;e.life-=dt;
+    const d=Math.hypot(e.x-G.px,e.y-G.py,e.z-G.pz);
+    if(d<.85){ G.hp-=12; G.shake=.35; Sfx.hit(); spawnBurst(G.px,G.py,G.pz,"#ff8080",14);
+      G.ebullets.splice(i,1); syncHUD(); if(G.hp<=0){ gameOver(); return; } }
+    else if(e.life<=0||e.z<-12||Math.abs(e.x)>20) G.ebullets.splice(i,1);
+  }
+  // 浮动球
+  for(const o of G.balls) o.ph+=dt*.8;
+}
+
+/* ============================ 渲染 ============================ */
+function drawBackground(){
+  const L=LEVELS[G.level];
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,L.top); g.addColorStop(.55,L.bot); g.addColorStop(1,L.water);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // 光柱
+  for(const r of rays){ const p=project(r.x,9,r.z||14);
+    if(!p) continue; const w=r.w*p.s;
+    const lg=ctx.createLinearGradient(p.x,0,p.x-w,H);
+    lg.addColorStop(0,"rgba(220,255,255,"+L.ray+")"); lg.addColorStop(1,"rgba(220,255,255,0)");
+    ctx.fillStyle=lg; ctx.beginPath();
+    ctx.moveTo(p.x-w*.35,0); ctx.lineTo(p.x+w*.35,0);
+    ctx.lineTo(p.x+w,H); ctx.lineTo(p.x-w,H); ctx.closePath(); ctx.fill(); }
+  // 水面波光
+  ctx.globalAlpha=.10; ctx.strokeStyle="#ffffff"; ctx.lineWidth=1;
+  for(let i=0;i<7;i++){ const y=H*.08+i*7+Math.sin(G.t*.8+i)*2;
+    ctx.beginPath(); ctx.moveTo(0,y);
+    for(let x=0;x<=W;x+=24) ctx.lineTo(x,y+Math.sin(x*.012+G.t*.6+i)*3);
+    ctx.stroke(); } ctx.globalAlpha=1;
+}
+function drawGrid(){
+  const L=LEVELS[G.level], scroll=G.travel%2;
+  ctx.lineWidth=1;
+  // 横向网格线随前进向近处流动，制造「不断往前跑」的速度感
+  for(let i=0;i<19;i++){ const z=1+i*2-scroll; if(z<.8) continue;
+    const a=fog(z)*.30, p1=project(-20,0,z),p2=project(20,0,z); if(!p1||!p2) continue;
+    ctx.strokeStyle="rgba(190,255,250,"+a+")";
+    ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke(); }
+  for(let x=-20;x<=20;x+=2){ const a=.22;
+    const p1=project(x,0,1),p2=project(x,0,36); if(!p1||!p2) continue;
+    ctx.strokeStyle="rgba(190,255,250,"+a+")";
+    ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke(); }
+  // 当前瞄准航道的地面光带（中性高亮，只指示「你在哪条道」，不泄露答案）
+  if(G.state==="play"||G.state==="clear"){
+    const cx=G.aimTarget, hw=LANE_W/2;
+    const a=project(cx-hw,.01,Z_NEAR),b=project(cx+hw,.01,Z_NEAR);
+    const c=project(cx+hw,.01,30),d=project(cx-hw,.01,30);
+    if(a&&b&&c&&d){ ctx.globalAlpha=.15; ctx.fillStyle=L.accent;
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+      ctx.lineTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.closePath();ctx.fill(); ctx.globalAlpha=1; }
+  }
+  // 5 条分道线：外侧 2 条发光作航道总边界，内侧 3 条虚线把海床切成 4 条答案航道
+  for(let i=0;i<LANE_EDGES.length;i++){
+    const sx=LANE_EDGES[i], outer=(i===0||i===LANE_EDGES.length-1);
+    const p1=project(sx,0,Z_NEAR),p2=project(sx,0,36); if(!p1||!p2) continue;
+    ctx.lineWidth=outer?2.6:1.2;
+    ctx.globalAlpha=outer?.62:.32; ctx.strokeStyle=L.accent;
+    if(outer){ ctx.shadowBlur=13; ctx.shadowColor=L.accent; }
+    else ctx.setLineDash([9,7]);
+    ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke();
+    ctx.setLineDash([]); ctx.shadowBlur=0; ctx.globalAlpha=1;
+  }
+  // 每条航道中心的流动光点，当前道更亮更大
+  for(let i=0;i<19;i++){ const z=1+i*2-scroll; if(z<.8) continue;
+    for(const cx of BALL_XS){ const p=project(cx,.02,z); if(!p) continue;
+      const cur=Math.abs(cx-G.aimTarget)<.01;
+      ctx.globalAlpha=fog(z)*(cur?.78:.30); ctx.fillStyle=L.accent;
+      ctx.beginPath();ctx.arc(p.x,p.y,Math.max(1,p.s*(cur?.030:.017)),0,TAU);ctx.fill(); } }
+  ctx.globalAlpha=1;
+  // 地平雾
+  const fg=ctx.createLinearGradient(0,H*.35,0,H*.72);
+  fg.addColorStop(0,"rgba(255,255,255,0)"); fg.addColorStop(1,L.bot+"55");
+  ctx.fillStyle=fg; ctx.fillRect(0,H*.35,W,H*.4);
+}
+function drawStreak(o){
+  const p=project(o.x,o.y,o.z), q=project(o.x,o.y,o.z+o.len); if(!p||!q) return;
+  ctx.globalAlpha=fog(o.z)*.32; ctx.strokeStyle="rgba(215,255,255,.9)"; ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(p.x,p.y);ctx.stroke(); ctx.globalAlpha=1;
+}
+function drawRock(o){ const p=project(o.x,0,o.z); if(!p) return;
+  const a=fog(o.z),w=o.w*p.s,h=o.h*p.s;
+  ctx.globalAlpha=a; ctx.fillStyle="#0e5b6e";
+  ctx.beginPath(); ctx.ellipse(p.x,p.y-h*.35,w/2,h/2,0,0,TAU); ctx.fill();
+  ctx.fillStyle="rgba(90,200,205,.28)"; ctx.beginPath();
+  ctx.ellipse(p.x-w*.12,p.y-h*.62,w*.28,h*.17,-.3,0,TAU); ctx.fill();
+  ctx.globalAlpha=1; }
+function drawCoral(o){ const p=project(o.x,0,o.z); if(!p) return;
+  const a=fog(o.z),h=o.h*p.s,sw=Math.sin(o.t)*.10*p.s;
+  ctx.globalAlpha=a; ctx.strokeStyle=o.c; ctx.lineWidth=Math.max(1,h*.13);
+  ctx.lineCap="round";
+  for(let i=-1;i<=1;i++){ ctx.beginPath(); ctx.moveTo(p.x,p.y);
+    ctx.quadraticCurveTo(p.x+i*h*.22+sw,p.y-h*.55,p.x+i*h*.38+sw,p.y-h); ctx.stroke(); }
+  ctx.fillStyle=o.c; for(let i=-1;i<=1;i++){ ctx.beginPath();
+    ctx.arc(p.x+i*h*.38+sw,p.y-h,Math.max(1.5,h*.09),0,TAU); ctx.fill(); }
+  ctx.globalAlpha=1; }
+function drawJelly(o){ const yy=o.y+Math.sin(o.t)*.32;
+  const p=project(o.x,yy,o.z); if(!p||p.x<-60||p.x>W+60) return;
+  const a=fog(o.z)*.92,r=o.r*p.s;
+  ctx.globalAlpha=a; glow(p.x,p.y,r*2.6,"rgba(255,190,235,.22)",1);
+  const g=ctx.createLinearGradient(p.x,p.y-r,p.x,p.y+r);
+  g.addColorStop(0,"#fff2fb"); g.addColorStop(1,"#e2b8ef");
+  ctx.fillStyle=g; ctx.beginPath();
+  ctx.moveTo(p.x-r,p.y+r*.15);
+  ctx.bezierCurveTo(p.x-r,p.y-r*1.15,p.x+r,p.y-r*1.15,p.x+r,p.y+r*.15);
+  ctx.quadraticCurveTo(p.x,p.y+r*.55,p.x-r,p.y+r*.15); ctx.fill();
+  ctx.strokeStyle="rgba(255,190,235,.75)";ctx.lineWidth=Math.max(1,r*.09);
+  for(let i=-1;i<=1;i++){ ctx.beginPath(); ctx.moveTo(p.x+i*r*.45,p.y+r*.2);
+    ctx.quadraticCurveTo(p.x+i*r*.6+Math.sin(o.t*2+i)*r*.3,p.y+r*.9,p.x+i*r*.4,p.y+r*1.35); ctx.stroke(); }
+  // 圆润大眼（通用卡通语言）
+  const er=Math.max(1,r*.13);
+  ctx.fillStyle="#3a2b4a"; ctx.beginPath();ctx.arc(p.x-r*.28,p.y-r*.1,er,0,TAU);
+  ctx.arc(p.x+r*.28,p.y-r*.1,er,0,TAU); ctx.fill();
+  ctx.fillStyle="#fff"; ctx.beginPath();ctx.arc(p.x-r*.28-er*.3,p.y-r*.1-er*.35,er*.38,0,TAU);
+  ctx.arc(p.x+r*.28-er*.3,p.y-r*.1-er*.35,er*.38,0,TAU); ctx.fill();
+  ctx.globalAlpha=1; }
+function drawBubble(o){ const p=project(o.x,o.y,o.z); if(!p) return;
+  ctx.globalAlpha=fog(o.z)*.5; ctx.strokeStyle="rgba(230,255,255,.9)";
+  ctx.lineWidth=1; ctx.beginPath(); ctx.arc(p.x,p.y,o.r*p.s,0,TAU); ctx.stroke(); ctx.globalAlpha=1; }
+
+function drawBall(o){
+  const yy=o.y+Math.sin(o.ph)*.16;
+  const p=project(o.x,yy,o.z); if(!p) return;
+  const r=o.r0||(o.r0=1.0*p.s);
+  const alive=o.alive;
+  const a=alive?1:Math.max(0,o.hitT/.6);
+  ctx.globalAlpha=a;
+  if(alive){
+    // 当前瞄准航道的选项球：中性青白虚环，仅指示「会打中它」，不泄露正确答案
+    if(Math.abs(o.x-G.aimTarget)<.01){
+      ctx.strokeStyle="rgba(190,255,246,.95)"; ctx.lineWidth=Math.max(1.4,r*.06);
+      ctx.setLineDash([r*.22,r*.16]);
+      ctx.beginPath();ctx.arc(p.x,p.y,r*1.45,0,TAU);ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    glow(p.x,p.y,r*2.5,o.color+"66",.55);
+    // 光环
+    ctx.strokeStyle=o.color; ctx.lineWidth=Math.max(1.5,r*.075);
+    ctx.shadowBlur=r*.5; ctx.shadowColor=o.color;
+    ctx.beginPath();ctx.ellipse(p.x,p.y,r*1.22,r*.42,-.18,0,TAU);ctx.stroke();
+    ctx.shadowBlur=0;
+    // 球体
+    const g=ctx.createRadialGradient(p.x-r*.32,p.y-r*.38,r*.08,p.x,p.y,r);
+    g.addColorStop(0,"rgba(255,255,255,.95)"); g.addColorStop(.35,o.color+"cc");
+    g.addColorStop(1,o.color+"22");
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,r,0,TAU);ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.65)";ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.arc(p.x,p.y,r,0,TAU);ctx.stroke();
+    ctx.fillStyle="rgba(255,255,255,.9)";ctx.beginPath();
+    ctx.ellipse(p.x-r*.35,p.y-r*.4,r*.2,r*.12,-.5,0,TAU);ctx.fill();
+  }
+  // 选项标签
+  const fs=clamp(r*.50,10,17);
+  ctx.font="700 "+fs+"px 'Microsoft YaHei',sans-serif";
+  const tw=ctx.measureText(o.text).width, bw=tw+fs*1.5, bh=fs*1.9;
+  const by=p.y-r-bh-9;
+  ctx.fillStyle="rgba(4,26,42,.88)"; rr(ctx,p.x-bw/2,by,bw,bh,bh/2); ctx.fill();
+  ctx.strokeStyle=o.color;ctx.lineWidth=1.3;
+  rr(ctx,p.x-bw/2,by,bw,bh,bh/2);ctx.stroke();
+  ctx.fillStyle="#f2ffff";ctx.textAlign="center";ctx.textBaseline="middle";
+  ctx.fillText(o.text,p.x,by+bh/2+.5);
+  ctx.textAlign="start";ctx.textBaseline="alphabetic";ctx.globalAlpha=1;
+}
+function drawSub(){
+  const p=project(G.px,G.py,G.pz); if(!p) return;
+  const S=SUBS[G.sub], k=p.s/27;
+  ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(G.tilt*.22); ctx.scale(k,k);
+  // 尾焰光
+  glow(0,14,44,"rgba(120,255,240,.45)",.8);
+  // 推进器
+  for(let i=0;i<S.thr;i++){ const ox=(i-(S.thr-1)/2)*15;
+    ctx.fillStyle="#1c5a70"; rr(ctx,ox-5,7,10,16,4); ctx.fill();
+    const fg=ctx.createLinearGradient(0,20,0,42+Math.sin(G.t*22+i)*6);
+    fg.addColorStop(0,"#eafffd");fg.addColorStop(1,"rgba(90,240,230,0)");
+    ctx.fillStyle=fg;ctx.beginPath();ctx.moveTo(ox-4,20);ctx.lineTo(ox+4,20);
+    ctx.lineTo(ox,42+Math.sin(G.t*22+i)*6);ctx.closePath();ctx.fill(); }
+  // 双翼
+  ctx.fillStyle=S.c2;
+  const wing=(S.wing==="delta")?[-46,0,-30,18]:(S.wing==="sweep")?[-52,4,-28,20]:[-44,-2,-26,16];
+  for(const s of [-1,1]){ ctx.beginPath();
+    ctx.moveTo(s*20,-2);ctx.lineTo(s*wing[0]*-1,wing[1]);
+    ctx.lineTo(s*wing[2]*-1,wing[3]);ctx.lineTo(s*18,12);ctx.closePath();ctx.fill(); }
+  // 舱体
+  const bg=ctx.createLinearGradient(0,-26,0,20);
+  bg.addColorStop(0,"#ffffff");bg.addColorStop(.42,S.c1);bg.addColorStop(1,S.c2);
+  ctx.fillStyle=bg;ctx.beginPath();ctx.ellipse(0,0,28,18,0,0,TAU);ctx.fill();
+  ctx.strokeStyle="rgba(255,255,255,.85)";ctx.lineWidth=1.6;ctx.stroke();
+  // 金属装甲线
+  ctx.strokeStyle="rgba(20,80,100,.30)";ctx.lineWidth=1.2;
+  for(const y of [-8,8]){ ctx.beginPath();ctx.moveTo(-22,y);ctx.lineTo(22,y);ctx.stroke(); }
+  // 驾驶舱玻璃
+  const cg=ctx.createLinearGradient(0,-26,0,2);
+  cg.addColorStop(0,"#dffcff");cg.addColorStop(1,S.c2);
+  ctx.fillStyle=cg;ctx.beginPath();ctx.ellipse(0,-13,13,11,0,Math.PI,TAU);ctx.fill();
+  ctx.strokeStyle="rgba(255,255,255,.9)";ctx.lineWidth=1.4;ctx.stroke();
+  // 卡通大眼
+  ctx.fillStyle="#123444";ctx.beginPath();ctx.arc(-4.5,-14,2.5,0,TAU);ctx.arc(4.5,-14,2.5,0,TAU);ctx.fill();
+  ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(-5.3,-14.9,1,0,TAU);ctx.arc(3.7,-14.9,1,0,TAU);ctx.fill();
+  // 炮管
+  ctx.fillStyle="#e9fbff";rr(ctx,-4,-34,8,17,3);ctx.fill();
+  ctx.fillStyle=S.c2;rr(ctx,-5,-36,10,5,2);ctx.fill();
+  // 舷灯
+  for(const s of [-1,1]){ ctx.fillStyle=s<0?"#ff7a8a":"#8affd8";
+    ctx.beginPath();ctx.arc(s*23,0,2.6,0,TAU);ctx.fill(); }
+  ctx.restore();
+}
+function drawBoss(){
+  const B=G.boss; if(!B) return;
+  const p=project(B.x,B.y,B.z); if(!p) return;
+  const k=p.s/14*(1+(1-B.appear)*.2);   // 视觉尺寸约潜艇 3 倍（按透视比例补偿）
+  ctx.save();ctx.translate(p.x,p.y);ctx.scale(k,k);
+  if(B.hit>0){ ctx.shadowBlur=40;ctx.shadowColor="#ff6060"; }
+  const C=B.color;
+  if(B.type==="shark"){
+    // 尾鳍
+    ctx.fillStyle="#35566e";ctx.beginPath();ctx.moveTo(74,0);ctx.lineTo(104,-30);
+    ctx.lineTo(100,0);ctx.lineTo(104,30);ctx.closePath();ctx.fill();
+    // 身体
+    const g=ctx.createLinearGradient(0,-40,0,42);g.addColorStop(0,"#c7dce8");g.addColorStop(.5,C);g.addColorStop(1,"#2f5068");
+    ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(-88,0);
+    ctx.bezierCurveTo(-60,-40,30,-44,78,-8);ctx.bezierCurveTo(84,0,84,2,78,10);
+    ctx.bezierCurveTo(30,40,-60,38,-88,0);ctx.closePath();ctx.fill();
+    // 背鳍 + 装甲板
+    ctx.fillStyle="#33566d";ctx.beginPath();ctx.moveTo(-10,-36);ctx.lineTo(16,-66);ctx.lineTo(34,-32);ctx.closePath();ctx.fill();
+    ctx.strokeStyle="rgba(220,245,255,.55)";ctx.lineWidth=3;
+    for(const x of [-40,-8,24]){ ctx.beginPath();ctx.moveTo(x,-30);ctx.lineTo(x+10,28);ctx.stroke(); }
+    // 巨口 + 牙
+    ctx.fillStyle="#172a3a";ctx.beginPath();ctx.moveTo(-88,2);ctx.quadraticCurveTo(-52,26,-16,14);
+    ctx.quadraticCurveTo(-52,6,-88,-4);ctx.fill();
+    ctx.fillStyle="#fff";
+    for(let i=0;i<6;i++){ const x=-80+i*11;ctx.beginPath();ctx.moveTo(x,3);ctx.lineTo(x+5,12);ctx.lineTo(x+9,3);ctx.fill(); }
+    // 发光眼
+    glow(-58,-12,14,"rgba(255,70,70,.9)",1);
+    ctx.fillStyle="#ff5a5a";ctx.beginPath();ctx.arc(-58,-12,5,0,TAU);ctx.fill();
+    ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(-59,-13.5,1.8,0,TAU);ctx.fill();
+  }else if(B.type==="squid"){
+    // 触手
+    ctx.strokeStyle="#8e3f83";ctx.lineWidth=11;ctx.lineCap="round";
+    for(let i=0;i<8;i++){ const x=(i-3.5)*13, ph=B.t*2+i*.7;
+      ctx.beginPath();ctx.moveTo(x*.5,26);
+      ctx.bezierCurveTo(x,60+Math.sin(ph)*10,x*1.5+Math.sin(ph)*16,84,x*1.3+Math.sin(ph)*22,112);
+      ctx.stroke(); }
+    ctx.strokeStyle="#d681c1";ctx.lineWidth=4;
+    for(let i=0;i<8;i++){ const x=(i-3.5)*13, ph=B.t*2+i*.7;
+      ctx.beginPath();ctx.moveTo(x*.5,26);
+      ctx.bezierCurveTo(x,60+Math.sin(ph)*10,x*1.5+Math.sin(ph)*16,84,x*1.3+Math.sin(ph)*22,112);
+      ctx.stroke(); }
+    const g=ctx.createLinearGradient(0,-90,0,34);g.addColorStop(0,"#f0b6e0");g.addColorStop(.6,C);g.addColorStop(1,"#5d2c63");
+    ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(0,-96);
+    ctx.bezierCurveTo(46,-88,48,-6,32,28);ctx.quadraticCurveTo(0,42,-32,28);
+    ctx.bezierCurveTo(-48,-6,-46,-88,0,-96);ctx.fill();
+    // 装甲环
+    ctx.strokeStyle="rgba(255,220,250,.5)";ctx.lineWidth=4;
+    for(const y of [-54,-26]){ctx.beginPath();ctx.ellipse(0,y,36-(y+54)*.25,7,0,0,TAU);ctx.stroke();}
+    glow(-16,-46,15,"rgba(255,240,120,.9)",1);
+    ctx.fillStyle="#ffe98a";ctx.beginPath();ctx.arc(-16,-46,6,0,TAU);ctx.arc(16,-46,6,0,TAU);ctx.fill();
+    ctx.fillStyle="#5a2140";ctx.beginPath();ctx.arc(-16,-46,2.6,0,TAU);ctx.arc(16,-46,2.6,0,TAU);ctx.fill();
+  }else{
+    // 灯笼杆 + 诱饵
+    ctx.strokeStyle="#3b2f70";ctx.lineWidth=6;ctx.beginPath();
+    ctx.moveTo(-6,-42);ctx.quadraticCurveTo(-52,-88,-66,-58);ctx.stroke();
+    glow(-66,-58,34,"rgba(180,140,255,.95)",1);
+    ctx.fillStyle="#e7d4ff";ctx.beginPath();ctx.arc(-66,-58,11,0,TAU);ctx.fill();
+    const g=ctx.createLinearGradient(0,-46,0,48);g.addColorStop(0,"#a99ae8");g.addColorStop(.55,C);g.addColorStop(1,"#281c56");
+    ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(-86,0);
+    ctx.bezierCurveTo(-58,-48,34,-50,80,-6);ctx.quadraticCurveTo(88,0,80,10);
+    ctx.bezierCurveTo(34,48,-58,44,-86,0);ctx.closePath();ctx.fill();
+    ctx.fillStyle="#3a2a72";ctx.beginPath();ctx.moveTo(74,-2);ctx.lineTo(108,-26);
+    ctx.lineTo(102,2);ctx.lineTo(108,28);ctx.closePath();ctx.fill();
+    ctx.strokeStyle="rgba(220,210,255,.45)";ctx.lineWidth=3;
+    for(const x of [-42,-8,26]){ctx.beginPath();ctx.moveTo(x,-32);ctx.lineTo(x+8,30);ctx.stroke();}
+    ctx.fillStyle="#1a1038";ctx.beginPath();ctx.moveTo(-86,4);ctx.quadraticCurveTo(-50,30,-14,16);
+    ctx.quadraticCurveTo(-50,8,-86,-4);ctx.fill();
+    ctx.fillStyle="#fff";for(let i=0;i<6;i++){const x=-78+i*11;ctx.beginPath();
+      ctx.moveTo(x,5);ctx.lineTo(x+5,14);ctx.lineTo(x+9,5);ctx.fill();}
+    glow(-56,-14,14,"rgba(255,90,120,.9)",1);
+    ctx.fillStyle="#ff6a86";ctx.beginPath();ctx.arc(-56,-14,5,0,TAU);ctx.fill();
+  }
+  ctx.shadowBlur=0;
+  // 弱点标识（脉动红环）
+  const pulse=1+Math.sin(G.t*5)*.12;
+  ctx.strokeStyle="rgba(255,70,70,.95)";ctx.lineWidth=3;
+  ctx.shadowBlur=16;ctx.shadowColor="#ff4040";
+  ctx.beginPath();ctx.arc(0,-4,26*pulse,0,TAU);ctx.stroke();
+  ctx.beginPath();ctx.arc(0,-4,4,0,TAU);ctx.fillStyle="#ff5a5a";ctx.fill();
+  ctx.shadowBlur=0;ctx.restore();
+}
+function drawBullet(b){ const p=project(b.x,b.y,b.z); if(!p) return;
+  glow(p.x,p.y,14,"rgba(160,255,245,.8)",.9);
+  ctx.strokeStyle="rgba(180,255,250,.55)";ctx.lineWidth=2.4;ctx.beginPath();
+  for(let i=0;i<b.trail.length;i++){ const q=project(b.trail[i].x,b.trail[i].y,b.trail[i].z);
+    if(!q)continue; if(i===0)ctx.moveTo(q.x,q.y);else ctx.lineTo(q.x,q.y); }
+  ctx.lineTo(p.x,p.y);ctx.stroke();
+  ctx.fillStyle="#f2ffff";ctx.beginPath();ctx.arc(p.x,p.y,4,0,TAU);ctx.fill(); }
+function drawEBullet(e){ const p=project(e.x,e.y,e.z); if(!p) return;
+  glow(p.x,p.y,16,"rgba(255,110,150,.8)",.9);
+  ctx.fillStyle="#ff9ab5";ctx.beginPath();ctx.arc(p.x,p.y,6,0,TAU);ctx.fill();
+  ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(p.x-1.5,p.y-1.5,2,0,TAU);ctx.fill(); }
+function drawPart(p){ const q=project(p.x,p.y,p.z); if(!q) return;
+  ctx.globalAlpha=clamp(p.life/.6,0,1);ctx.fillStyle=p.color;
+  ctx.beginPath();ctx.arc(q.x,q.y,p.r*q.s,0,TAU);ctx.fill();ctx.globalAlpha=1; }
+
+function render(){
+  ctx.save();
+  if(G.shake>0) ctx.translate(rnd(-1,1)*G.shake*9,rnd(-1,1)*G.shake*9);
+  drawBackground(); drawGrid();
+  const list=[];
+  for(const o of rocks) list.push({z:o.z,f:()=>drawRock(o)});
+  for(const o of corals) list.push({z:o.z,f:()=>drawCoral(o)});
+  for(const o of jellies) list.push({z:o.z,f:()=>drawJelly(o)});
+  for(const o of bubbles) list.push({z:o.z,f:()=>drawBubble(o)});
+  for(const o of streaks) list.push({z:o.z-.05,f:()=>drawStreak(o)});
+  if(G.state==="play"||G.state==="clear"){
+    for(const o of G.balls) list.push({z:o.z-.01,f:()=>drawBall(o)});
+    if(G.boss) list.push({z:G.boss.z,f:drawBoss});
+    for(const b of G.bullets) list.push({z:b.z-.02,f:()=>drawBullet(b)});
+    for(const e of G.ebullets) list.push({z:e.z-.02,f:()=>drawEBullet(e)});
+    for(const p of G.parts) list.push({z:p.z-.02,f:()=>drawPart(p)});
+  }
+  list.push({z:G.pz,f:drawSub});   // 主菜单也展示当前选中的潜艇
+  list.sort((a,b)=>b.z-a.z);
+  for(const it of list) it.f();
+  // 暗角
+  const vg=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.3,W/2,H/2,Math.max(W,H)*.75);
+  vg.addColorStop(0,"rgba(0,0,0,0)");vg.addColorStop(1,"rgba(0,12,24,.42)");
+  ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+  ctx.restore();
+}
+
+/* ============================ 主循环 ============================ */
+let last=performance.now();
+function loop(now){ const dt=Math.min(.05,(now-last)/1000); last=now;
+  update(dt); render(); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+
+/* ============================ 界面 ============================ */
+const SPEC_HTML=
+ '<h2>资源生成提示词（原样存档）</h2><div class="spec">'+
+ '<div class="kv"><b>潜艇</b><span>生成6款不同外观的3D潜艇，适合海底场景，带有发射炮弹的结构，金属质感，科幻风格，尺寸适合游戏场景使用</span></div>'+
+ '<div class="kv" style="margin-top:8px"><b>BOSS</b><span>生成巨齿鲨王3D模型，深海风格，带有攻击动画，身体有金属装甲，眼睛发光，尺寸是潜艇的3倍</span></div>'+
+ '<div class="kv" style="margin-top:8px"><b>场景</b><span>生成3D海底场景，包含礁石、水母、珊瑚等海洋生物，分浅海、深海、深渊三个层级，每个层级有不同的光照和氛围</span></div>'+
+ '<div class="kv" style="margin-top:8px"><b>风格参照</b><span>人物和场景可以参照动画片海底小纵队</span></div></div>'+
+ '<h2>本原型已落地的风格锚点</h2><div class="spec">'+
+ '<div class="kv"><b>比例</b><span>圆润 Q 版、大头大眼、清晰剪影；BOSS 视觉尺寸约潜艇 3 倍</span></div>'+
+ '<div class="kv"><b>配色</b><span>浅海青绿 → 深海钴蓝 → 深渊紫，明度逐层下降，生物荧光作点缀</span></div>'+
+ '<div class="kv"><b>渲染</b><span>低多边形卡通、描边高光、卡通大眼高光点、脉动弱点环</span></div>'+
+ '<div class="kv"><b>氛围</b><span>科普探险向，网格海床 + 光柱 + 气泡 + 成群水母</span></div>'+
+ '<div class="kv"><b>构图</b><span>自动向前下潜的跑酷式镜头；礁石 / 珊瑚固定夹在左右两侧，海床用 5 条分道线切出 4 条答案航道（每个选项独占一条），当前航道有地面光带高亮</span></div></div>'+
+ '<div class="note">合规与工程量说明：仅借鉴通用美术语言，未使用任何具体角色造型、名称、标识或专属配色组合。'+
+ '当前 6 款潜艇 / 3 个 BOSS / 三层场景均为程序化几何占位，零外部依赖、双击即玩；'+
+ 'AI 生成的 GLB/FBX 模型需人工精修、拓扑检查与合规确认后方可替换。'+
+ '替换点为 <code>drawSub()</code> / <code>drawBoss()</code> / <code>drawSceneProps()</code> 三处渲染函数。'+
+ '平台接口、格式支持与商店条款以官方文档当前版本为准。</div>';
+
+function showMenu(){
+  G.state="menu"; $("hud").classList.add("hide");$("pad").classList.add("hide");
+  $("fire").classList.add("hide");$("crosshair").classList.add("hide");
+  $("overlay").classList.remove("hide");
+  const cards=SUBS.map((s,i)=>'<div class="subcard'+(i===G.sub?" on":"")+'" data-sub="'+i+'">'+
+    '<div class="nm"><i class="dot" style="background:'+s.c2+';color:'+s.c2+'"></i>'+s.name+'</div>'+
+    '<div class="st">'+s.tag+'<br>速度 '+s.speed.toFixed(2)+' × · 火力 '+s.power.toFixed(2)+' × · 耐久 '+s.hp+'</div></div>').join("");
+  $("overlay").innerHTML='<div class="card"><h1>海底大作战</h1>'+
+    '<div class="sub">3D 潜艇射击 × 四大名著知识答题闯关</div>'+
+    '<h2>选择你的潜艇</h2><div class="subs">'+cards+'</div>'+
+    '<h2>玩法</h2><div class="spec">'+
+    '潜艇自动向前下潜，海床切成 <b>4 条答案航道</b>，每个选项球独占一条 · 鼠标 / WASD / 摇杆左右变道，上下升降躲弹幕<br>'+
+    '对准哪条道，炮弹就沿那条道<b>正前方</b>射出 · 左键 / 空格 / 发射键开炮；击破正确项得分并累积连击，击破错误项扣分<br>'+
+    '答对 '+LEVELS[0].need+' / '+LEVELS[1].need+' / '+LEVELS[2].need+' 题后 BOSS 登场，此后每次答对都会对 BOSS 造成重创<br>'+
+    '击杀 BOSS 解锁下一关；潜艇耐久归零则本关失败</div>'+
+    '<div class="tips">题库共 '+BANK.length+' 题 · 三关递进 · 难度与倒计时随深度提升</div>'+
+    '<button class="btn" data-act="start">开始下潜</button>'+
+    '<button class="btn ghost" data-act="spec">查看资源生成规格</button></div>';
+}
+function showSpec(){
+  $("overlay").innerHTML='<div class="card"><h1>资源生成规格</h1>'+
+    '<div class="sub">阶段一 · 美术与资源输入</div>'+SPEC_HTML+
+    '<button class="btn" data-act="back">返回主菜单</button></div>';
+}
+$("overlay").addEventListener("click",e=>{
+  const subCard=e.target.closest("[data-sub]");
+  if(subCard){ G.sub=parseInt(subCard.dataset.sub,10);
+    $("overlay").querySelectorAll(".subcard").forEach(n=>n.classList.remove("on"));
+    subCard.classList.add("on"); return; }
+  const t=e.target.closest("[data-act]"); if(!t) return;
+  const a=t.dataset.act;
+  if(a==="start") startGame();
+  else if(a==="spec") showSpec();
+  else if(a==="back"||a==="menu") showMenu();
+  else if(a==="next"){ G.state="play"; $("overlay").classList.add("hide");
+    $("hud").classList.remove("hide");$("pad").classList.remove("hide");
+    $("fire").classList.remove("hide");$("crosshair").classList.remove("hide");
+    startLevel(G.level+1); }
+  else if(a==="retry"){ G.state="play"; $("overlay").classList.add("hide");
+    $("hud").classList.remove("hide");$("pad").classList.remove("hide");
+    $("fire").classList.remove("hide");$("crosshair").classList.remove("hide");
+    startLevel(G.level); }
+});
+showMenu();
+</script>
+</body>
+</html>

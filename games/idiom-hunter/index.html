@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>成语猎人 · AI 创意小游戏</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: "KaiTi", "STKaiti", "楷体", "Microsoft YaHei", serif;
+    background: #f5efdf;
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(192,57,43,.04) 0, transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(43,43,43,.05) 0, transparent 45%);
+    color: #2b2b2b;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100%;
+    padding: 16px 12px 40px;
+  }
+  /* ===== 顶部标题 ===== */
+  .header { text-align: center; margin-bottom: 14px; position: relative; }
+  .title {
+    font-size: 44px; letter-spacing: 10px; font-weight: bold;
+    color: #2b2b2b; display: inline-block; position: relative;
+  }
+  .title::after {
+    content: "AI 猎"; position: absolute; right: -58px; top: -8px;
+    width: 44px; height: 44px; border: 3px solid #b93a32; border-radius: 6px;
+    color: #b93a32; font-size: 15px; letter-spacing: 0;
+    display: flex; align-items: center; justify-content: center;
+    transform: rotate(8deg); opacity: .85; font-weight: bold; padding: 2px;
+    writing-mode: vertical-rl; line-height: 1.1;
+  }
+  .subtitle { font-size: 15px; color: #7a6f5d; letter-spacing: 4px; margin-top: 6px; }
+  /* ===== 状态栏 ===== */
+  .hud {
+    display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 14px; width: 100%; max-width: 520px;
+  }
+  .hud-item {
+    background: #fffdf6; border: 1.5px solid #d8cdb4; border-radius: 12px;
+    padding: 8px 16px; min-width: 96px; text-align: center;
+    box-shadow: 0 2px 0 rgba(120,105,75,.15);
+  }
+  .hud-item .label { font-size: 12px; color: #8a7f6a; letter-spacing: 2px; }
+  .hud-item .value { font-size: 22px; font-weight: bold; color: #2b2b2b; }
+  .hud-item .value.warn { color: #b93a32; }
+  /* ===== 主区域 ===== */
+  .stage { display: flex; gap: 16px; width: 100%; max-width: 860px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+  .board-wrap {
+    background: #fffdf6; border: 2px solid #d8cdb4; border-radius: 16px;
+    padding: 14px; box-shadow: 0 6px 24px rgba(120,105,75,.18);
+    position: relative;
+  }
+  #board {
+    display: grid; gap: 6px;
+    touch-action: manipulation;
+  }
+  .cell {
+    width: 52px; height: 52px; border-radius: 10px;
+    background: #f2ead6; border: 1.5px solid #e2d7bd;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: bold; color: #2b2b2b;
+    cursor: pointer; user-select: none;
+    transition: transform .08s, background .15s, color .15s, border-color .15s;
+  }
+  .cell:active { transform: scale(.92); }
+  .cell.first { background: #b93a32; color: #fff; border-color: #93251f; box-shadow: 0 0 0 3px rgba(185,58,50,.25); }
+  .cell.sel { background: #e8a33d; color: #fff; border-color: #c9871f; }
+  .cell.found { background: #4e7d5b; color: #fff; border-color: #3c6247; cursor: default; }
+  .cell.shake { animation: shake .35s; background: #d96a5a !important; color: #fff; border-color: #b93a32 !important; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 50%{transform:translateX(4px)} 75%{transform:translateX(-3px)} }
+  /* ===== 侧栏 ===== */
+  .side { width: 300px; display: flex; flex-direction: column; gap: 12px; }
+  .panel {
+    background: #fffdf6; border: 2px solid #d8cdb4; border-radius: 16px;
+    padding: 14px 16px; box-shadow: 0 4px 14px rgba(120,105,75,.12);
+  }
+  .panel h3 { font-size: 16px; letter-spacing: 3px; margin-bottom: 10px; color: #4a4030; border-left: 4px solid #b93a32; padding-left: 8px; }
+  .idiom-list { list-style: none; font-size: 15px; }
+  .idiom-list li { padding: 7px 4px; border-bottom: 1px dashed #e2d7bd; color: #b7ab90; transition: color .3s; }
+  .idiom-list li:last-child { border-bottom: none; }
+  .idiom-list li.done { color: #2b2b2b; }
+  .idiom-list li.done .w { font-weight: bold; color: #b93a32; }
+  .idiom-list li .m { display: none; font-size: 12.5px; color: #6f6552; margin-top: 3px; line-height: 1.5; }
+  .idiom-list li.done .m { display: block; }
+  .btn-row { display: flex; gap: 8px; }
+  button {
+    font-family: inherit; font-size: 15px; letter-spacing: 2px;
+    padding: 9px 0; flex: 1; border-radius: 10px; cursor: pointer;
+    border: 1.5px solid #b93a32; background: #fffdf6; color: #b93a32;
+    transition: all .15s; font-weight: bold;
+  }
+  button:hover { background: #b93a32; color: #fff; }
+  button.primary { background: #b93a32; color: #fff; }
+  button.primary:hover { background: #93251f; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .toast {
+    position: fixed; top: 18%; left: 50%; transform: translateX(-50%) translateY(-8px);
+    background: rgba(43,43,43,.88); color: #fff; padding: 10px 22px;
+    border-radius: 24px; font-size: 16px; letter-spacing: 2px;
+    opacity: 0; pointer-events: none; transition: all .25s; z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  /* ===== 遮罩层 ===== */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(245,239,223,.96);
+    display: flex; align-items: center; justify-content: center; z-index: 40;
+    opacity: 0; pointer-events: none; transition: opacity .3s;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .overlay-card { text-align: center; max-width: 420px; padding: 30px; }
+  .overlay-card h2 { font-size: 34px; letter-spacing: 6px; margin-bottom: 14px; }
+  .overlay-card p { font-size: 15.5px; color: #5d5340; line-height: 1.9; margin-bottom: 22px; text-align: left; }
+  .overlay-card .big-btn { font-size: 17px; padding: 12px 44px; flex: none; }
+  .seal {
+    width: 72px; height: 72px; margin: 0 auto 16px; border: 3px solid #b93a32;
+    border-radius: 10px; color: #b93a32; display: flex; align-items: center;
+    justify-content: center; font-size: 22px; font-weight: bold; letter-spacing: 2px;
+    transform: rotate(-6deg); line-height: 1.2; padding: 4px; text-align: center;
+  }
+  /* 彩带 */
+  .confetti { position: fixed; top: -20px; z-index: 60; pointer-events: none; font-size: 18px; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(720deg); opacity: .6; } }
+  .footer { margin-top: 18px; font-size: 12.5px; color: #a2967c; letter-spacing: 1px; }
+  @media (max-width: 760px) {
+    .title { font-size: 34px; letter-spacing: 6px; }
+    .cell { width: 40px; height: 40px; font-size: 20px; }
+    .side { width: 100%; max-width: 420px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">成 语 猎 人</div>
+  <div class="subtitle">—— 于字海之中，猎取千年成语 ——</div>
+</div>
+
+<div class="hud">
+  <div class="hud-item"><div class="label">关卡</div><div class="value" id="hud-level">1</div></div>
+  <div class="hud-item"><div class="label">得分</div><div class="value" id="hud-score">0</div></div>
+  <div class="hud-item"><div class="label">剩余时间</div><div class="value" id="hud-time">150</div></div>
+  <div class="hud-item"><div class="label">已猎获</div><div class="value" id="hud-found">0 / 4</div></div>
+</div>
+
+<div class="stage">
+  <div class="board-wrap"><div id="board"></div></div>
+  <div class="side">
+    <div class="panel">
+      <h3>猎物图鉴</h3>
+      <ul class="idiom-list" id="idiom-list"></ul>
+    </div>
+    <div class="panel">
+      <h3>锦囊</h3>
+      <div class="btn-row">
+        <button id="btn-hint">提示（-30分）</button>
+        <button id="btn-restart">重新开始</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 开始界面 -->
+<div class="overlay show" id="overlay-start">
+  <div class="overlay-card">
+    <div class="seal">字海猎手</div>
+    <h2>成语猎人</h2>
+    <p>
+      千年成语藏于字海，请你将它们一一猎获。<br><br>
+      <b>玩法：</b>先点击成语<b>第一个字</b>，再点击<b>最后一个字</b>，即可选中整条直线（横、竖、斜均可，正反皆可）。<br><br>
+      每猎获一个成语 +100 分，通关剩余时间折算奖励分；连击猎获还有额外加分。锦囊可提示第一个字（每次 -30 分）。<br><br>
+      共三关，字体越铺越广，考验你的成语储备！
+    </p>
+    <button class="primary big-btn" id="btn-start">开 始 狎 猎</button>
+  </div>
+</div>
+
+<!-- 结算界面 -->
+<div class="overlay" id="overlay-end">
+  <div class="overlay-card">
+    <div class="seal" id="end-seal">完赛</div>
+    <h2 id="end-title">时间到！</h2>
+    <p id="end-text"></p>
+    <button class="primary big-btn" id="btn-again">再 猎 一 局</button>
+  </div>
+</div>
+
+<div class="footer">"智游杯" AI+游戏创意作品挑战赛 参赛作品 · 借助 AI 工具创作 · 2026</div>
+
+<script>
+/* ==================== 题库（AI 生成并人工校对，全部为正向寓意成语） ==================== */
+const LEVELS = [
+  { size: 8, time: 150, idioms: [
+    { w: "全力以赴", m: "把全部力量都投入进去。" },
+    { w: "心想事成", m: "心中所想的事都能圆满实现。" },
+    { w: "学无止境", m: "学习是没有尽头的，当终身求索。" },
+    { w: "日新月异", m: "每天每月都有新变化，形容发展迅速。" },
+  ]},
+  { size: 9, time: 180, idioms: [
+    { w: "厚积薄发", m: "长期积累，一朝充分施展。" },
+    { w: "水滴石穿", m: "水不停地滴，能把石头滴穿，比喻坚持之力。" },
+    { w: "百折不挠", m: "无论受多少挫折都不退缩。" },
+    { w: "温故知新", m: "温习旧知识，获得新的理解。" },
+    { w: "脚踏实地", m: "做事踏实认真，不浮夸。" },
+  ]},
+  { size: 10, time: 210, idioms: [
+    { w: "精益求精", m: "好了还求更好。" },
+    { w: "锲而不舍", m: "不停地雕刻，比喻有恒心、有毅力。" },
+    { w: "循序渐进", m: "按一定的步骤逐渐深入或提高。" },
+    { w: "融会贯通", m: "把各方面知识融合贯穿，得到全面透彻的理解。" },
+    { w: "开卷有益", m: "读书总有好处。" },
+    { w: "自强不息", m: "自觉地努力向上，永不松懈。" },
+  ]},
+];
+
+/* 填充用常见汉字池 */
+const FILLER = "山水风云天地日月星辰火木金土人心手口春夏秋冬梅兰竹菊诗酒花茶琴棋书画龙凤鹤燕江河湖海云雨雪霜松柏杨柳桃李杏枫梅竹青红黄蓝紫东西南北中和美善福安康乐静雅清幽淡然悠远宁思言志行知学仁义礼智信勇毅诚朴刚柔谦敏慧颖浩瀚博渊澄明澈" +
+  "一三五七八九十百千万春秋战国齐鲁燕韩赵魏秦楚汉唐宋元明清";
+
+/* ==================== 游戏状态 ==================== */
+const $ = id => document.getElementById(id);
+let state = null;
+let timerId = null;
+let comboTimerId = null;
+let comboCount = 0;
+
+function newGame() {
+  clearInterval(timerId);
+  state = { level: 0, score: 0 };
+  loadLevel(0);
+}
+
+function loadLevel(idx) {
+  clearInterval(timerId);
+  const lv = LEVELS[idx];
+  const grid = buildGrid(lv);
+  if (!grid) { loadLevel(idx); return; }
+  state.grid = grid;
+  state.size = lv.size;
+  state.time = lv.time;
+  state.idioms = lv.idioms.map(o => ({ ...o, found: false }));
+  state.placedSet = new Set(lv.idioms.map(o => o.w));
+  state.first = null;
+  state.selected = [];
+  comboCount = 0;
+  render();
+  updateHud();
+  startTimer();
+}
+
+/* 在网格中放置成语（8 个方向） */
+function buildGrid(lv) {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const n = lv.size;
+    const grid = Array.from({ length: n }, () => Array(n).fill(""));
+    const ok = true;
+    const placed = [];
+    for (const item of lv.idioms) {
+      let done = false;
+      for (let t = 0; t < 300; t++) {
+        const dirs = [[0,1],[1,0],[1,1],[1,-1],[0,-1],[-1,0],[-1,-1],[-1,1]];
+        const [dx, dy] = dirs[Math.floor(Math.random() * 8)];
+        const x0 = Math.floor(Math.random() * n);
+        const y0 = Math.floor(Math.random() * n);
+        const x1 = x0 + dx * (item.w.length - 1);
+        const y1 = y0 + dy * (item.w.length - 1);
+        if (x1 < 0 || x1 >= n || y1 < 0 || y1 >= n) continue;
+        let fits = true;
+        const cells = [];
+        for (let i = 0; i < item.w.length; i++) {
+          const x = x0 + dx * i, y = y0 + dy * i;
+          if (grid[y][x] !== "" && grid[y][x] !== item.w[i]) { fits = false; break; }
+          cells.push([x, y]);
+        }
+        if (!fits) continue;
+        for (let i = 0; i < item.w.length; i++) grid[cells[i][1]][cells[i][0]] = item.w[i];
+        placed.push(cells);
+        done = true;
+        break;
+      }
+      if (!done) { /* 本轮失败，重试整个网格 */ }
+    }
+    if (placed.length === lv.idioms.length) {
+      // 填充空格
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++)
+        if (grid[y][x] === "") grid[y][x] = FILLER[Math.floor(Math.random() * FILLER.length)];
+      return grid;
+    }
+  }
+  return null;
+}
+
+/* ==================== 渲染 ==================== */
+function render() {
+  const board = $("board");
+  board.innerHTML = "";
+  board.style.gridTemplateColumns = `repeat(${state.size}, auto)`;
+  const n = state.size;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const d = document.createElement("div");
+    d.className = "cell";
+    d.textContent = state.grid[y][x];
+    d.dataset.x = x; d.dataset.y = y;
+    d.addEventListener("click", onCellClick);
+    board.appendChild(d);
+  }
+  renderList();
+}
+
+function renderList() {
+  const ul = $("idiom-list");
+  ul.innerHTML = "";
+  for (const it of state.idioms) {
+    const li = document.createElement("li");
+    if (it.found) li.className = "done";
+    li.innerHTML = `<span class="w">${it.found ? it.w : "？？？ ？？？ "}</span>` +
+      (it.found ? `<div class="m">${it.m}</div>` : "");
+    ul.appendChild(li);
+  }
+}
+
+function cellEl(x, y) {
+  return document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+}
+
+function updateHud() {
+  $("hud-level").textContent = state.level + 1;
+  $("hud-score").textContent = state.score;
+  const t = $("hud-time");
+  t.textContent = state.time;
+  t.classList.toggle("warn", state.time <= 15);
+  const found = state.idioms.filter(i => i.found).length;
+  $("hud-found").textContent = `${found} / ${state.idioms.length}`;
+}
+
+/* ==================== 选择逻辑 ==================== */
+function onCellClick(e) {
+  if (!state || state.ended) return;
+  const x = +e.target.dataset.x, y = +e.target.dataset.y;
+  const cell = e.target;
+  if (cell.classList.contains("found")) return;
+
+  if (!state.first) {
+    state.first = { x, y };
+    cell.classList.add("first");
+    return;
+  }
+  if (state.first.x === x && state.first.y === y) {  // 再点自己 = 取消
+    cell.classList.remove("first");
+    state.first = null;
+    return;
+  }
+  // 计算直线上的格子
+  const dx = Math.sign(x - state.first.x), dy = Math.sign(y - state.first.y);
+  const lenX = Math.abs(x - state.first.x), lenY = Math.abs(y - state.first.y);
+  const clearSelection = () => {
+    document.querySelectorAll(".cell.first,.cell.sel").forEach(c => c.classList.remove("first", "sel"));
+    state.first = null;
+  };
+  if (lenX !== lenY && lenX !== 0 && lenY !== 0) {  // 不在一条直线上
+    clearSelection();
+    state.first = { x, y };
+    cell.classList.add("first");
+    return;
+  }
+  const cells = [];
+  const steps = Math.max(lenX, lenY);
+  for (let i = 0; i <= steps; i++) cells.push([state.first.x + dx * i, state.first.y + dy * i]);
+  cells.forEach(([cx, cy]) => cellEl(cx, cy).classList.add("sel"));
+  const str = cells.map(([cx, cy]) => state.grid[cy][cx]).join("");
+  const rev = [...str].reverse().join("");
+
+  setTimeout(() => {
+    clearSelection();
+    check(str, cells) || check(rev, cells) || wrong(cells);
+  }, 160);
+}
+
+function check(str, cells) {
+  const it = state.idioms.find(i => !i.found && i.w === str);
+  if (!it) return false;
+  it.found = true;
+  comboCount = comboTimerId ? comboCount + 1 : 1;
+  clearTimeout(comboTimerId);
+  comboTimerId = setTimeout(() => { comboCount = 0; comboTimerId = null; }, 8000);
+  let gain = 100;
+  if (comboCount > 1) { gain += 50 * (comboCount - 1); toast(`连击 ×${comboCount}！+${gain}`); }
+  else toast(`猎获「${it.w}」+100`);
+  state.score += gain;
+  cells.forEach(([cx, cy]) => { const c = cellEl(cx, cy); c.classList.remove("sel", "first"); c.classList.add("found"); });
+  renderList(); updateHud();
+  if (state.idioms.every(i => i.found)) levelClear();
+  return true;
+}
+
+function wrong(cells) {
+  cells.forEach(([cx, cy]) => {
+    const c = cellEl(cx, cy);
+    if (c && !c.classList.contains("found")) { c.classList.add("shake"); setTimeout(() => c.classList.remove("shake"), 380); }
+  });
+}
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._id);
+  t._id = setTimeout(() => t.classList.remove("show"), 1600);
+}
+
+/* ==================== 计时与流程 ==================== */
+function startTimer() {
+  clearInterval(timerId);
+  timerId = setInterval(() => {
+    state.time--;
+    updateHud();
+    if (state.time <= 0) endGame(false);
+  }, 1000);
+}
+
+function levelClear() {
+  clearInterval(timerId);
+  const bonus = state.time * 2;
+  state.score += bonus;
+  toast(`本关通关！时间奖励 +${bonus}`);
+  updateHud();
+  setTimeout(() => {
+    if (state.level >= LEVELS.length - 1) endGame(true);
+    else { state.level++; loadLevel(state.level); toast(`第 ${state.level + 1} 关，字海更广了！`); }
+  }, 1300);
+}
+
+function endGame(win) {
+  clearInterval(timerId);
+  state.ended = true;
+  const total = LEVELS.reduce((s, l) => s + l.idioms.length, 0);
+  const found = [];
+  state.idioms.forEach(i => { if (i.found) found.push(i.w); });
+  $("end-title").textContent = win ? "全部猎获！" : "时间到！";
+  $("end-seal").textContent = win ? "猎手无双" : "再战";
+  $("end-text").innerHTML = win
+    ? `恭喜你猎获了全部 ${total} 个成语！<br><br>最终得分：<b style="color:#b93a32;font-size:22px">${state.score}</b><br><br>字海无涯，愿你在成语的世界里继续精进。`
+    : `本局得分：<b style="color:#b93a32;font-size:20px">${state.score}</b><br><br>成语之路贵在坚持——水滴石穿，再来一局！`;
+  $("overlay-end").classList.add("show");
+  if (win) confetti();
+}
+
+function confetti() {
+  const chars = ["成","语","猎","人","文","武","礼","智","信","福"];
+  for (let i = 0; i < 40; i++) {
+    const d = document.createElement("div");
+    d.className = "confetti";
+    d.textContent = chars[Math.floor(Math.random() * chars.length)];
+    d.style.left = Math.random() * 100 + "vw";
+    d.style.color = ["#b93a32","#e8a33d","#4e7d5b","#2b2b2b"][i % 4];
+    d.style.animationDuration = (2 + Math.random() * 2) + "s";
+    d.style.animationDelay = Math.random() * 0.8 + "s";
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 5000);
+  }
+}
+
+/* ==================== 按钮 ==================== */
+$("btn-start").addEventListener("click", () => {
+  $("overlay-start").classList.remove("show");
+  newGame();
+});
+$("btn-again").addEventListener("click", () => {
+  $("overlay-end").classList.remove("show");
+  newGame();
+});
+$("btn-restart").addEventListener("click", () => newGame());
+$("btn-hint").addEventListener("click", () => {
+  if (!state || state.ended) return;
+  const it = state.idioms.find(i => !i.found);
+  if (!it) return;
+  if (state.score < 30) { toast("分数不足，无法使用锦囊"); return; }
+  state.score -= 30;
+  const c = cellEl(0, 0);
+  // 找到该成语第一个字的位置并高亮
+  const n = state.size;
+  outer: for (let y = 0; y < n; y++) for (let x = 0; x < n; x++)
+    if (state.grid[y][x] === it.w[0]) {
+      const el = cellEl(x, y);
+      if (el && !el.classList.contains("found")) {
+        el.style.boxShadow = "0 0 0 4px #e8a33d";
+        setTimeout(() => el.style.boxShadow = "", 2500);
+        break outer;
+      }
+    }
+  toast(`锦囊提示：本关还剩「${it.w.length}字成语」，首字已高亮`);
+  updateHud();
+});
+</script>
+</body>
+</html>

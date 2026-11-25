@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>星界远征</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080b14;display:flex;justify-content:center;align-items:center;min-height:100vh}
+canvas{border-radius:14px;box-shadow:0 0 40px #4285ff66}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = 1000;
+canvas.height = 550;
+
+const keys = {};
+document.addEventListener('keydown',e=>{keys[e.code]=true})
+document.addEventListener('keyup',e=>{keys[e.code]=false})
+
+//粒子系统
+let particles = [];
+function spawnParticle(x,y,color,count=10){
+    for(let i=0;i<count;i++){
+        particles.push({
+            x,y,
+            vx:(Math.random()-0.5)*7,
+            vy:(Math.random()-0.5)*7,
+            life:32,
+            color,
+            size:Math.random()*5+2
+        })
+    }
+}
+function updateParticles(){
+    particles = particles.filter(p=>p.life>0);
+    particles.forEach(p=>{
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+        p.size *= 0.93;
+    })
+}
+function drawParticles(){
+    particles.forEach(p=>{
+        ctx.globalAlpha = p.life/32;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+        ctx.fill();
+    })
+    ctx.globalAlpha = 1;
+}
+
+//矩形碰撞
+function rectOverlap(a,b){
+    return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y
+}
+
+//玩家
+const player = {
+    x:60,y:400,w:44,h:54,
+    vx:0,vy:0,speed:5,jump:-16,gravity:0.55,
+    hp:100,maxHp:100,energy:100,maxEnergy:100,
+    atk:30,skillDmg:55,
+    isAttack:false,atkCd:0,skillCd:0,
+    onGround:false,face:1,
+    animFrame:0,animTimer:0
+}
+
+//关卡数据
+const levels = [
+    {
+        platforms:[
+            {x:0,y:460,w:200,h:24},
+            {x:240,y:400,w:160,h:22},
+            {x:440,y:340,w:150,h:22},
+            {x:620,y:280,w:170,h:22},
+            {x:320,y:220,w:140,h:22},
+            {x:540,y:160,w:160,h:22},
+            {x:780,y:110,w:150,h:22}
+        ],
+        monsters:[
+            {x:280,y:345,w:44,h:48,hp:75,maxHp:75,atk:12,speed:1.4,dir:1,range:100,startX:280,type:"slime"},
+            {x:480,y:285,w:48,h:52,hp:100,maxHp:100,atk:18,speed:1.1,dir:-1,range:90,startX:480,type:"golem"}
+        ],
+        coins:[
+            {x:300,y:360,w:22,h:22},
+            {x:480,y:300,w:22,h:22},
+            {x:660,y:240,w:22,h:22},
+            {x:360,y:180,w:22,h:22}
+        ],
+        spikes:[
+            {x:560,y:320,w:70,h:14}
+        ],
+        goal:{x:840,y:60,w:52,h:58}
+    },
+    {
+        platforms:[
+            {x:0,y:460,w:160,h:24},
+            {x:200,y:410,w:130,h:22},
+            {x:380,y:350,w:140,h:22},
+            {x:180,y:280,w:150,h:22},
+            {x:400,y:220,w:160,h:22},
+            {x:600,y:170,w:140,h:22},
+            {x:760,y:120,w:180,h:22}
+        ],
+        monsters:[
+            {x:220,y:355,w:44,h:48,hp:85,maxHp:85,atk:14,speed:1.6,dir:1,range:95,startX:220,type:"slime"},
+            {x:420,y:165,w:48,h:52,hp:120,maxHp:120,atk:20,speed:1.2,dir:-1,range:85,startX:420,type:"golem"},
+            {x:640,y:115,w:42,h:46,hp:65,maxHp:65,atk:10,speed:2.0,dir:1,range:110,startX:640,type:"bat"}
+        ],
+        coins:[
+            {x:240,y:370,w:22,h:22},
+            {x:420,y:310,w:22,h:22},
+            {x:220,y:240,w:22,h:22},
+            {x:640,y:130,w:22,h:22}
+        ],
+        spikes:[
+            {x:420,y:330,w:80,h:14},
+            {x:620,y:150,w:60,h:14}
+        ],
+        goal:{x:820,y:70,w:52,h:58}
+    }
+];
+
+let currentLevel = 0;
+let score = 0;
+let monsters = [];
+let platforms = [];
+let coins = [];
+let spikes = [];
+let goal = {};
+let skillProjectiles = [];
+
+function loadLevel(idx){
+    const lv = levels[idx];
+    platforms = JSON.parse(JSON.stringify(lv.platforms));
+    monsters = JSON.parse(JSON.stringify(lv.monsters));
+    coins = JSON.parse(JSON.stringify(lv.coins));
+    spikes = JSON.parse(JSON.stringify(lv.spikes));
+    goal = JSON.parse(JSON.stringify(lv.goal));
+    player.x=60;player.y=400;
+    player.hp=player.maxHp;
+    player.energy=player.maxEnergy;
+    skillProjectiles=[];
+}
+loadLevel(0);
+
+//攻击盒
+function attackBox(){
+    return player.face===1
+        ? {x:player.x+player.w,y:player.y,w:46,h:player.h}
+        : {x:player.x-46,y:player.y,w:46,h:player.h}
+}
+
+//绘制渐变背景+视差星星
+function drawBg(){
+    const grad = ctx.createLinearGradient(0,0,0,canvas.height);
+    grad.addColorStop(0,"#0f172a");
+    grad.addColorStop(1,"#1e2942");
+    ctx.fillStyle=grad;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#ffffff22";
+    for(let i=0;i<80;i++){
+        const sx = (i*151+currentLevel*20) % canvas.width;
+        const sy = (i*97)%canvas.height;
+        ctx.beginPath();
+        ctx.arc(sx,sy,Math.random()*1.2+0.4,0,Math.PI*2);
+        ctx.fill();
+    }
+}
+
+//血条
+function drawBar(entity,x,y,w,isEnergy=false){
+    ctx.fillStyle="#222";
+    ctx.fillRect(x,y,w,7);
+    let ratio = entity.hp/entity.maxHp;
+    if(isEnergy) ratio = entity.energy/entity.maxEnergy;
+    let c;
+    if(isEnergy) c="#44aaff";
+    else c = ratio>0.5 ? "#3dd670" : ratio>0.25 ? "#ffd343" : "#ff4c5c";
+    ctx.fillStyle=c;
+    ctx.fillRect(x,y,w*ratio,7);
+}
+
+function loop(){
+    player.vx=0;
+    if(keys['KeyA']){player.vx=-player.speed;player.face=-1}
+    if(keys['KeyD']){player.vx=player.speed;player.face=1}
+    if(keys['KeyW'] && player.onGround){
+        player.vy=player.jump;
+        player.onGround=false;
+    }
+    player.vy += player.gravity;
+    player.x += player.vx;
+    player.y += player.vy;
+
+    //动画计时器
+    player.animTimer++;
+    if(player.animTimer>8){
+        player.animTimer=0;
+        player.animFrame=(player.animFrame+1)%4;
+    }
+
+    //普攻
+    if(player.atkCd>0) player.atkCd--;
+    if(keys['KeyJ'] && player.atkCd===0){
+        player.isAttack=true;
+        player.atkCd=30;
+        const atk = attackBox();
+        monsters.forEach(m=>{
+            if(rectOverlap(atk,m)){
+                m.hp -= player.atk;
+                spawnParticle(m.x+m.w/2,m.y+m.h/2,"#ffdd55",12);
+            }
+        })
+    }
+    if(player.atkCd<22) player.isAttack=false;
+
+    //技能冲击波
+    if(player.skillCd>0) player.skillCd--;
+    if(keys['KeyK'] && player.skillCd===0 && player.energy>=30){
+        player.energy -= 30;
+        player.skillCd=45;
+        skillProjectiles.push({
+            x:player.x+(player.face===1?player.w:-30),
+            y:player.y+player.h/2-12,
+            w:36,h:24,
+            vx:player.face*9
+        })
+        spawnParticle(player.x+player.w/2,player.y+player.h/2,"#44aaff",18);
+    }
+
+    //技能子弹更新
+    skillProjectiles = skillProjectiles.filter(p=>{
+        p.x += p.vx;
+        let hit = false;
+        monsters.forEach(m=>{
+            if(rectOverlap(p,m)){
+                m.hp -= player.skillDmg;
+                spawnParticle(m.x+m.w/2,m.y+m.h/2,"#44aaff",15);
+                hit=true;
+            }
+        })
+        return !hit && p.x>0 && p.x<canvas.width;
+    })
+
+    //能量缓慢恢复
+    if(player.energy < player.maxEnergy) player.energy += 0.15;
+
+    //边界
+    if(player.x<0) player.x=0;
+    if(player.x>canvas.width-player.w) player.x=canvas.width-player.w;
+
+    //平台碰撞
+    player.onGround=false;
+    platforms.forEach(p=>{
+        if(player.vy>0 && rectOverlap(player,p)){
+            if(player.y+player.h - player.vy <= p.y+6){
+                player.y = p.y - player.h;
+                player.vy=0;
+                player.onGround=true;
+            }
+        }
+    })
+
+    //怪物逻辑
+    monsters = monsters.filter(m=>m.hp>0);
+    monsters.forEach(m=>{
+        m.x += m.speed * m.dir;
+        if(m.x>m.startX+m.range || m.x<m.startX-m.range) m.dir *= -1;
+        if(rectOverlap(player,m) && player.atkCd===0){
+            player.hp -= m.atk;
+            player.atkCd=40;
+            spawnParticle(player.x+player.w/2,player.y+player.h/2,"#ff5555",12);
+        }
+    })
+
+    //金币收集
+    coins = coins.filter(c=>{
+        if(rectOverlap(player,c)){
+            score += 100;
+            spawnParticle(c.x+11,c.y+11,"#ffdd22",10);
+            return false;
+        }
+        return true;
+    })
+
+    //尖刺陷阱
+    spikes.forEach(s=>{
+        if(rectOverlap(player,s) && player.atkCd===0){
+            player.hp -= 22;
+            player.atkCd=40;
+            spawnParticle(player.x+player.w/2,player.y+player.h/2,"#ff3333");
+        }
+    })
+
+    //通关
+    if(rectOverlap(player,goal)){
+        currentLevel++;
+        if(currentLevel >= levels.length){
+            alert("🎉 全部通关！总分："+score);
+            currentLevel=0;
+            score=0;
+        }
+        loadLevel(currentLevel);
+    }
+
+    //死亡重置
+    if(player.hp<=0 || keys['KeyR']){
+        loadLevel(currentLevel);
+    }
+
+    updateParticles();
+
+    //渲染
+    drawBg();
+    //平台
+    platforms.forEach(p=>{
+        const g = ctx.createLinearGradient(p.x,p.y,p.x,p.y+p.h);
+        g.addColorStop(0,"#639fc7");
+        g.addColorStop(1,"#365f80");
+        ctx.fillStyle=g;
+        ctx.fillRect(p.x,p.y,p.w,p.h);
+    })
+    //尖刺
+    ctx.fillStyle="#777";
+    spikes.forEach(s=>{
+        ctx.beginPath();
+        ctx.moveTo(s.x,s.y+s.h);
+        ctx.lineTo(s.x+s.w/2,s.y);
+        ctx.lineTo(s.x+s.w,s.y+s.h);
+        ctx.closePath();
+        ctx.fill();
+    })
+    //金币发光
+    ctx.shadowColor="#ffdd22";
+    ctx.shadowBlur=12;
+    ctx.fillStyle="#ffdd22";
+    coins.forEach(c=>{
+        ctx.beginPath();
+        ctx.arc(c.x+11,c.y+11,11,0,Math.PI*2);
+        ctx.fill();
+    })
+    ctx.shadowBlur=0;
+    //终点
+    ctx.shadowColor="#22ff88";
+    ctx.shadowBlur=22;
+    ctx.fillStyle="#22ff88";
+    ctx.fillRect(goal.x,goal.y,goal.w,goal.h);
+    ctx.shadowBlur=0;
+
+    //怪物绘制（不同种类不同颜色）
+    monsters.forEach(m=>{
+        if(m.type==="slime") ctx.fillStyle="#bb3355";
+        else if(m.type==="golem") ctx.fillStyle="#776666";
+        else if(m.type==="bat") ctx.fillStyle="#553377";
+        ctx.fillRect(m.x,m.y,m.w,m.h);
+        drawBar(m,m.x,m.y-10,m.w);
+    })
+
+    //玩家
+    ctx.fillStyle="#42a5ff";
+    ctx.fillRect(player.x,player.y,player.w,player.h);
+    drawBar(player,player.x,player.y-12,player.w);
+    drawBar(player,player.x,player.y-20,player.w,true);
+
+    //普攻刀光
+    if(player.isAttack){
+        ctx.fillStyle="#ffffffaa";
+        const atk=attackBox();
+        ctx.fillRect(atk.x,atk.y,atk.w,atk.h);
+    }
+    //技能冲击波
+    ctx.fillStyle="#44aaff99";
+    skillProjectiles.forEach(p=>ctx.fillRect(p.x,p.y,p.w,p.h));
+
+    drawParticles();
+
+    //UI文字
+    ctx.fillStyle="#fff";
+    ctx.font="19px sans-serif";
+    ctx.fillText("A/D移动 W跳跃 J攻击 K技能 R重置",15,30);
+    ctx.fillText("关卡："+(currentLevel+1)+"｜分数："+score,15,60);
+
+    requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

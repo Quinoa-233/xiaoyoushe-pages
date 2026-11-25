@@ -1,0 +1,2954 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A0E15">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>第九艺术 · 校园游戏平台</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+  /* ===== 设计令牌 ===== */
+  :root{
+    --surface-1:#0A0E15; --surface-2:#13171F; --surface-3:#191920; --surface-4:#20222B;
+    --text-1:#E6E3DA; --text-2:#B6B3AA; --text-3:#95928A; --text-num:#CBC8BF;
+    --accent:#378ADD; --accent-soft:rgba(55,138,221,.16); --accent-text:#A9D3F7;
+    --line:rgba(255,255,255,.07); --line-strong:rgba(255,255,255,.14);
+    --radius-md:10px; --radius-lg:14px;
+    --ease:cubic-bezier(.2,.8,.2,1);
+    --bg-url:none;
+    /* 版面容器：宽屏尽量铺开，窄屏左右留白同步收窄 */
+    --page-max:1720px;
+    --page-pad:clamp(12px, 2.2vw, 28px);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    /* 让页脚永远贴在视口底部：短页面不留一块空白 */
+    display: flex; flex-direction: column; min-height: 100vh;
+    /* 底：冷调光晕 + 细星空点阵；插画由 .bg-art 独立图层承担 */
+    background:
+      radial-gradient(1300px 560px at 50% -6%, rgba(45, 140, 175, 0.20), transparent 64%),
+      radial-gradient(850px 420px at 88% 12%, rgba(55, 110, 180, 0.09), transparent 60%),
+      radial-gradient(760px 520px at 8% 28%, rgba(45, 120, 150, 0.07), transparent 55%),
+      radial-gradient(rgba(255,255,255, 0.035) 1px, transparent 1.7px),
+      linear-gradient(180deg, #131E2B 0%, #0F1720 55%, var(--surface-1) 100%);
+    background-size: auto, auto, auto, 26px 26px, auto;
+    background-attachment: fixed;
+    color: var(--text-1);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* 日间模式：环境光换成清晨蓝调；承载面（卡片/面板）仍保持深色，文字对比度不退化 */
+  body[data-theme="day"] {
+    background:
+      radial-gradient(1300px 560px at 50% -6%, rgba(120, 186, 232, 0.34), transparent 66%),
+      radial-gradient(850px 420px at 88% 12%, rgba(160, 205, 240, 0.20), transparent 60%),
+      radial-gradient(760px 520px at 8% 28%, rgba(196, 222, 245, 0.13), transparent 55%),
+      linear-gradient(180deg, #22394D 0%, #1A2B3B 55%, #101C27 100%);
+  }
+  body[data-theme="day"] .topbar { background: rgba(20, 34, 46, 0.76); }
+  /* ===== 插画层：独立 fixed 图层，只负责氛围，不承载文字 ===== */
+  .bg-art{
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: var(--bg-url) center top / cover no-repeat;
+    filter: saturate(.75) brightness(.78);
+    transform: translateZ(0);
+  }
+  body.bg-img { background: #080B11; }
+  /* 遮罩一：纵向渐变，越往内容区越实 */
+  body.bg-img .bg-art::before{
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      rgba(8,10,16,.28) 0%,
+      rgba(8,10,16,.46) 42%,
+      rgba(8,10,16,.62) 72%,
+      rgba(8,10,16,.80) 100%);
+  }
+  /* 遮罩二：径向暗角，压住画面边缘的高频细节 */
+  body.bg-img .bg-art::after{
+    content: ""; position: absolute; inset: 0;
+    background:
+      radial-gradient(120% 80% at 50% 0%, rgba(8,10,16,.05), rgba(8,10,16,.45) 78%),
+      rgba(8,10,16,.12);
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+
+  /* ===== 顶部导航 ===== */
+  .topbar {
+    display: flex; align-items: center; gap: 24px;
+    padding: 0 var(--page-pad); height: 56px;
+    background: rgba(10, 13, 19, 0.72);
+    -webkit-backdrop-filter: blur(14px) saturate(120%);
+    backdrop-filter: blur(14px) saturate(120%);
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 50;
+    flex-shrink: 0;
+  }
+  /* 超宽屏：顶栏内容跟主区左边缘对齐，不贴屏幕边 */
+  @media (min-width: 1780px) {
+    .topbar { padding-inline: calc((100% - var(--page-max)) / 2 + var(--page-pad)); }
+  }
+  .logo { font-size: 17px; font-weight: 600; color: #85B7EB; letter-spacing: 1px; }
+  .logo small { font-size: 11px; color: #A9A69D; font-weight: 400; margin-left: 8px; letter-spacing: 0; }
+  .nav-tabs { display: flex; gap: 4px; height: 100%; }
+  .nav-tabs button {
+    padding: 0 16px; font-size: 13.5px; color: #C7C4BA;
+    border-bottom: 2px solid transparent; height: 100%; white-space: nowrap;
+    transition: color .15s;
+  }
+  .nav-tabs button:hover { color: #F7F5F0; }
+  .nav-tabs button.active { color: #F7F5F0; font-weight: 600; border-bottom-color: var(--accent); }
+  .nav-tabs button:focus-visible { outline: 2px solid #85B7EB; outline-offset: -2px; }
+  .topbar .spacer { flex: 1; }
+  .search-box {
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 8px; padding: 7px 14px; width: 220px;
+    color: #F7F5F0; font-size: 12px; outline: none;
+    transition: border-color .15s, background .15s;
+  }
+  .search-box:focus { border-color: rgba(133,183,235,.55); background: rgba(255,255,255,.07); }
+  .search-box::placeholder { color: #A9A69D; }
+  /* 搜索结果下拉 */
+  .search-wrap { position: relative; }
+  .search-panel {
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 80;
+    width: 320px; max-height: 62vh; overflow-y: auto;
+    background: #14161D; border: 1px solid var(--line-strong); border-radius: 10px;
+    box-shadow: 0 18px 42px rgba(0,0,0,.55);
+    padding: 6px; display: none;
+  }
+  .search-panel.show { display: block; }
+  .search-sec { font-size: 10.5px; color: #8C9199; letter-spacing: .08em; padding: 8px 10px 4px; }
+  .search-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px; border-radius: 7px; cursor: pointer;
+  }
+  .search-row:hover, .search-row.active { background: rgba(255,255,255,.07); }
+  .search-row .sr-thumb {
+    width: 40px; height: 23px; border-radius: 4px; flex: none;
+    background: #0B0F16 center/cover no-repeat; overflow: hidden;
+  }
+  .search-row .sr-main { min-width: 0; flex: 1; }
+  .search-row .sr-title { font-size: 12.5px; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .search-row .sr-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .search-row .sr-avatar {
+    width: 26px; height: 26px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; background: rgba(55,138,221,.22); color: #A9D3F7;
+  }
+  .search-empty { padding: 14px 10px; font-size: 12px; color: var(--text-3); text-align: center; }
+  /* 作者筛选条 */
+  .author-bar {
+    display: none; align-items: center; gap: 10px;
+    margin-bottom: 14px; padding: 9px 12px;
+    background: rgba(55,138,221,.1); border: 1px solid rgba(55,138,221,.32);
+    border-radius: 8px; font-size: 12.5px; color: #D5E6F8;
+  }
+  .author-bar.show { display: flex; }
+  .author-bar .ab-x {
+    margin-left: auto; border: 0; background: transparent; color: #A9D3F7;
+    cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 5px;
+  }
+  .author-bar .ab-x:hover { background: rgba(255,255,255,.1); }
+  /* 日间 / 夜间切换 */
+  .theme-toggle {
+    flex: 0 0 auto;
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-2);
+    border: 1px solid var(--line-strong); background: rgba(255,255,255,.03);
+    transition: color .15s, border-color .15s, background .15s, transform .15s;
+  }
+  .theme-toggle:hover { color: var(--accent-text); border-color: var(--accent); background: var(--accent-soft); }
+  .theme-toggle:active { transform: scale(.94); }
+  .theme-toggle:focus-visible { outline: 2px solid #85B7EB; outline-offset: 2px; }
+  body[data-theme="night"] .ico-moon { display: none; }
+  body[data-theme="day"] .ico-sun { display: none; }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #185FA5; color: #E6F1FB;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .prototype-tag {
+    font-size: 11px; color: #A9A69D; border: 1px dashed rgba(255,255,255,0.3);
+    border-radius: 4px; padding: 2px 8px;
+  }
+
+  main {
+    max-width: var(--page-max); margin: 0 auto;
+    padding: 24px var(--page-pad) 64px;
+    position: relative; z-index: 1;
+    flex: 1 0 auto; width: 100%;
+  }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ===== 首页：精选横幅 ===== */
+  .carousel {
+    position: relative;
+    background: #14141B; border-radius: var(--radius-lg);
+    aspect-ratio: 1536 / 652; margin-bottom: 28px; overflow: hidden;
+    cursor: pointer; transition: transform .22s var(--ease), box-shadow .22s var(--ease);
+    box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  }
+  .carousel:hover { transform: translateY(-2px); }
+  /* 内容遮罩：只压底部，给海报自带标题留出干净的上半屏 */
+  .carousel::after {
+    content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg, transparent 64%, rgba(6,9,14,.30) 100%);
+  }
+  .carousel-slide {
+    position: absolute; inset: 0; display: flex;
+    align-items: flex-end; justify-content: flex-end;
+    padding: 18px 22px; gap: 16px; min-width: 0;
+  }
+  /* 海报本身就是 2x 图，按原始比例铺，禁止浏览器再重采样 */
+  .carousel-bg { image-rendering: -webkit-optimize-contrast; transition: opacity .3s var(--ease), filter .3s var(--ease); }
+  /* 换图等待中的过渡态 */
+  .carousel.poster-loading .carousel-bg { opacity: .55; filter: saturate(.55); }
+  .badge {
+    display: inline-block; font-size: 11px; padding: 2px 10px; border-radius: 4px;
+  }
+  .badge-teal { background: #085041; color: #9FE1CB; }
+  .badge-amber { background: #633806; color: #FAC775; }
+  .badge-blue { background: #0C447C; color: #85B7EB; }
+  .btn-primary {
+    display: inline-block; background: #185FA5; color: #E6F1FB;
+    padding: 8px 22px; border-radius: 6px; font-size: 13px; font-weight: 600;
+    transition: background .15s;
+  }
+  .btn-primary:hover { background: #1D6FBF; }
+  .btn-ghost {
+    display: inline-block; border: 1px solid rgba(255,255,255,0.3);
+    color: #D3D1C7; padding: 7px 18px; border-radius: 6px; font-size: 13px;
+    transition: border-color .15s;
+  }
+  .btn-ghost:hover { border-color: rgba(255,255,255,0.55); }
+  .carousel-bg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; z-index: 0;
+  }
+  /* 横幅文案：标题 / 副标题 / 四项特色全部由页面渲染（海报本身已无文字），
+     字形只有一套，日间与夜间只换配色与光晕 */
+  .banner-copy { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+  .banner-copy .bc-head { position: absolute; left: 4.8%; top: 9%; max-width: 78%; }
+  .banner-copy .bc-title {
+    font-size: clamp(26px, 5.4vw, 92px);
+    font-weight: 800; font-style: italic; line-height: 1.02;
+    letter-spacing: .01em; white-space: nowrap;
+    color: #F5F8FF; -webkit-text-stroke: .9px rgba(246,250,255,.55);
+    text-shadow:
+      0 2px 2px rgba(9,18,36,.5),
+      0 6px 20px rgba(10,24,52,.55),
+      0 0 36px rgba(86,146,226,.45),
+      0 0 76px rgba(58,110,190,.28);
+  }
+  .banner-copy .bc-sub {
+    display: inline-flex; align-items: center;
+    margin-top: clamp(7px, 1.1vw, 16px);
+    padding: clamp(4px, .55vw, 8px) clamp(11px, 1.1vw, 18px);
+    border: 1px solid rgba(226,238,255,.5);
+    background: rgba(12,26,50,.22);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+    font-size: clamp(10px, 1.12vw, 17px);
+    letter-spacing: .28em; text-indent: .28em;
+    color: rgba(242,247,255,.96);
+    text-shadow: 0 1px 3px rgba(8,18,38,.85), 0 0 10px rgba(10,26,52,.6);
+  }
+  .banner-copy .bc-feats {
+    position: absolute; left: 4.8%; top: 40%;
+    list-style: none; margin: 0 0 0 -10px; padding: 16px 44px 16px 10px;
+    border-radius: 16px;
+    /* 特色列表落在中景（树、房子）上，两侧主题各给一层极淡的承载雾，保证文字有底 */
+    background: radial-gradient(120% 120% at 0% 50%,
+      rgba(6,12,22,.62) 0%, rgba(6,12,22,.30) 46%, rgba(6,12,22,0) 78%);
+    display: flex; flex-direction: column; gap: clamp(10px, 1.4vw, 20px);
+  }
+  .banner-copy .bc-feats li { display: flex; align-items: center; gap: 12px; }
+  .banner-copy .bc-ico {
+    width: clamp(26px, 2.6vw, 38px); height: clamp(26px, 2.6vw, 38px);
+    border: 1.5px solid rgba(255,255,255,.8); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(30,60,110,.3); flex: none;
+  }
+  .banner-copy .bc-feats b {
+    display: block; font-size: clamp(12.5px, 1.3vw, 18px); font-weight: 700; color: #fff;
+    text-shadow: 0 1px 3px rgba(15,35,75,.95), 0 0 8px rgba(15,35,75,.9), 0 0 20px rgba(15,35,75,.75);
+  }
+  .banner-copy .bc-feats i {
+    display: block; margin-top: 2px; font-style: normal;
+    font-size: clamp(10.5px, 1vw, 13.5px); color: rgba(255,255,255,.9);
+    text-shadow: 0 1px 3px rgba(15,35,75,.95), 0 0 8px rgba(15,35,75,.85), 0 0 18px rgba(15,35,75,.7);
+  }
+  /* —— 日间差分：亮底海报换深蓝字＋白描边光晕，边框、图标、箭头一起反色 —— */
+  body[data-theme="day"] .carousel::after {
+    background: linear-gradient(180deg, rgba(255,255,255,.06) 0%, transparent 42%, rgba(12,32,56,.18) 100%);
+  }
+  /* 日间海报的左半屏是树与房子，深蓝字直接压上去会糊；
+     给文案这一列铺一层晨雾一样的白，既是承载层，也符合白天画面的空气感 */
+  body[data-theme="day"] .banner-copy::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(100deg,
+      rgba(255,255,255,.52) 0%, rgba(255,255,255,.34) 18%,
+      rgba(255,255,255,.15) 33%, rgba(255,255,255,0) 46%);
+    /* 雾只压在文案所在的上半屏，草地与铁轨保持通透 */
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 56%, rgba(0,0,0,.32) 82%, transparent 96%);
+    mask-image: linear-gradient(180deg, #000 0%, #000 56%, rgba(0,0,0,.32) 82%, transparent 96%);
+  }
+  body[data-theme="day"] .banner-copy .bc-title {
+    color: #0E2138; -webkit-text-stroke: 1px rgba(255,255,255,.72);
+    text-shadow:
+      0 1px 0 rgba(255,255,255,.92),
+      0 2px 10px rgba(255,255,255,.9),
+      0 0 30px rgba(255,255,255,.8),
+      0 0 64px rgba(255,255,255,.55);
+  }
+  body[data-theme="day"] .banner-copy .bc-sub {
+    border-color: rgba(18,38,63,.45); background: rgba(255,255,255,.5); color: #0E2138;
+    text-shadow: 0 1px 2px rgba(255,255,255,.9);
+  }
+  body[data-theme="day"] .banner-copy .bc-feats {
+    background: radial-gradient(140% 125% at 0% 50%,
+      rgba(250,252,255,.94) 0%, rgba(250,252,255,.72) 42%, rgba(250,252,255,.24) 66%,
+      rgba(250,252,255,0) 84%);
+  }
+  body[data-theme="day"] .banner-copy .bc-feats b { color: #12263F; text-shadow: 0 1px 2px rgba(255,255,255,.95), 0 0 10px rgba(255,255,255,.85); }
+  body[data-theme="day"] .banner-copy .bc-feats i { color: rgba(18,38,63,.88); text-shadow: 0 1px 2px rgba(255,255,255,.9), 0 0 8px rgba(255,255,255,.8); }
+  body[data-theme="day"] .banner-copy .bc-ico { border-color: rgba(18,38,63,.72); background: rgba(255,255,255,.62); }
+  body[data-theme="day"] .banner-copy .bc-ico svg { stroke: #12263F; }
+  body[data-theme="day"] .carousel-arrow { background: rgba(255,255,255,.62); color: #12263F; }
+  body[data-theme="day"] .carousel-arrow:hover { background: rgba(255,255,255,.88); }
+  body[data-theme="day"] .carousel-dot { background: rgba(18,38,63,.3); }
+  body[data-theme="day"] .carousel-dot.active { background: #185FA5; }
+  /* 平板及以下：文案整组缩小保留（海报已无自带文字，标题不能跟着消失） */
+  @media (max-width: 900px) {
+    .banner-copy .bc-head { left: 5%; top: 9%; max-width: 92%; }
+    .banner-copy .bc-title { font-size: clamp(22px, 6vw, 40px); }
+    .banner-copy .bc-sub { font-size: clamp(10px, 2.3vw, 13px); letter-spacing: .18em; text-indent: .18em; margin-top: 7px; }
+    .banner-copy .bc-feats { display: none; }
+    /* 手机/平板上标题就压在天空里，不需要额外铺雾，保住插画的通透 */
+    body[data-theme="day"] .banner-copy::before { display: none; }
+  }
+  @media (max-width: 480px) {
+    .banner-copy .bc-head { top: 10%; }
+    .banner-copy .bc-sub { padding: 3px 9px; font-size: 10px; letter-spacing: .12em; text-indent: .12em; }
+  }
+  .carousel-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 5;
+    width: 34px; height: 58px; background: rgba(0,0,0,0.35); color: #F7F5F0;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity .15s, background .15s;
+  }
+  .carousel:hover .carousel-arrow { opacity: 1; }
+  .carousel-arrow:hover { background: rgba(0,0,0,0.55); }
+  .carousel-arrow.left { left: 0; border-radius: 0 10px 10px 0; }
+  .carousel-arrow.right { right: 0; border-radius: 10px 0 0 10px; }
+  .carousel-dots { position: absolute; left: 26px; bottom: 12px; display: flex; gap: 7px; z-index: 5; }
+  .carousel-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.3); cursor: pointer; transition: background .15s; }
+  .carousel-dot.active { background: #85B7EB; }
+
+  /* ===== 首页主体布局 ===== */
+  .home-layout { display: flex; gap: 24px; }
+  .home-main { flex: 1; min-width: 0; }
+  .section-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .section-head h3 { font-size: 16px; font-weight: 600; letter-spacing: .2px; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+  .filter-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13px; padding: 6px 14px; border-radius: 999px;
+    background: rgba(255,255,255,.02);
+    border: 1px solid rgba(255,255,255,.12); color: var(--text-3);
+    transition: color .15s, background .15s, border-color .15s, box-shadow .15s;
+  }
+  .filter-chip:hover { color: var(--text-1); border-color: rgba(255,255,255,.28); }
+  .filter-chip.active {
+    color: var(--accent-text); background: var(--accent-soft);
+    border-color: var(--accent); font-weight: 600;
+    box-shadow: 0 0 0 1px rgba(55,138,221,.32), 0 0 16px rgba(55,138,221,.22);
+  }
+  .filter-chip.active::before {
+    content: ""; width: 5px; height: 5px; border-radius: 50%;
+    background: #85B7EB; box-shadow: 0 0 8px #378ADD;
+  }
+  .filter-chip:focus-visible { outline: 2px solid #85B7EB; outline-offset: 2px; }
+
+  .game-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 18px; align-items: start; }
+  .game-card {
+    background: var(--surface-3); border: 1px solid var(--line);
+    border-radius: var(--radius-lg); overflow: hidden; cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,.40), 0 4px 12px rgba(0,0,0,.28);
+    transition: transform .22s var(--ease), box-shadow .22s var(--ease), border-color .22s;
+  }
+  @media (hover: hover) {
+    .game-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(133,183,235,.38);
+      box-shadow: 0 10px 28px rgba(0,0,0,.55), 0 0 22px rgba(55,138,221,.10);
+    }
+    .game-card:hover .cover-img,
+    .game-card:hover .cover-vid { transform: scale(1.06); }
+  }
+  .game-card:active { transform: translateY(-1px) scale(.995); }
+  .game-card:focus-visible { outline: 2px solid #85B7EB; outline-offset: 2px; }
+  .game-cover {
+    aspect-ratio: 16 / 9; height: auto; position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 600; letter-spacing: 1px; text-align: center; padding: 0 14px;
+  }
+  .game-cover .cover-img, .game-cover .cover-vid {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; display: block;
+    transition: transform .38s var(--ease);
+  }
+  .game-cover .cover-title { position: relative; text-shadow: 0 1px 6px rgba(0,0,0,0.5); }
+  .game-card-body { padding: 12px 14px 14px; }
+  .game-card-body .title {
+    font-size: 15px; font-weight: 600; line-height: 1.4; color: var(--text-1);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .game-card-body .meta {
+    font-size: 12px; color: var(--text-3); margin-top: 5px; line-height: 1.5;
+    display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  }
+  .meta .tag-school { color: #9FE1CB; }
+  .meta .tag-import { color: #FAC775; }
+  .meta .dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,.28); }
+  .heat-row {
+    display: flex; align-items: center; gap: 16px; margin-top: 9px;
+    font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums;
+  }
+  .heat-row .h-item { display: inline-flex; align-items: center; gap: 5px; }
+  .heat-row .h-item .num { color: var(--text-num); font-weight: 600; }
+  .heat-row svg { display: block; opacity: .72; }
+  .value.pink { color: #F09595; }
+  .flower-btn { display: inline-flex; align-items: center; gap: 6px; }
+  .flower-btn.on { border-color: rgba(226,75,74,0.65); color: #F09595; }
+
+  /* 插画模式下：卡片区一块磨砂承载层，文字与卡片落在干净的底上 */
+  .home-main { position: relative; }
+  body.bg-img .home-main::before {
+    content: ""; position: absolute; inset: -16px -14px -18px; z-index: -1;
+    border-radius: 18px;
+    background: rgba(10, 13, 19, .72);
+    -webkit-backdrop-filter: blur(18px) saturate(110%);
+    backdrop-filter: blur(18px) saturate(110%);
+  }
+
+  .sidebar { width: 260px; flex-shrink: 0; }
+  .sidebar-inner { position: sticky; top: 76px; }
+  .side-card {
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: var(--radius-lg); padding: 16px 16px 14px; margin-bottom: 14px;
+  }
+  .side-card h4 {
+    font-size: 13.5px; font-weight: 600; margin-bottom: 12px; color: var(--text-1);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .side-card h4::before {
+    content: ""; width: 3px; height: 12px; border-radius: 2px;
+    background: var(--accent); box-shadow: 0 0 8px rgba(55,138,221,.6);
+  }
+  .rank-item {
+    display: flex; align-items: center; gap: 10px; padding: 6px 0;
+    cursor: pointer; border-radius: 6px;
+  }
+  .rank-item:hover .rk-name { color: #85B7EB; }
+  .rank-item .rk-num { width: 18px; font-size: 13px; font-weight: 600; color: #A9A69D; text-align: center; }
+  .rank-item:nth-child(1) .rk-num { color: #EF9F27; }
+  .rank-item:nth-child(2) .rk-num { color: #C7C4BA; }
+  .rank-item:nth-child(3) .rk-num { color: #B4775A; }
+  .rank-item .rk-name { font-size: 12px; flex: 1; }
+  .rank-item .rk-hot { font-size: 11px; color: #A9A69D; }
+  .news-item { font-size: 12.5px; color: var(--text-2); padding: 6px 0; cursor: pointer; transition: color .15s; }
+  .news-item:hover { color: var(--text-1); }
+  .news-item .new-flag { color: #5DCAA5; font-size: 10px; margin-left: 6px; }
+  /* 侧栏：站点数据 */
+  .side-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+  .side-stats .n { font-size: 19px; font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; line-height: 1.3; }
+  .side-stats .l { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  /* 侧栏：创作中心入口 */
+  .side-cta {
+    background:
+      radial-gradient(120% 100% at 100% 0%, rgba(55,138,221,.20), transparent 62%),
+      var(--surface-2);
+    border-color: rgba(55,138,221,.26);
+  }
+  .side-cta p { font-size: 12px; color: var(--text-3); line-height: 1.65; margin-bottom: 12px; }
+  .btn-side {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 600; color: var(--accent-text);
+    background: var(--accent-soft); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 6px 12px;
+    transition: background .15s, box-shadow .15s;
+  }
+  .btn-side:hover { background: rgba(55,138,221,.26); box-shadow: 0 0 16px rgba(55,138,221,.22); }
+
+  /* ===== 详情页 ===== */
+  .breadcrumb { font-size: 12px; color: #A9A69D; margin-bottom: 16px; }
+  .breadcrumb span.link { cursor: pointer; }
+  .breadcrumb span.link:hover { color: #C7C4BA; }
+  .detail-head { display: flex; gap: 24px; align-items: flex-start; }
+  .detail-info { flex: 1; min-width: 0; }
+
+  /* ---- 详情页媒体区：steam 式的展示视频 + 缩略图 ---- */
+  .detail-media { flex: 0 0 clamp(430px, 43%, 680px); min-width: 0; }
+  .detail-media.no-demo { flex: 0 0 260px; }
+  .media-stage {
+    position: relative; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden;
+    background: #05070B; border: 1px solid var(--line-strong);
+    cursor: pointer;
+  }
+  .detail-media.no-demo .media-stage { cursor: default; }
+  .media-stage video, .media-stage .media-photo {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; display: none; background: #05070B;
+  }
+  .media-stage.show-video video { display: block; }
+  .media-stage.show-photo .media-photo { display: block; }
+  .media-fallback {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 600; letter-spacing: 2px;
+  }
+  .media-stage.show-fallback .media-fallback { display: flex; }
+  .media-play {
+    position: absolute; left: 50%; top: 50%; z-index: 2;
+    width: 64px; height: 64px; border: 1px solid rgba(255, 255, 255, .22); border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 12, 18, .6); color: #fff;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, .45);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    transform: translate(-50%, -50%) scale(.92);
+    opacity: 0; pointer-events: none;
+    transition: opacity .18s var(--ease), transform .18s var(--ease), background .18s;
+  }
+  .media-play svg { margin-left: 3px; }
+  .media-stage.paused .media-play { opacity: 1; pointer-events: auto; }
+  .media-play:hover { background: rgba(55, 138, 221, .92); transform: translate(-50%, -50%) scale(1); }
+  .detail-media.no-demo .media-play { display: none; }
+  .media-bar {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+    height: 44px; padding: 0 10px; display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(180deg, rgba(5, 7, 11, 0), rgba(5, 7, 11, .84) 62%);
+    opacity: 0; transition: opacity .18s;
+  }
+  .media-stage:hover .media-bar, .media-stage.paused .media-bar { opacity: 1; }
+  .detail-media.no-demo .media-bar { display: none; }
+  .media-tag {
+    font-size: 11px; color: #A9D3F7; background: rgba(55, 138, 221, .24);
+    border-radius: 4px; padding: 2px 8px;
+  }
+  .media-dur { font-size: 11px; color: rgba(247, 245, 240, .72); }
+  .media-gap { flex: 1; }
+  .media-btn {
+    width: 26px; height: 26px; border: 0; border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 255, 255, .12); color: #F7F5F0;
+  }
+  .media-btn:hover { background: rgba(255, 255, 255, .24); }
+  .media-thumbs {
+    display: flex; gap: 6px; margin-top: 8px;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .media-thumbs::-webkit-scrollbar { display: none; }
+  .media-thumb {
+    position: relative; flex: 0 0 92px; aspect-ratio: 16 / 9;
+    border: 1px solid transparent; border-radius: 6px; overflow: hidden; cursor: pointer;
+    background: #0B0F16 center/cover no-repeat;
+    opacity: .55; transition: opacity .15s, border-color .15s;
+  }
+  .media-thumb:hover { opacity: .85; }
+  .media-thumb.on { opacity: 1; border-color: var(--accent); }
+  .media-thumb .tplay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #fff;
+  }
+  .media-thumb .tplay svg { filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .85)); }
+  .media-thumb .tlbl {
+    position: absolute; left: 4px; bottom: 2px; font-size: 10px; color: #F7F5F0;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+  }
+  .detail-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .detail-title-row h2 { font-size: 19px; font-weight: 600; }
+  .detail-byline { font-size: 12px; color: #C7C4BA; margin-top: 8px; }
+  .tag-chips { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .tag-chip {
+    border: 1px solid rgba(255,255,255,0.25); color: #D3D1C7;
+    font-size: 11px; padding: 3px 12px; border-radius: 4px;
+  }
+  .detail-actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+  .detail-actions .mytime { font-size: 12px; color: #A9A69D; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
+  .stat-card { background: rgba(24, 24, 30, 0.7); border-radius: 10px; padding: 14px 16px; }
+  .stat-card .label { font-size: 12px; color: #A9A69D; }
+  .stat-card .value { font-size: 22px; font-weight: 600; margin-top: 5px; }
+  .stat-card .value.green { color: #97C459; }
+
+  .detail-layout { display: flex; gap: 18px; }
+  .detail-main { flex: 1; min-width: 0; }
+  .detail-tabs { display: flex; gap: 20px; border-bottom: 1px solid rgba(255,255,255,0.12); }
+  .detail-tabs button {
+    font-size: 13px; color: #C7C4BA; padding: 10px 2px;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .detail-tabs button.active { color: #F7F5F0; border-bottom-color: #378ADD; }
+  .tab-panel { display: none; padding-top: 16px; }
+  .tab-panel.active { display: block; }
+  .game-desc { font-size: 13px; line-height: 1.8; color: #D3D1C7; }
+
+  .comment-card {
+    background: #2C2C2A; border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;
+    display: flex; gap: 12px;
+  }
+  .c-avatar {
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600;
+  }
+  .comment-card .c-meta { font-size: 11px; color: #C7C4BA; }
+  .comment-card .c-meta .rec-up { color: #97C459; }
+  .comment-card .c-meta .rec-down { color: #E24B4A; }
+  .comment-card .c-text { font-size: 13px; margin-top: 5px; line-height: 1.6; }
+  .comment-input {
+    width: 100%; background: #2C2C2A; border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 8px; padding: 11px 14px; color: #F7F5F0; font-size: 12px;
+    outline: none; font-family: inherit; resize: none;
+  }
+
+  .friend-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .friend-row .f-ava {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 11px;
+  }
+  .friend-row .f-text { font-size: 12px; }
+
+  /* ===== 个人中心 ===== */
+  .me-layout { display: flex; gap: 16px; align-items: flex-start; }
+  .profile-card {
+    width: 220px; flex-shrink: 0; background: rgba(22, 22, 28, 0.66);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 12px;
+    padding: 20px; text-align: center;
+  }
+  .profile-card .big-ava {
+    width: 58px; height: 58px; border-radius: 50%; margin: 0 auto;
+    background: #185FA5; color: #E6F1FB; font-size: 19px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .profile-card .p-name { font-size: 15px; font-weight: 600; margin-top: 12px; }
+  .profile-card .p-class { font-size: 12px; color: #C7C4BA; margin-top: 5px; }
+  .lv-bar { height: 6px; background: #221F1C; border-radius: 3px; margin-top: 12px; overflow: hidden; }
+  .lv-bar > div { width: 62%; height: 100%; background: #378ADD; }
+  .profile-card .lv-hint { font-size: 11px; color: #A9A69D; margin-top: 7px; }
+  .p-stats {
+    display: flex; justify-content: space-around; margin-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.12); padding-top: 14px;
+  }
+  .p-stats .num { font-size: 16px; font-weight: 600; }
+  .p-stats .lbl { font-size: 11px; color: #A9A69D; margin-top: 3px; }
+
+  .me-main { flex: 1; min-width: 0; }
+  .panel {
+    background: rgba(18, 18, 23, 0.62);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 16px 18px; margin-bottom: 14px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  }
+  .panel-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .panel-head h4 { font-size: 14px; font-weight: 600; }
+  .panel-head .hint { font-size: 12px; color: #97C459; }
+  .panel-head .gray { font-size: 12px; color: #A9A69D; }
+  .chart { display: flex; align-items: flex-end; gap: 14px; height: 110px; padding: 0 8px; }
+  .chart-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 5px; }
+  .chart-bar { width: 100%; border-radius: 4px; background: #0C447C; }
+  .chart-bar.peak { background: #185FA5; }
+  .chart-bar.zero { background: transparent; border: 1px dashed rgba(255,255,255,0.25); height: 12px; }
+  .chart-val { font-size: 11px; color: #A9A69D; }
+  .chart-labels { display: flex; gap: 14px; margin-top: 8px; padding: 0 8px; }
+  .chart-labels span { flex: 1; text-align: center; font-size: 11px; color: #A9A69D; }
+
+  .feed-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .feed-row + .feed-row { border-top: 1px solid rgba(255,255,255,0.08); }
+  .feed-row .f-ava {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+  }
+  .feed-row .f-text { font-size: 12px; line-height: 1.5; }
+  .feed-row .hl { color: #85B7EB; }
+  .feed-row .hl-gold { color: #EF9F27; }
+
+  .me-side { width: 190px; flex-shrink: 0; }
+  .badge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .badge-cell {
+    aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; font-size: 11px;
+  }
+  .badge-cell.locked { background: #221F1C; border: 1px dashed rgba(255,255,255,0.25); color: #A9A69D; }
+  .recent-item { font-size: 12px; color: #C7C4BA; padding: 5px 0; cursor: pointer; }
+  .recent-item:hover { color: #F7F5F0; }
+
+  /* ===== 排行榜 ===== */
+  .rank-table { width: 100%; border-collapse: collapse; }
+  .rank-table th {
+    text-align: left; font-size: 12px; color: #A9A69D; font-weight: 400;
+    padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.12);
+    white-space: nowrap;
+  }
+  .rank-table td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 13px; }
+  .rank-table tr:hover td { background: rgba(255,255,255,0.03); }
+  .rank-table tr.row-click { cursor: pointer; }
+  .rank-table .rk-num { font-weight: 600; width: 40px; }
+
+  /* ===== 占位页 ===== */
+  /* ===== 登录 / 个人中心 ===== */
+  .auth-mask {
+    position: fixed; inset: 0; z-index: 120; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(5,7,11,.72); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  }
+  .auth-mask.show { display: flex; }
+  .auth-card {
+    width: 360px; max-width: calc(100vw - 32px);
+    background: #16181F; border: 1px solid var(--line-strong); border-radius: 14px;
+    padding: 22px 22px 20px; box-shadow: 0 24px 60px rgba(0,0,0,.6);
+  }
+  .auth-card h3 { font-size: 16px; font-weight: 600; }
+  .auth-card .auth-sub { font-size: 12px; color: var(--text-3); margin-top: 6px; line-height: 1.6; }
+  .auth-tabs { display: flex; gap: 18px; margin: 16px 0 14px; border-bottom: 1px solid var(--line); }
+  .auth-tabs button {
+    font-size: 13px; color: var(--text-3); padding: 8px 2px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .auth-tabs button.on { color: var(--text-1); border-bottom-color: var(--accent); }
+  .auth-field { margin-bottom: 10px; }
+  .auth-field label { display: block; font-size: 11.5px; color: var(--text-3); margin-bottom: 5px; }
+  .auth-field input {
+    width: 100%; background: rgba(255,255,255,.05); border: 1px solid var(--line-strong);
+    border-radius: 8px; padding: 9px 12px; color: var(--text-1); font-size: 13px; outline: none;
+  }
+  .auth-field input:focus { border-color: rgba(133,183,235,.55); background: rgba(255,255,255,.07); }
+  .auth-err { font-size: 12px; color: #F09595; min-height: 18px; margin: 4px 0 8px; }
+  .auth-card .btn-primary { width: 100%; padding: 10px 0; text-align: center; }
+  .auth-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+  .auth-foot a { font-size: 11.5px; color: var(--text-3); cursor: pointer; }
+  .auth-foot a:hover { color: var(--text-2); }
+
+  .me-wrap { max-width: 720px; }
+  .me-card {
+    background: rgba(24,24,30,.72); border: 1px solid var(--line);
+    border-radius: 12px; padding: 20px; margin-bottom: 16px;
+  }
+  .me-head { display: flex; align-items: center; gap: 14px; }
+  .me-avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 600; background: rgba(55,138,221,.22); color: #A9D3F7;
+  }
+  .me-name { font-size: 15px; font-weight: 600; }
+  .me-meta { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+  .me-rows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+  .me-row { background: rgba(255,255,255,.04); border-radius: 9px; padding: 12px 14px; }
+  .me-row .k { font-size: 11.5px; color: var(--text-3); }
+  .me-row .v { font-size: 18px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .me-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .me-hint { font-size: 12px; color: var(--text-3); line-height: 1.7; }
+  .quota-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.1); overflow: hidden; margin-top: 10px; }
+  .quota-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #E24B4A, #F09595); }
+
+  /* 轻提示 */
+  #toast {
+    position: fixed; left: 50%; bottom: 40px; transform: translate(-50%, 12px);
+    z-index: 200; background: rgba(20,22,29,.96); border: 1px solid var(--line-strong);
+    color: var(--text-1); font-size: 13px; padding: 10px 16px; border-radius: 9px;
+    opacity: 0; pointer-events: none; transition: opacity .2s var(--ease), transform .2s var(--ease);
+    box-shadow: 0 14px 34px rgba(0,0,0,.5); max-width: 80vw;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  .todo-page { text-align: center; padding: 90px 0; }
+  .todo-page h3 { font-size: 16px; font-weight: 600; color: #C7C4BA; }
+  .todo-page p { font-size: 12px; color: #A9A69D; margin-top: 10px; }
+
+  /* ===== 弹窗 ===== */
+  .modal-mask {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.6);
+    align-items: center; justify-content: center;
+  }
+  .modal-mask.show { display: flex; }
+  .modal {
+    background: #2C2C2A; border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 14px; padding: 26px 30px; width: 420px; max-width: 90vw;
+  }
+  .modal h3 { font-size: 16px; font-weight: 600; }
+  .modal p { font-size: 13px; color: #C7C4BA; line-height: 1.7; margin: 12px 0 18px; }
+  .modal .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-timer { font-size: 26px; font-weight: 600; color: #85B7EB; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
+  .modal .timer-hint { font-size: 11px; color: #A9A69D; margin-top: 4px; }
+  .modal.playing { width: min(1040px, 94vw); padding: 18px 20px 20px; }
+  .modal-head { display: none; }   /* 只有进入游玩态才显示标题与关闭按钮 */
+  .modal.playing .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .modal.playing .modal-head h3 { margin: 0; }
+  .game-frame { width: 100%; height: min(66vh, 620px); border: none; border-radius: 10px; background: #1A1917; display: block; }
+  .frame-hint { font-size: 11px; color: #A9A69D; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .frame-hint a { color: #85B7EB; text-decoration: none; }
+  .frame-hint a:hover { text-decoration: underline; }
+
+  /* ===== 响应式 ===== */
+  .tabbar { display: none; }
+
+  @media (max-width: 1150px) {
+    .sidebar { display: none; }
+  }
+  @media (max-width: 900px) {
+    .game-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 14px; }
+    .detail-head { flex-direction: column; gap: 16px; }
+    .detail-media, .detail-media.no-demo { flex: none; width: 100%; }
+    .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .carousel:hover { transform: none; }
+    /* 平板宽度：顶栏收紧，避免品牌与导航折成两行 */
+    .topbar { padding: 0 var(--page-pad); gap: 14px; }
+    .logo small { display: none; }
+    .nav-tabs button { padding: 0 12px; font-size: 13px; }
+    .search-box { width: 168px; }
+  }
+
+  /* ---- 手机版：≤640px 单列重排 + 底部导航 ---- */
+  @media (max-width: 640px) {
+    :root { --tabbar-h: 54px; }
+    body {
+      padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+      -webkit-text-size-adjust: 100%;
+      -webkit-tap-highlight-color: transparent;
+    }
+    main { padding: 14px var(--page-pad) 20px; }
+
+    /* 顶栏：只留品牌与头像，导航下沉到底部 */
+    .topbar {
+      height: 52px; padding: 0 var(--page-pad); gap: 10px;
+      background: rgba(10, 13, 19, .94);   /* 手机上少透一点，滚过的卡片不会在标题后面留鬼影 */
+    }
+    .logo { font-size: 16px; letter-spacing: .5px; }
+    .logo small { display: none; }
+    .nav-tabs { display: none; }
+    .topbar .search-box { display: none; }
+    .avatar { width: 30px; height: 30px; font-size: 12px; }
+
+    /* 底部导航栏 */
+    .tabbar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+      display: flex; align-items: stretch;
+      background: rgba(10, 13, 19, .94);
+      -webkit-backdrop-filter: blur(16px) saturate(120%);
+      backdrop-filter: blur(16px) saturate(120%);
+      border-top: 1px solid var(--line-strong);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .tabbar button {
+      position: relative;
+      flex: 1; min-height: var(--tabbar-h);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      color: var(--text-3); transition: color .15s, background .15s;
+      touch-action: manipulation;
+    }
+    .tabbar button svg { width: 21px; height: 21px; stroke: currentColor; display: block; }
+    .tabbar button span { font-size: 10.5px; letter-spacing: .3px; line-height: 1; }
+    .tabbar button.active { color: var(--accent-text); }
+    .tabbar button.active span { font-weight: 600; }
+    .tabbar button.active::before {
+      content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 26px; height: 2px; border-radius: 0 0 2px 2px;
+      background: var(--accent); box-shadow: 0 0 10px rgba(55,138,221,.9);
+    }
+    .tabbar button.active svg { filter: drop-shadow(0 0 6px rgba(55,138,221,.8)); }
+    .tabbar button:active { background: rgba(255,255,255,.05); }
+    .tabbar button:focus-visible { outline: 2px solid #85B7EB; outline-offset: -3px; }
+
+    /* 横幅：图在上、文案在下，不再用浮层压住海报，标题在手机上也能读到 */
+    .carousel { aspect-ratio: auto; border-radius: 14px; margin-bottom: 16px; }
+    .carousel::after { display: none; }
+    .carousel-slide { position: relative; inset: auto; display: block; padding: 0; opacity: 1 !important; }
+    .carousel-bg {
+      position: relative; inset: auto; display: block;
+      width: 100%; height: auto;
+      aspect-ratio: 1536 / 652;   /* 跟海报原图同比例，手机上不裁掉两侧的排版文字 */
+    }
+
+    /* 二级筛选：吸顶 + 横向滑动，不换行挤成两排 */
+    .section-head {
+      position: sticky; top: 52px; z-index: 20;
+      flex-direction: column; align-items: stretch; gap: 8px;
+      margin: 0 calc(-1 * var(--page-pad)) 12px; padding: 8px 0 10px;
+      background: rgba(10, 13, 19, .93);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--line);
+    }
+    .section-head h3 { font-size: 15px; padding: 0 var(--page-pad); }
+    .filters {
+      flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain;
+      gap: 8px; padding: 0 var(--page-pad) 2px; margin: 0;
+      scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    }
+    .filters::-webkit-scrollbar { display: none; }
+    .filter-chip { flex: none; padding: 8px 14px; font-size: 12.5px; touch-action: manipulation; }
+
+    /* 卡片：单列改横向图文，一屏能看到更多作品 */
+    .game-grid { grid-template-columns: 1fr; gap: 12px; }
+    .game-card { display: flex; align-items: stretch; }
+    .game-cover {
+      width: 40%; flex: none; aspect-ratio: auto; height: auto; min-height: 92px;
+      padding: 0 8px; font-size: 13px; letter-spacing: 0;
+    }
+    .game-card-body { flex: 1; min-width: 0; padding: 10px 12px 11px; }
+    .game-card-body .title { font-size: 14px; }
+    .game-card-body .meta { font-size: 11.5px; gap: 6px; margin-top: 4px; }
+    .heat-row { gap: 12px; margin-top: 7px; font-size: 11.5px; }
+
+    /* 侧栏：不再整块消失，改成网格下方的通栏卡片 */
+    .home-layout { display: block; }
+    .sidebar { display: block; width: auto; margin-top: 18px; }
+    .sidebar-inner { position: static; display: grid; gap: 12px; }
+    .side-card { margin-bottom: 0; }
+    .news-item, .rank-item { padding: 8px 0; }
+
+    /* 详情页 */
+    .breadcrumb { font-size: 11.5px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .media-play { width: 50px; height: 50px; }
+    .media-thumb { flex: 0 0 78px; }
+    .media-bar { height: 38px; }
+    .detail-title-row h2 { font-size: 18px; }
+    .detail-title-row { gap: 8px; }
+    .detail-byline { font-size: 11.5px; line-height: 1.6; }
+    .detail-actions { gap: 10px; margin-top: 14px; }
+    .detail-actions .btn-primary { flex: 1; text-align: center; padding: 12px 0; }
+    .detail-actions .btn-ghost { padding: 11px 14px; }
+    .stat-grid { gap: 10px; margin: 16px 0; }
+    .stat-card { padding: 12px 13px; }
+    .stat-card .value { font-size: 19px; }
+    .game-desc { font-size: 13px; line-height: 1.85; }
+
+    /* 排行榜：收起类型与通关人数两列，避免横向溢出 */
+    .panel { padding: 2px 0; }
+    .rank-table th, .rank-table td { padding: 10px 8px; }
+    .rank-table th:nth-child(3), .rank-table td:nth-child(3),
+    .rank-table th:nth-child(6), .rank-table td:nth-child(6) { display: none; }
+    .rank-table td:nth-child(2) { max-width: 148px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rank-table .rk-num { width: 26px; }
+
+    /* 弹窗：开始游玩时占满整屏 */
+    .modal { width: auto; max-width: calc(100vw - 28px); padding: 20px 18px; }
+    .modal.playing {
+      width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh;
+      border: 0; border-radius: 0; overflow-y: auto;
+      padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+    }
+    .modal.playing .modal-head { margin-bottom: 8px; }
+    .modal.playing .modal-head h3 { font-size: 13px; }
+    .modal.playing .modal-head .btn-ghost { padding: 8px 14px; font-size: 12.5px; min-height: 34px; flex: none; }
+    .modal.playing .game-frame { height: calc(100dvh - 96px); border-radius: 8px; }
+    .frame-hint { font-size: 10.5px; gap: 8px; }
+    .frame-hint span:first-child { display: none; }
+    .todo-page { padding: 56px 0; }
+  }
+
+  @media (max-width: 380px) {
+    .game-cover { width: 37%; }
+    .tabbar button span { font-size: 10px; }
+    .rank-table td:nth-child(2) { max-width: 118px; }
+  }
+  /* 尊重系统"减少透明度"偏好：全部转实色 */
+  @media (prefers-reduced-transparency: reduce) {
+    .topbar { -webkit-backdrop-filter: none; backdrop-filter: none; background: #0C1017; }
+    .section-head { -webkit-backdrop-filter: none; backdrop-filter: none; background: #0C1017; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+  }
+
+  /* ===== 联系我们 ===== */
+  .contact-wrap { max-width: 980px; margin: 0 auto; }
+  .contact-hero { text-align: center; padding: 6px 0 26px; }
+  .ct-kicker {
+    display: inline-block; font-size: 10.5px; letter-spacing: .2em;
+    color: var(--accent-text); padding: 5px 13px; border-radius: 999px;
+    border: 1px solid rgba(133,183,235,.26); background: rgba(55,138,221,.10);
+  }
+  .contact-hero h2 { font-size: 25px; font-weight: 600; letter-spacing: .5px; margin-top: 14px; color: var(--text-1); }
+  .contact-hero p { max-width: 580px; margin: 12px auto 0; font-size: 12.5px; line-height: 1.95; color: var(--text-3); }
+
+  .contact-grid { display: grid; grid-template-columns: 1.02fr .98fr; gap: 16px; align-items: start; }
+
+  .qq-card {
+    position: relative; overflow: hidden; border-radius: 16px; padding: 22px 22px 18px;
+    background:
+      radial-gradient(120% 120% at 100% 0%, rgba(55,138,221,.16), transparent 58%),
+      linear-gradient(180deg, rgba(24,31,42,.94), rgba(16,20,27,.94));
+    border: 1px solid rgba(133,183,235,.20);
+    box-shadow: 0 18px 44px rgba(0,0,0,.38);
+  }
+  .qq-head { display: flex; align-items: center; gap: 12px; position: relative; }
+  .qq-badge {
+    width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+    font-size: 18px; font-weight: 700; color: #D7EBFF;
+    background: linear-gradient(180deg, #2E86D8, #1D5F9E);
+    box-shadow: 0 6px 16px rgba(29,95,158,.45);
+  }
+  .qq-title h3 { font-size: 15px; font-weight: 600; color: var(--text-1); }
+  .qq-title p { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
+  .qq-num-row { display: flex; align-items: baseline; gap: 10px; margin: 20px 0 16px; position: relative; }
+  .qq-num {
+    font-size: 30px; font-weight: 700; letter-spacing: .12em; color: #EAF2FB;
+    font-variant-numeric: tabular-nums; text-shadow: 0 0 22px rgba(133,183,235,.32);
+  }
+  .qq-tag {
+    font-size: 10.5px; color: var(--accent-text); letter-spacing: .06em;
+    border: 1px solid rgba(133,183,235,.3); border-radius: 6px; padding: 2px 7px;
+  }
+  .qq-acts { display: flex; gap: 10px; flex-wrap: wrap; position: relative; }
+  .qq-acts .btn-primary, .qq-acts .btn-ghost {
+    flex: 1; min-width: 118px; display: inline-flex; align-items: center; justify-content: center;
+    padding: 10px 16px; border-radius: 8px;
+  }
+  .qq-hint { margin-top: 14px; font-size: 11px; line-height: 1.8; color: var(--text-3); position: relative; }
+
+  .ct-list { display: flex; flex-direction: column; gap: 10px; }
+  .ct-item {
+    display: flex; gap: 12px; padding: 14px 16px; border-radius: 12px;
+    background: rgba(255,255,255,.035); border: 1px solid var(--line);
+    transition: border-color .18s, background .18s;
+  }
+  .ct-item:hover { border-color: rgba(133,183,235,.24); background: rgba(255,255,255,.055); }
+  .ct-item b { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-1); }
+  .ct-item i { display: block; font-style: normal; font-size: 11.5px; line-height: 1.75; color: var(--text-3); margin-top: 4px; }
+  .ct-ico {
+    flex: 0 0 30px; width: 30px; height: 30px; border-radius: 9px;
+    display: grid; place-items: center; color: #9DC9F1;
+    background: rgba(55,138,221,.13); border: 1px solid rgba(133,183,235,.18);
+  }
+  .ct-ico svg { width: 16px; height: 16px; }
+
+  .ct-note {
+    margin-top: 16px; padding: 16px 18px; border-radius: 12px;
+    background: rgba(239,159,39,.06); border: 1px solid rgba(239,159,39,.18);
+  }
+  .ct-note b { font-size: 12px; font-weight: 600; color: #FAC775; }
+  .ct-note p { font-size: 11.5px; line-height: 1.85; color: var(--text-3); margin-top: 6px; }
+
+  /* ===== 页脚：署名 + 联系入口 ===== */
+  .site-foot {
+    position: relative; z-index: 1; margin-top: 26px; border-top: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(10,14,21,0), rgba(8,11,17,.72));
+    flex-shrink: 0;
+  }
+  .sf-inner {
+    max-width: var(--page-max); margin: 0 auto; padding: 26px var(--page-pad) 30px;
+    /* 基线对齐：右侧链接与左侧「第九艺术」同一基线，字号不同也不会一高一低 */
+    display: grid; grid-template-columns: 1fr auto; gap: 18px 24px; align-items: baseline;
+  }
+  .sf-logo { font-size: 14px; font-weight: 600; color: #85B7EB; letter-spacing: 1px; }
+  .sf-logo span { font-size: 11px; font-weight: 400; color: var(--text-3); margin-left: 8px; letter-spacing: 0; }
+  .sf-credit { margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-3); }
+  .sf-by { letter-spacing: .04em; }
+  .sf-name { font-size: 13px; color: #EAF2FB; letter-spacing: .08em; }
+  .sf-role {
+    font-size: 10.5px; color: var(--accent-text); padding: 2px 9px; border-radius: 999px;
+    border: 1px solid rgba(133,183,235,.26); background: rgba(55,138,221,.10);
+  }
+  .sf-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .sf-links button { font-size: 11.5px; color: var(--text-3); padding: 6px 11px; border-radius: 7px; transition: color .15s, background .15s; }
+  .sf-links button:hover { color: var(--text-1); background: rgba(255,255,255,.06); }
+  .sf-links .sf-cta { color: var(--accent-text); border: 1px solid rgba(133,183,235,.28); background: rgba(55,138,221,.10); }
+  .sf-links .sf-cta:hover { color: #EAF2FB; background: rgba(55,138,221,.20); }
+  .sf-copy { grid-column: 1 / -1; font-size: 10.5px; color: #6F757D; border-top: 1px solid var(--line); padding-top: 14px; }
+
+  @media (max-width: 820px) {
+    .contact-grid { grid-template-columns: 1fr; }
+    .contact-hero { padding: 0 0 18px; }
+    .contact-hero h2 { font-size: 20px; }
+    .contact-hero p { font-size: 12px; }
+    .qq-num { font-size: 26px; }
+  }
+  @media (max-width: 640px) {
+    .sf-inner { grid-template-columns: 1fr; padding: 20px var(--page-pad) 22px; gap: 14px; }
+    .sf-links { justify-content: flex-start; margin: 0 -11px; }
+    .sf-copy { padding-top: 12px; }
+    .contact-wrap { padding: 0; }
+    .qq-card { padding: 18px 16px 16px; }
+  }
+</style>
+<!-- 首屏大海报由 JS 赋值，浏览器发现得晚；这里提前按当前主题预加载，少等 1~2 秒。
+     手机走 960w 窄图（19~66KB），桌面才用 1920w，慢网下不会被一张 200KB 的图卡住。 -->
+<link rel="preload" as="image" id="hero-preload" href="covers/carousel-1-night.webp"
+      imagesrcset="covers/carousel-1-night-960.webp 960w, covers/carousel-1-night.webp 1920w"
+      imagesizes="(max-width: 640px) 100vw, 1720px" fetchpriority="high">
+<script>
+  (function () {
+    try {
+      if (localStorage.getItem('ninth_theme') === 'day') {
+        var l = document.getElementById('hero-preload');
+        l.setAttribute('href', 'covers/carousel-1-day.webp');
+        l.setAttribute('imagesrcset', 'covers/carousel-1-day-960.webp 960w, covers/carousel-1-day.webp 1920w');
+      }
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+<script>
+/* 主题在首帧就定好，避免图标和底色闪一下 */
+(function () {
+  try { document.body.dataset.theme = localStorage.getItem('ninth_theme') || 'night'; }
+  catch (e) { document.body.dataset.theme = 'night'; }
+})();
+</script>
+
+<div class="bg-art" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="logo">第九艺术<small>校园游戏平台</small></div>
+  <nav class="nav-tabs">
+    <button data-nav="home" class="active">首页</button>
+    <button data-nav="rank">排行榜</button>
+    <button data-nav="studio">创作中心</button>
+    <button data-nav="contact">联系我们</button>
+  </nav>
+  <div class="spacer"></div>
+  <div class="search-wrap">
+    <input class="search-box" id="search-input" placeholder="搜索游戏或同学" autocomplete="off">
+    <div class="search-panel" id="search-panel"></div>
+  </div>
+  <button class="theme-toggle" id="theme-toggle" title="切换日间 / 夜间" aria-label="切换日间夜间模式">
+    <svg class="ico-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.4v2.2M12 19.4v2.2M2.4 12h2.2M19.4 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/></svg>
+    <svg class="ico-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.6 8.6 0 0 1 9.5 3.5a8.6 8.6 0 1 0 11 11z"/></svg>
+  </button>
+  <div class="avatar" data-nav="me" title="游客模式">客</div>
+</header>
+
+<main>
+  <!-- ===== 首页 ===== -->
+  <section id="view-home" class="view active">
+    <div class="carousel" id="carousel">
+      <div class="carousel-slide" id="carousel-slide">
+        <img class="carousel-bg" id="carousel-bg" alt="">
+        <div class="banner-copy">
+          <div class="bc-head">
+            <h1 class="bc-title">嘿！这里是第九艺术~</h1>
+            <p class="bc-sub">一个致力于游戏研发与创新的社团</p>
+          </div>
+          <ul class="bc-feats">
+            <li><span class="bc-ico"><svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 5.7L3 17.7 6.3 21l5.7-5.7a4.5 4.5 0 0 0 5.7-6l-2.6 2.6-2.7-2.7 2.6-2.9z"/></svg></span><span><b>独立游戏开发</b><i>从想法到实现</i></span></li>
+            <li><span class="bc-ico"><svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="5"/><path d="M6 12h4M8 10v4"/><circle cx="16" cy="11" r="0.6" fill="#fff"/><circle cx="18.5" cy="13" r="0.6" fill="#fff"/></svg></span><span><b>原创作品</b><i>用游戏表达世界</i></span></li>
+            <li><span class="bc-ico"><svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/></svg></span><span><b>技术探索</b><i>热爱 · 学习 · 分享</i></span></li>
+            <li><span class="bc-ico"><svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16.2 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M21 20c0-2.6-1.6-4.7-3.9-5.5"/></svg></span><span><b>热爱共创</b><i>一起做有趣的事</i></span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="home-layout">
+      <div class="home-main">
+        <div class="section-head">
+          <h3>全部游戏</h3>
+          <div class="filters">
+            <button class="filter-chip active" data-filter="all">全部</button>
+            <button class="filter-chip" data-filter="play">即点即玩</button>
+            <button class="filter-chip" data-filter="video">视频演示</button>
+            <button class="filter-chip" data-filter="dl">桌面 / 手机版</button>
+          </div>
+        </div>
+        <div class="author-bar" id="author-bar">
+          <span id="author-bar-text"></span>
+          <button class="ab-x" id="author-bar-x">清除筛选 ✕</button>
+        </div>
+        <div class="game-grid" id="game-grid"></div>
+      </div>
+      <div class="sidebar">
+        <div class="sidebar-inner">
+          <div class="side-card">
+            <h4>新品速递</h4>
+            <div id="news-list"></div>
+          </div>
+          <div class="side-card">
+            <h4>站点数据</h4>
+            <div class="side-stats" id="side-stats"></div>
+          </div>
+          <div class="side-card side-cta">
+            <h4>创作中心</h4>
+            <p>你的作品也可以出现在这里。上传游戏，写上简介，让全校同学玩到。</p>
+            <button class="btn-side" data-nav="studio">开始投稿 →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 排行榜 ===== -->
+  <section id="view-rank" class="view">
+    <div class="panel" style="padding: 6px 0;">
+      <table class="rank-table">
+        <thead><tr><th>排名</th><th>游戏</th><th>类型</th><th>总浏览</th><th>小红花</th><th>通关人数</th></tr></thead>
+        <tbody id="rank-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== 详情页 ===== -->
+  <section id="view-detail" class="view">
+    <div class="breadcrumb"><span class="link" data-nav="home">首页</span> / <span id="crumb-tag"></span> / <span id="crumb-title" style="color:#C7C4BA;"></span></div>
+    <div class="detail-head">
+      <div class="detail-media no-demo" id="detail-media">
+        <div class="media-stage show-photo" id="media-stage">
+          <video id="media-video" playsinline webkit-playsinline muted loop preload="none"></video>
+          <img class="media-photo" id="media-photo" alt="">
+          <div class="media-fallback" id="media-fallback"></div>
+          <button class="media-play" id="media-play" type="button" aria-label="播放演示视频">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2v13.6L19 12z"/></svg>
+          </button>
+          <div class="media-bar">
+            <span class="media-tag" id="media-tag">演示视频</span>
+            <span class="media-dur" id="media-dur"></span>
+            <span class="media-gap"></span>
+            <button class="media-btn" id="media-full" type="button" title="全屏播放" aria-label="全屏播放">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 15v5h-5M20 9V4h-5M4 15v5h5"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="media-thumbs" id="media-thumbs"></div>
+      </div>
+      <div class="detail-info">
+        <div class="detail-title-row">
+          <h2 id="detail-title"></h2>
+          <span id="detail-badges"></span>
+        </div>
+        <div class="detail-byline" id="detail-byline"></div>
+        <div class="tag-chips" id="detail-tags"></div>
+        <div class="detail-actions">
+          <button class="btn-primary" id="detail-play">立即游玩</button>
+          <button class="btn-ghost flower-btn" id="detail-flower" title="给这个游戏送一朵小红花">
+            <svg width="14" height="14" viewBox="0 0 20 20"><g fill="#E24B4A"><circle cx="10" cy="4" r="3.4"/><circle cx="15.7" cy="8.1" r="3.4"/><circle cx="13.5" cy="14.9" r="3.4"/><circle cx="6.5" cy="14.9" r="3.4"/><circle cx="4.3" cy="8.1" r="3.4"/></g><circle cx="10" cy="10" r="3.1" fill="#FAC775"/></svg>
+            小红花 <span id="detail-flower-count">0</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="detail-stats"></div>
+
+    <div class="detail-layout">
+      <div class="detail-main">
+        <div class="detail-tabs">
+          <button class="active" data-dtab="intro">游戏简介</button>
+          <button data-dtab="devlog">开发者日志</button>
+        </div>
+        <div class="tab-panel active" data-dpanel="intro">
+          <p class="game-desc" id="detail-desc"></p>
+        </div>
+        <div class="tab-panel" data-dpanel="devlog">
+          <p class="game-desc" id="devlog-text"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 个人中心（游客模式） ===== -->
+  <section id="view-me" class="view">
+    <div class="me-wrap" id="me-page"></div>
+  </section>
+
+  <!-- 登录 / 注册 -->
+  <div class="auth-mask" id="auth-mask">
+    <div class="auth-card">
+      <h3 id="auth-title">登录校游社</h3>
+      <div class="auth-sub">用学号登录，送花和游玩记录会存到服务器上。</div>
+      <div class="auth-tabs">
+        <button id="auth-tab-login" class="on">登录</button>
+        <button id="auth-tab-register">首次注册</button>
+      </div>
+      <div class="auth-field">
+        <label>学号</label>
+        <input id="auth-sid" inputmode="numeric" placeholder="例如 2025301xxx" autocomplete="username">
+      </div>
+      <div class="auth-field">
+        <label>密码</label>
+        <input id="auth-pw" type="password" placeholder="至少 6 位" autocomplete="current-password">
+      </div>
+      <div id="auth-reg-extra" style="display:none;">
+        <div class="auth-field">
+          <label>昵称（可不填）</label>
+          <input id="auth-nick" placeholder="显示在个人中心" maxlength="20">
+        </div>
+        <div class="auth-field">
+          <label>班级（可不填）</label>
+          <input id="auth-cls" placeholder="例如 计算机26301" maxlength="30">
+        </div>
+      </div>
+      <div class="auth-err" id="auth-err"></div>
+      <button class="btn-primary" id="auth-submit">登录</button>
+      <div class="auth-foot">
+        <a id="auth-guest">先随便逛逛</a>
+        <a id="auth-switch">没有账号？去注册</a>
+      </div>
+    </div>
+  </div>
+  <div id="toast"></div>
+
+  <!-- ===== 联系我们 ===== -->
+  <section id="view-contact" class="view">
+    <div class="contact-wrap">
+      <header class="contact-hero">
+        <span class="ct-kicker">CONTACT · 联系我们</span>
+        <h2>想说的话，都放在群里说</h2>
+        <p>本站不设社区、评论与私信功能，所有交流统一在 QQ 群进行。</p>
+      </header>
+
+      <div class="contact-grid">
+        <div class="qq-card">
+          <div class="qq-head">
+            <span class="qq-badge" aria-hidden="true">Q</span>
+            <div class="qq-title">
+              <h3>第九艺术 · 交流群</h3>
+              <p>作品反馈 · 组队试玩 · 找作者对接</p>
+            </div>
+          </div>
+          <div class="qq-num-row">
+            <div class="qq-num" id="qq-num">1129620477</div>
+            <span class="qq-tag">QQ 群</span>
+          </div>
+          <div class="qq-acts">
+            <button class="btn-primary" id="qq-copy">复制群号</button>
+            <a class="btn-ghost" id="qq-open" href="mqqapi://card/show_pslcard?src_type=internal&amp;version=1&amp;uin=1129620477&amp;card_type=group&amp;source=qrcode">在 QQ 中打开</a>
+          </div>
+          <p class="qq-hint">手机上点「在 QQ 中打开」会直接跳转群名片；跳不过去就复制群号，在 QQ 里搜索加入。</p>
+        </div>
+
+        <div class="ct-list">
+          <div class="ct-item">
+            <span class="ct-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.4h8.4"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.8 18.2l-4 1 1-4z"/></svg></span>
+            <div><b>提交作品</b><i>群里发链接或压缩包，附上姓名、班级和玩法说明，作者会帮你接进平台。</i></div>
+          </div>
+          <div class="ct-item">
+            <span class="ct-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6 20.4 8v8L12 20.4 3.6 16V8z"/><path d="M12 12v8.4M3.6 8 12 12l8.4-4"/></svg></span>
+            <div><b>报告问题</b><i>游戏打不开、卡片信息有误、手机上排版错位，截图丢群里，当天会修。</i></div>
+          </div>
+          <div class="ct-item">
+            <span class="ct-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16.4 5.4a3.2 3.2 0 0 1 0 5.6"/><path d="M21 20c0-2.6-1.6-4.7-3.9-5.5"/></svg></span>
+            <div><b>加入社团</b><i>想一起做游戏、画立绘、写剧情，群里说一声，约个时间聊聊。</i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ct-note">
+        <b>为什么不做站内社区</b>
+        <p>校内平台没有内容审核的条件，开放发帖、评论、私信就等于把风险留在站内。所以站里只做「看作品、点开玩、送小红花」，讨论请移步 QQ 群：进群即视为同意遵守校规与群规。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-studio" class="view">
+    <div class="todo-page">
+      <h3>创作中心 · 建设中</h3>
+      <p>网页上传与审核还在做。现在想把作品放上来，直接到 QQ 群找作者对接，当天就能接进平台。</p>
+      <button class="btn-primary" data-nav="contact" style="margin-top:18px;">去「联系我们」</button>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 页脚：署名 + 联系入口（全站可见） ===== -->
+<footer class="site-foot">
+  <div class="sf-inner">
+    <div class="sf-brand">
+      <div class="sf-logo">第九艺术<span>校园游戏平台</span></div>
+      <p class="sf-credit">
+        <span class="sf-by">设计与开发</span>
+        <b class="sf-name">赵文珺</b>
+        <span class="sf-role">网页开发者</span>
+      </p>
+    </div>
+    <nav class="sf-links" aria-label="页脚导航">
+      <button data-nav="home">首页</button>
+      <button data-nav="rank">排行榜</button>
+      <button data-nav="contact" class="sf-cta">联系我们 · 进群交流</button>
+    </nav>
+    <p class="sf-copy">© 2026 第九艺术 · 本站仅供校内交流，作品版权归各作者所有</p>
+  </div>
+</footer>
+
+<!-- ===== 移动端底部导航（≤640px 显示，桌面隐藏） ===== -->
+<nav class="tabbar" aria-label="主导航">
+  <button data-nav="home" class="active">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.4l8.5 7.2"/><path d="M5.8 9.8V20.4h12.4V9.8"/><path d="M9.8 20.4v-5.6h4.4v5.6"/></svg>
+    <span>首页</span>
+  </button>
+  <button data-nav="rank">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V11"/><path d="M10 20V5"/><path d="M16 20v-6"/><path d="M21.5 20H2.5"/></svg>
+    <span>排行</span>
+  </button>
+  <button data-nav="contact">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 11.6a8 8 0 0 1-11.4 7.2L4.3 20.4l1.7-4.7a8 8 0 1 1 14.6-4.1z"/><circle cx="9.4" cy="11.9" r=".85" fill="currentColor" stroke="none"/><circle cx="12.6" cy="11.9" r=".85" fill="currentColor" stroke="none"/><circle cx="15.8" cy="11.9" r=".85" fill="currentColor" stroke="none"/></svg>
+    <span>联系</span>
+  </button>
+  <button data-nav="studio">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="4.2" width="17.6" height="15.6" rx="3.4"/><path d="M12 8.8v6.4M8.8 12h6.4"/></svg>
+    <span>创作</span>
+  </button>
+  <button data-nav="me">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.2" r="3.6"/><path d="M4.8 20.4c0-3.6 3.2-6.4 7.2-6.4s7.2 2.8 7.2 6.4"/></svg>
+    <span>我的</span>
+  </button>
+</nav>
+
+<!-- ===== 游玩弹窗（游客模式，无计时） ===== -->
+<div class="modal-mask" id="play-modal">
+  <div class="modal" id="play-modal-box">
+    <div class="modal-head" id="modal-head">
+      <h3 id="modal-title-playing"></h3>
+      <button class="btn-ghost" id="modal-close-top">关闭</button>
+    </div>
+    <div id="modal-placeholder">
+      <h3 id="modal-title">开始游玩</h3>
+      <p>这个游戏还没有接入网页版。正式版会内嵌网页游戏画布，点开即玩，全程游客模式、无需登录。</p>
+      <div class="modal-btns" style="margin-top:18px; justify-content:center;">
+        <button class="btn-primary" id="modal-close">知道了</button>
+      </div>
+    </div>
+    <div id="modal-game" style="display:none;">
+      <iframe class="game-frame" id="game-frame" title="game" allow="fullscreen; autoplay; gamepad"></iframe>
+      <div class="frame-hint">
+        <span>鼠标被游戏抓住出不来？按一次 <b style="color:#F0997B;">Esc</b> 释放，再点右上角关闭</span>
+        <span><a id="game-newtab" href="#" target="_blank" rel="noopener">新窗口打开</a> · 游客模式</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 模拟数据（游客模式：浏览 / 小红花 / 通关，无时长无评论） ================= */
+const GAMES = [
+  {
+    id: 1, title: '第七号样本：残影', tag: '校园', cat: 'play', genre: '平台解谜', mode: '单人',
+    byline: '人工智能26303 · 赵文珺 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
+    coverBg: '#085041', coverFg: '#5DCAA5', featured: true,
+    tags: ['解谜', '像素风', '钥匙收集', '时序门'],
+    playUrl: 'https://echoes-demo.app.workbuddy.host/?sharecode=7O7FAGB4JM',
+    coverImg: 'games/echoes/cover.webp', previewVid: 'games/echoes/preview.mp4',
+    demo: true,
+    desc: '一款像素风平台解谜游戏。你要在残影重叠的旧校舍里收集 8 枚钥匙，解开时序门的谜题，找到记忆消失的真相。共 8 关，另有隐藏结局。',
+    devlog: '11 月 5 日：手感调优完成，SPEED 从 280 降到 240，多人反馈"一按就窜"的问题解决了。第 6 关两道 0.6 秒时序门放宽到 1.0 秒。\n11 月 1 日：新增钥匙全收集成就。\n10 月 28 日：网页版发布。'
+  },
+  { id: 2, title: 'NEON STRIKE · 霓虹突击', tag: '校园', cat: 'play', genre: '动作射击', mode: '单人',
+    byline: '云计算25301 · 路顺 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#085041', coverFg: '#5DCAA5',
+    tags: ['射击', '霓虹', '街机'],
+    playUrl: 'games/neon-strike/',
+    coverImg: 'games/neon-strike/cover.webp', previewVid: 'games/neon-strike/preview.mp4',
+    demo: true,
+    desc: '霓虹风格的太空射击，弹幕与得分一网打尽。',
+    devlog: '暂无开发者日志。' },
+  { id: 3, title: '星球清道夫 · 净土计划', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
+    byline: '云计算25302 · 尹源鑫 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#712B13', coverFg: '#F0997B',
+    tags: ['休闲', '消除', '环保'],
+    playUrl: 'games/planet-cleaner/',
+    coverImg: 'games/planet-cleaner/cover.webp', previewVid: 'games/planet-cleaner/preview.mp4',
+    demo: true,
+    desc: '驾驶清扫船净化星球，还宇宙一片净土。',
+    devlog: '暂无开发者日志。' },
+  { id: 4, title: '鼠鼠大逃亡', tag: '校园', cat: 'play', genre: '跑酷', mode: '单人',
+    byline: '云计算25302 · 张学通 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#0C447C', coverFg: '#85B7EB',
+    tags: ['跑酷', '收集', '可爱'],
+    playUrl: 'games/mouse-escape/',
+    coverImg: 'games/mouse-escape/cover.webp', previewVid: 'games/mouse-escape/preview.mp4',
+    demo: true,
+    desc: '收集奶酪钻进小洞，躲避追击跑得越远越好。',
+    devlog: '暂无开发者日志。' },
+  { id: 5, title: '苍穹防线 · 飞机大战', tag: '校园', cat: 'play', genre: '射击', mode: '单人',
+    byline: '云计算25302 · 王佳旭 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#27500A', coverFg: '#97C459',
+    tags: ['射击', '飞机', '弹幕'],
+    playUrl: 'games/sky-defense/',
+    coverImg: 'games/sky-defense/cover.webp', previewVid: 'games/sky-defense/preview.mp4',
+    demo: true,
+    desc: '经典飞机大战，守卫苍穹防线的每一寸天空。',
+    devlog: '暂无开发者日志。' },
+  { id: 6, title: '微光守护 · Glimmer Watch', tag: '校园', cat: 'play', genre: '生存', mode: '单人',
+    byline: '云计算25302 · 王文翰 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#72243E', coverFg: '#ED93B1',
+    tags: ['生存', '氛围', '像素'],
+    playUrl: 'games/glimmer-watch/',
+    coverImg: 'games/glimmer-watch/cover.webp', previewVid: 'games/glimmer-watch/preview.mp4',
+    demo: true,
+    desc: '在微光将熄的世界里撑过一个个垃圾日。',
+    devlog: '暂无开发者日志。' },
+  { id: 7, title: '第 4 厂 · 削土豆的人', tag: '校园', cat: 'play', genre: '叙事', mode: '单人',
+    byline: '云计算25302 · 王津 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['叙事', '剧情', '模拟'],
+    playUrl: 'games/factory-4/',
+    coverImg: 'games/factory-4/cover.webp', previewVid: 'games/factory-4/preview.mp4',
+    demo: true,
+    desc: '供应总局的削皮车间，一个关于流水线的故事。',
+    devlog: '暂无开发者日志。' },
+  { id: 8, title: '成语猎人', tag: '校园', cat: 'play', genre: '教育', mode: '单人',
+    byline: '云计算25302 · 邱文龙 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['教育', '成语', '答题'],
+    playUrl: 'games/idiom-hunter/',
+    coverImg: 'games/idiom-hunter/cover.webp', previewVid: 'games/idiom-hunter/preview.mp4',
+    demo: true,
+    desc: '用成语当武器狩猎题目，边玩边涨词汇量。',
+    devlog: '暂无开发者日志。' },
+  { id: 9, title: '萌味餐厅 · 3D厨房', tag: '校园', cat: 'play', genre: '经营', mode: '单人',
+    byline: '云计算26302 · 张子涵 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#185FA5', coverFg: '#E6F1FB',
+    tags: ['经营', '3D', '模拟'],
+    playUrl: 'games/cute-diner/',
+    coverImg: 'games/cute-diner/cover.webp', previewVid: 'games/cute-diner/preview.mp4',
+    desc: '3D 厨房经营 Demo，接单、烹饪、上菜一条龙。',
+    devlog: '暂无开发者日志。' },
+  { id: 10, title: '擂茶小馆', tag: '校园', cat: 'play', genre: '经营', mode: '单人',
+    byline: '人工智能25301 · 刘晓晴 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#085041', coverFg: '#5DCAA5',
+    tags: ['经营', '美食', '传统文化'],
+    playUrl: 'games/leicha-tea/',
+    coverImg: 'games/leicha-tea/cover.webp', previewVid: 'games/leicha-tea/preview.mp4',
+    desc: '手工现擂·随心搭配，把客家擂茶开成小店。',
+    devlog: '暂无开发者日志。' },
+  { id: 11, title: '萝卜猎手', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
+    byline: '人工智能25302 · 周文博 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#712B13', coverFg: '#F0997B',
+    tags: ['休闲', '农场', '收集'],
+    playUrl: 'games/carrot-hunter/',
+    coverImg: 'games/carrot-hunter/cover.webp', previewVid: 'games/carrot-hunter/preview.mp4',
+    demo: true,
+    desc: '在田地里追捕萝卜，轻松愉快的收集小游戏。',
+    devlog: '暂无开发者日志。' },
+  { id: 12, title: '警笛之下 · Under the Siren', tag: '校园', cat: 'play', genre: '解谜', mode: '单人',
+    byline: '人工智能25302 · 张云鹏 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#0C447C', coverFg: '#85B7EB',
+    tags: ['解谜', '悬疑', '剧情'],
+    playUrl: 'games/under-siren/',
+    coverImg: 'games/under-siren/cover.webp', previewVid: 'games/under-siren/preview.mp4',
+    demo: true,
+    desc: '警报响起之后，真相藏在警笛声下面。',
+    devlog: '暂无开发者日志。' },
+  { id: 13, title: '汽车大逃杀 · 公路关卡战', tag: '校园', cat: 'play', genre: '竞速', mode: '单人',
+    byline: '人工智能25302 · 张占磊 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#27500A', coverFg: '#97C459',
+    tags: ['竞速', '对战', '关卡'],
+    playUrl: 'games/car-battle/',
+    coverImg: 'games/car-battle/cover.webp', previewVid: 'games/car-battle/preview.mp4',
+    demo: true,
+    desc: '公路关卡制大逃杀，方向盘上见真章。',
+    devlog: '暂无开发者日志。' },
+  { id: 14, title: '星际突击', tag: '校园', cat: 'play', genre: '射击', mode: '单人',
+    byline: '人工智能26301 · 赵宏奥 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#72243E', coverFg: '#ED93B1',
+    tags: ['射击', '太空', '街机'],
+    playUrl: 'games/star-assault/',
+    coverImg: 'games/star-assault/cover.webp', previewVid: 'games/star-assault/preview.mp4',
+    desc: '太空射击街机作，机体升级火力全开。',
+    devlog: '暂无开发者日志。' },
+  { id: 15, title: '小鱼快游 · 桂圆鱼', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
+    byline: '人工智能26302 · 于慧源 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['休闲', '海洋', '养成'],
+    playUrl: 'games/fish-swim/',
+    coverImg: 'games/fish-swim/cover.webp', previewVid: 'games/fish-swim/preview.mp4',
+    demo: true,
+    desc: '带着桂圆鱼畅游深海，躲避天敌收集食物。',
+    devlog: '暂无开发者日志。' },
+  { id: 16, title: '雪岭速降 SNOWLINE RUSH', tag: '校园', cat: 'play', genre: '跑酷', mode: '单人',
+    byline: '大数据25301 · 李昊坤 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['跑酷', '滑雪', 'AI自适应'],
+    playUrl: 'games/snowline-rush/',
+    coverImg: 'games/snowline-rush/cover.webp', previewVid: 'games/snowline-rush/preview.mp4',
+    desc: 'AI 自适应难度的滑雪跑酷，雪道越滑越快。',
+    devlog: '暂无开发者日志。' },
+  { id: 17, title: '回声花园 · Echo Garden', tag: '校园', cat: 'play', genre: '模拟', mode: '单人',
+    byline: '大数据25302 · 张熠阳 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#185FA5', coverFg: '#E6F1FB',
+    tags: ['模拟', '治愈', '种花'],
+    playUrl: 'games/echo-garden/',
+    coverImg: 'games/echo-garden/cover.webp', previewVid: 'games/echo-garden/preview.mp4',
+    desc: '在花园里种下回声，听它们慢慢发芽。',
+    devlog: '暂无开发者日志。' },
+  { id: 18, title: 'AI 娘格斗 · 算力擂台', tag: '校园', cat: 'play', genre: '格斗', mode: '单人',
+    byline: '大数据26301 · 孙凯文 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#085041', coverFg: '#5DCAA5',
+    tags: ['格斗', '对战', '算力'],
+    playUrl: 'games/ai-battle/',
+    coverImg: 'games/ai-battle/cover.webp', previewVid: 'games/ai-battle/preview.mp4',
+    demo: true,
+    desc: '把算力当武力，AI 娘们在擂台上一决高下。',
+    devlog: '暂无开发者日志。' },
+  { id: 19, title: '迷雾画廊', tag: '校园', cat: 'play', genre: '解谜', mode: '单人',
+    byline: '大数据26301 · 李静怡 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#712B13', coverFg: '#F0997B',
+    tags: ['解谜', '推理', 'AI沉浸'],
+    playUrl: 'games/mist-gallery/',
+    coverImg: 'games/mist-gallery/cover.webp', previewVid: 'games/mist-gallery/preview.mp4',
+    desc: 'AI 沉浸式推理侦探游戏，拨开画廊的迷雾。',
+    devlog: '暂无开发者日志。' },
+  { id: 20, title: '星界远征', tag: '校园', cat: 'play', genre: '冒险', mode: '单人',
+    byline: '大数据26303 · 张永康 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#0C447C', coverFg: '#85B7EB',
+    tags: ['冒险', '探索', '星际'],
+    playUrl: 'games/star-expedition/',
+    coverImg: 'games/star-expedition/cover.webp', previewVid: 'games/star-expedition/preview.mp4',
+    desc: '组建舰队远征星界，未知星域等你探索。',
+    devlog: '暂无开发者日志。' },
+  { id: 21, title: '月面清道夫 · Moon Sweeper', tag: '校园', cat: 'play', genre: '休闲', mode: '单人',
+    byline: '大数据26303 · 李晨洁 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#27500A', coverFg: '#97C459',
+    tags: ['休闲', '太空', '清扫'],
+    playUrl: 'games/moon-sweeper/',
+    coverImg: 'games/moon-sweeper/cover.webp', previewVid: 'games/moon-sweeper/preview.mp4',
+    demo: true,
+    desc: '在月面上清扫太空垃圾，化身月球环卫工。',
+    devlog: '暂无开发者日志。' },
+  { id: 22, title: '星火拾荒者 · SPARK SCAVENGER', tag: '校园', cat: 'play', genre: '动作', mode: '单人',
+    byline: '物联网26303 · 程振一 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#72243E', coverFg: '#ED93B1',
+    tags: ['动作', '拾荒', '末日'],
+    playUrl: 'games/spark-scavenger/',
+    coverImg: 'games/spark-scavenger/cover.webp', previewVid: 'games/spark-scavenger/preview.mp4',
+    demo: true,
+    desc: '末日废土拾荒求生，收集星火点亮文明。',
+    devlog: '暂无开发者日志。' },
+  { id: 23, title: '传感器守护者 · 仓库布防', tag: '校园', cat: 'play', genre: '塔防', mode: '单人',
+    byline: '物联网26303 · 陈子涵 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['塔防', '策略', '仓库'],
+    playUrl: 'games/sensor-guard/',
+    coverImg: 'games/sensor-guard/cover.webp', previewVid: 'games/sensor-guard/preview.mp4',
+    desc: '布防传感器守卫仓库， IoT 主题的塔防新作。',
+    devlog: '暂无开发者日志。' },
+  { id: 24, title: '黄昏轮回 · 英灵试炼', tag: '校园', cat: 'play', genre: 'RPG', mode: '单人',
+    byline: '计算机25301 · 崔皓泽 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['RPG', 'Roguelike', '北欧'],
+    playUrl: 'games/dusk-cycle/',
+    coverImg: 'games/dusk-cycle/cover.webp', 
+    desc: '北欧英灵主题 Roguelike，每一次轮回都是新构筑。',
+    devlog: '暂无开发者日志。' },
+  { id: 25, title: '残域余烬：归途', tag: '校园', cat: 'play', genre: '生存', mode: '单人',
+    byline: '计算机26301 · 徐茂恒 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#185FA5', coverFg: '#E6F1FB',
+    tags: ['生存', '营地', '末日'],
+    playUrl: 'games/ember-road/',
+    coverImg: 'games/ember-road/cover.webp', previewVid: 'games/ember-road/preview.mp4',
+    desc: '在残域中经营营地、收集余烬，走完归途。',
+    devlog: '暂无开发者日志。' },
+  { id: 26, title: '地牢逃途', tag: '校园', cat: 'play', genre: 'RPG', mode: '单人',
+    byline: '计算机26301 · 谢宸琳 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#085041', coverFg: '#5DCAA5',
+    tags: ['RPG', '地牢', '可玩'],
+    playUrl: 'games/dungeon-escape/',
+    
+    desc: '大型地牢逃亡，装备与路线自由搭配。',
+    devlog: '暂无开发者日志。' },
+  { id: 27, title: '海底大作战 · 答题闯关', tag: '校园', cat: 'play', genre: '教育', mode: '单人',
+    byline: '计算机26302 · 李国盛 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#712B13', coverFg: '#F0997B',
+    tags: ['教育', '四大名著', '答题'],
+    playUrl: 'games/sea-battle/',
+    coverImg: 'games/sea-battle/cover.webp', previewVid: 'games/sea-battle/preview.mp4',
+    demo: true,
+    desc: '四大名著答题闯关，在海底一路杀到龙宫。',
+    devlog: '暂无开发者日志。' },
+  { id: 28, title: 'Q版泡泡堂 · 水球大作战', tag: '校园', cat: 'play', genre: '对战', mode: '单人',
+    byline: '计算机26302 · 李恒达 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#0C447C', coverFg: '#85B7EB',
+    tags: ['对战', '泡泡堂', '水球'],
+    playUrl: 'games/water-bomb/',
+    coverImg: 'games/water-bomb/cover.webp', previewVid: 'games/water-bomb/preview.mp4',
+    demo: true,
+    desc: 'Q 版水球大乱斗，经典泡泡堂的清新复刻。',
+    devlog: '暂无开发者日志。' },
+  { id: 29, title: '孤剑试炼 · Lone Blade Trials', tag: '校园', cat: 'play', genre: '动作', mode: '单人',
+    byline: '计算机26302 · 李金坤 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#27500A', coverFg: '#97C459',
+    tags: ['动作', '武侠', '试炼'],
+    playUrl: 'games/lone-blade/',
+    coverImg: 'games/lone-blade/cover.webp', previewVid: 'games/lone-blade/preview.mp4',
+    demo: true,
+    desc: '一人一剑闯试炼，武侠动作 v0.8。',
+    devlog: '暂无开发者日志。' },
+  { id: 30, title: '星际逃亡', tag: '校园', cat: 'video', genre: '策略', mode: '单人',
+    byline: '信息技术系云计算25301 · 尹相洁 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/xingji-taowang/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#72243E', coverFg: '#ED93B1',
+    tags: ['智游杯', '敬请期待'],
+    desc: 'Python 桌面作品，含演示视频与源码。',
+    devlog: '暂无开发者日志。' },
+  { id: 31, title: '死仓', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
+    byline: '信息技术系云计算25302 · 尹领 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/sicang/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['智游杯', '敬请期待'],
+    desc: '剧情向作品，含演示视频与设计文档。',
+    devlog: '暂无开发者日志。' },
+  { id: 32, title: '果冻合成大作战 · 马卡龙', tag: '校园', cat: 'video', genre: '休闲', mode: '单人',
+    byline: '信息技术系云计算25301 · 李虹洁 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/guodong-hecheng/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['智游杯', '敬请期待'],
+    desc: '合成玩法休闲作，含演示视频。',
+    devlog: '暂无开发者日志。' },
+  { id: 33, title: '心动的声音', tag: '校园', cat: 'video', genre: '音游', mode: '单人',
+    byline: '信息技术系云计算25301 · 兰文轩 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/xindong-shengyin/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#185FA5', coverFg: '#E6F1FB',
+    tags: ['智游杯', '敬请期待'],
+    desc: '声音主题作品，含演示视频与简介。',
+    devlog: '暂无开发者日志。' },
+  { id: 34, title: '一剑江湖', tag: '校园', cat: 'video', genre: '武侠 Roguelike', mode: '单人',
+    byline: '信息技术系云计算25301 · 高梓祺 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/gaofuzhi-demo/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#085041', coverFg: '#5DCAA5',
+    tags: ['水墨', '武侠', 'Roguelike', '横版动作'],
+    desc: '水墨武侠 Roguelike 横版动作，故事从「一剑入山庄，救回师妹」起笔。剑术近身或法术远程二选一，沿七程三十处机缘的分支地图前行，在战斗、奇遇、货铺与黑市之间取舍。兵器会真正改写弹道形态，六式连段配闪避与随行灵体。作者提交的演示站链接已失效，暂时只能看演示视频。',
+    devlog: '作者自述：全站纯静态，手机与电脑皆可直接游玩；提交时附的临时隧道地址已过期。' },
+  { id: 35, title: '蓝色鲸鱼小姐', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
+    byline: '信息技术系云计算26302 · 李佳晓 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/lanse-jingyu/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#712B13', coverFg: '#F0997B',
+    tags: ['智游杯', '敬请期待'],
+    desc: '剧情向作品，含演示视频与优化版简介。',
+    devlog: '暂无开发者日志。' },
+  { id: 36, title: '疾风闪避', tag: '校园', cat: 'video', genre: '跑酷', mode: '单人',
+    byline: '信息技术系云计算26301 · 张文 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/jifeng-shanbi/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#0C447C', coverFg: '#85B7EB',
+    tags: ['智游杯', '敬请期待'],
+    desc: '躲避类跑酷，含演示视频与文档。',
+    devlog: '暂无开发者日志。' },
+  { id: 37, title: '渊途铸甲 · 像素地牢', tag: '校园', cat: 'play', genre: 'Roguelike', mode: '单人',
+    byline: '信息技术系人工智能25302 · 杨子钦 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/yuantu-zhujia/cover.webp', previewVid: 'games/yuantu-zhujia/preview.mp4',
+    demo: true,
+    playUrl: 'https://yuantu-zhuajia.app.workbuddy.host/?sharecode=I2G776G7R4',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#27500A', coverFg: '#97C459',
+    tags: ['Roguelike', '地牢', '锻造', 'Godot'],
+    desc: 'Godot 4.3 做的 Roguelike 动作冒险，网页版三端同源。四个职业、五级品质装备、不限次数附魔与三合一升品——深渊给你原料，锻造台给你手段。越往下越强，装备会留下来。',
+    devlog: '暂无开发者日志。' },
+  { id: 38, title: '接糖果 Catch', tag: '校园', cat: 'video', genre: '休闲', mode: '单人',
+    byline: '信息技术系人工智能25303 · 元欣宇 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/jie-tangguo/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#72243E', coverFg: '#ED93B1',
+    tags: ['智游杯', '敬请期待'],
+    desc: '接糖果休闲游戏，含项目报告与视频。',
+    devlog: '暂无开发者日志。' },
+  { id: 39, title: '经验地牢 · 二次开发', tag: '校园', cat: 'dl', genre: 'RPG', mode: '单人',
+    byline: '信息技术系人工智能25302 · 张凌宇 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/jingyan-dilao/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['智游杯', '敬请期待'],
+    desc: '基于 Experienced Pixel Dungeon 的二次开发，附下载链接。',
+    devlog: '暂无开发者日志。' },
+  { id: 40, title: '魔法高塔', tag: '校园', cat: 'dl', genre: 'RPG', mode: '单人',
+    byline: '信息技术系计算机25301 · 李文豪 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/mofa-gaota/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['智游杯', '敬请期待'],
+    desc: '桌面 exe 作品，含 AI 创作台账与截图。',
+    devlog: '暂无开发者日志。' },
+  { id: 41, title: '60Days', tag: '校园', cat: 'dl', genre: '生存', mode: '单人',
+    byline: '信息技术系计算机26301 · 蒋雪韬 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/60days/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#185FA5', coverFg: '#E6F1FB',
+    tags: ['智游杯', '敬请期待'],
+    desc: '桌面 exe 作品，60 天生存挑战。',
+    devlog: '暂无开发者日志。' },
+  { id: 42, title: 'RuralFarm · 田园物语', tag: '校园', cat: 'dl', genre: '经营', mode: '单人',
+    byline: '信息技术系人工智能26303 · 郭淑琳 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/rural-farm/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#085041', coverFg: '#5DCAA5',
+    tags: ['智游杯', '敬请期待'],
+    desc: '桌面 exe 作品，农场经营。',
+    devlog: '暂无开发者日志。' },
+  { id: 43, title: '逐光旅途', tag: '校园', cat: 'play', genre: '动作闯关', mode: '单人',
+    byline: '信息技术系计算机26301 · 刘家豪 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/zhuguang-lvtu/cover.webp', previewVid: 'games/zhuguang-lvtu/preview.mp4',
+    demo: true,
+    playUrl: 'https://zhuguang-journey.app.workbuddy.host/?sharecode=J2ZVJDYKH5',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#712B13', coverFg: '#F0997B',
+    tags: ['国风', '横版闯关', '四职业', '48 关'],
+    desc: '国风横版动作闯关，6 章 48 关。少女握着一柄收在腰侧的刀，穿过原野、森林、云海与长夜渡口，把熄灭的星辰一颗一颗重新点亮。四职业各有战斗手感，普攻连段接重击。',
+    devlog: '暂无开发者日志。' },
+  { id: 44, title: '异境回响', tag: '校园', cat: 'video', genre: '叙事', mode: '单人',
+    byline: '信息技术系计算机26301 · 马越 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/yijing-huixiang/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#0C447C', coverFg: '#85B7EB',
+    tags: ['智游杯', '敬请期待'],
+    desc: '叙事作品，含简介与制作过程。',
+    devlog: '暂无开发者日志。' },
+  { id: 45, title: '铁誓 · 边陲余生', tag: '校园', cat: 'play', genre: '生存 RPG', mode: '单人',
+    byline: '信息技术系计算机26301 · 张煜埕 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/tieshi-bianchui/cover.webp', previewVid: 'games/tieshi-bianchui/preview.mp4',
+    demo: true,
+    playUrl: 'https://iron-oath.app.workbuddy.host/?sharecode=N3LVXXYARA',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#27500A', coverFg: '#97C459',
+    tags: ['中世纪', '生存', '体温', '开放探索'],
+    desc: '以「体温」为核心压力的中世纪生存 RPG。你在橡木谷只有四块面包、一瓶药水和一把待修的铁剑，每天都要重新算一笔账：柴火够不够烧到天亮。浏览器打开即玩。',
+    devlog: '暂无开发者日志。' },
+  { id: 46, title: '岸边的一天', tag: '校园', cat: 'play', genre: '钓鱼养成', mode: '单人',
+    byline: '信息技术系计算机26301 · 林健 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/anbian/cover.webp', previewVid: 'games/anbian/preview.mp4',
+    demo: true,
+    playUrl: 'https://riverside-fishing.app.workbuddy.host/?sharecode=CO25JAK4TP',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#72243E', coverFg: '#ED93B1',
+    tags: ['像素', '钓鱼', '养成', '三分钟一天'],
+    desc: '三分钟过完一天：六处水域、三十七种鱼、八个装备槽，岸上还坐着六个等着跟你说点事的人。点击水面抛竿，按住收线，钓上来的东西不一定都是鱼。',
+    devlog: '暂无开发者日志。' },
+  { id: 47, title: 'Flee', tag: '校园', cat: 'video', genre: '跑酷', mode: '单人',
+    byline: '信息技术系大数据26301 · 陈月娇 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/flee/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['智游杯', '敬请期待'],
+    desc: '逃跑主题作品，含演示视频。',
+    devlog: '暂无开发者日志。' },
+  { id: 48, title: '霓虹断点', tag: '校园', cat: 'video', genre: '动作', mode: '单人',
+    byline: '信息技术系大数据26303 · 刘小雨 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/hongdian/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['智游杯', '敬请期待'],
+    desc: '霓虹风动作作品，含演示视频。',
+    devlog: '暂无开发者日志。' },
+  { id: 49, title: '灵动小猫 · 星夜奇旅', tag: '校园', cat: 'video', genre: '冒险', mode: '单人',
+    byline: '信息技术系物联网26303 · 徐隆昊 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/lingdong-xiaomao/cover.webp',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#185FA5', coverFg: '#E6F1FB',
+    tags: ['智游杯', '敬请期待'],
+    desc: '猫咪主题冒险，含演示视频。',
+    devlog: '暂无开发者日志。' },
+  { id: 50, title: '文明战棋 · 六边形回合制', tag: '校园', cat: 'play', genre: '策略战棋', mode: '单人',
+    byline: '信息技术系大数据25301 · 王惟鹏 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/wenming-zhanqi/cover.webp', previewVid: 'games/wenming-zhanqi/preview.mp4',
+    demo: true,
+    playUrl: 'https://civ-mvp.app.workbuddy.host/?sharecode=MJVBPB2RJR',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#633806', coverFg: '#EF9F27',
+    tags: ['策略', '六边形', '回合制', '文明like'],
+    desc: '44×28 格的六边形地图，和另外三个国家抢同一个大陆。两条胜利路线：把科技推到飞船造出太空船，或者占下所有文明的旧都。节奏比文明快得多，一回合一个决定。',
+    devlog: '暂无开发者日志。' },
+  { id: 51, title: '新宿决战 · 术式对决', tag: '校园', cat: 'play', genre: '动作对战', mode: '单人',
+    byline: '信息技术系云计算25301 · 贾昀锴 · 第一届智游杯初赛',
+    addedAt: '2026-11-17',
+    coverImg: 'games/juzhen-jueji/cover.webp', previewVid: 'games/juzhen-jueji/preview.mp4',
+    demo: true,
+    playUrl: 'https://xkt-d4g0e5uxs792b655e-1482562258.tcloudbaseapp.com/%E7%9F%A9%E9%98%B5%E6%A8%A1%E5%9E%8B%E6%B5%8B%E8%AF%951/index.html',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0,
+    coverBg: '#26215C', coverFg: '#AFA9EC',
+    tags: ['动作', 'BOSS 战', '技能搭配', '1.6.17'],
+    desc: '操控五条悟挑战三轮小怪，最后面对宿傩。困难以上会追加魔虚罗与嵌合兽，宿傩进三阶段后拖时间已经没用了。击败三阶段后还有剧情 CG，「向南」难度通关五次会解锁隐藏关卡。',
+    devlog: '暂无开发者日志。' },
+  { id: 52, title: '斗兽棋 · 兽战', tag: '校园', cat: 'play', genre: '棋类', mode: '单人',
+    byline: '信息技术系大数据26303 · 王浩名 · 第一届智游杯初赛',
+    addedAt: '2026-11-23',
+    coverImg: 'games/doushouqi/cover.webp',
+    playUrl: 'https://a697a1a1fef1e8bb6.app.workbuddy.host/?sharecode=3URWBU2HCZ',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
+    coverBg: '#1F3A2C', coverFg: '#9BD5A8',
+    tags: ['棋类', '丛林棋', '回合制', '五分钟一局'],
+    desc: '经典的丛林棋：八种动物按大小吃子，只有老鼠能下河、狮子老虎能跳河，进了对方兽穴就赢。棋盘小、回合快，输赢多半在开局那几步换子。',
+    devlog: '暂无开发者日志。' },
+  { id: 53, title: '农场物语 · Tile Farm', tag: '校园', cat: 'play', genre: '经营养成', mode: '单人',
+    byline: '信息技术系计算机26301 · 吴昌朔 · 第一届智游杯初赛',
+    addedAt: '2026-11-23',
+    coverImg: 'games/nongchang-wuyu/cover.webp',
+    playUrl: 'https://isometric-farm.app.workbuddy.host/?sharecode=BDXRHECZ6S',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
+    coverBg: '#3B2E12', coverFg: '#E4C07A',
+    tags: ['Phaser3', '等轴测', '种田', '村民好感'],
+    desc: 'Phaser3 做的等轴测田园经营：翻地、播种、浇水、收获，村民会在自家门前自己种地，还能刷好感、接任务、下矿。自带新手引导和菜单读档。',
+    devlog: '暂无开发者日志。' },
+  { id: 54, title: '深渊回响 · 俯视角肉鸽', tag: '校园', cat: 'play', genre: 'Roguelike', mode: '单人',
+    byline: '信息技术系计算机26301 · 罗嘉林 · 第一届智游杯初赛',
+    addedAt: '2026-11-23',
+    coverImg: 'games/shenyuan-huixiang/cover.webp',
+    playUrl: 'https://abyssal-echo-17695.app.workbuddy.host/?sharecode=NEHPMEZAYL',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
+    coverBg: '#2A1030', coverFg: '#C9A0E8',
+    tags: ['动作肉鸽', '双摇杆射击', '10 职业', '无尽模式'],
+    desc: '清场、挑门、捡枪、注魔，一层层往深渊下潜。10 职业、20 幕 100 层、20 个 Boss、23 把武器。撤离信标亮起时，是见好就收还是再赌一层。WASD 移动、鼠标射击、空格冲刺。',
+    devlog: '暂无开发者日志。' },
+  { id: 55, title: '字味小馆', tag: '校园', cat: 'play', genre: '文字解谜', mode: '单人',
+    byline: '信息技术系计算机26302 · 张智博 · 第一届智游杯初赛',
+    addedAt: '2026-11-23',
+    coverImg: 'games/ziwei-xiaoguan/cover.webp',
+    playUrl: 'https://app-fowi6dz9cm4h.miaoda.online/',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
+    coverBg: '#4A2B21', coverFg: '#F0B79A',
+    tags: ['汉字', '偏旁拼字', '模拟经营'],
+    desc: '用偏旁拼字的点菜小游戏：客人点的字被拆成部件摆在推车上，拼对了才上得了菜。偏旁数量有限，还得算着先给哪桌。',
+    devlog: '暂无开发者日志。' },
+  { id: 56, title: '节奏音游', tag: '校园', cat: 'play', genre: '音乐', mode: '单人',
+    byline: '信息技术系云计算26301 · 肖祥荣 · 第一届智游杯初赛',
+    addedAt: '2026-11-23',
+    coverImg: 'games/jiezou-yinyou/cover.webp',
+    playUrl: 'https://snake-game-56862.app.workbuddy.host/?sharecode=C2NXOQXTNH',
+    views: 0, weekViews: 0, flowers: 0, cleared: 0, myFlower: false,
+    coverBg: '#12203A', coverFg: '#8FC4F0',
+    tags: ['音游', '节奏', '竖屏可玩'],
+    desc: '体量很小的网页音游，跟着节拍踩准拍点。手机上竖屏能玩，电脑也能开。',
+    devlog: '暂无开发者日志。' }
+];
+
+/* ================= 本机数据持久化 =================
+   浏览量/小红花存 localStorage，刷新不丢。
+   注意：这是"本机数据"——每台设备各记各的；以后接上后端再换成全站共享。 */
+const STATS_KEY = 'ninth_stats_v1';
+let statsStore = {};
+try { statsStore = JSON.parse(localStorage.getItem(STATS_KEY)) || {}; } catch (e) { statsStore = {}; }
+function saveStats() {
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(statsStore)); } catch (e) {}
+}
+GAMES.forEach(g => {
+  const s = statsStore[g.id];
+  if (s) { g.views = s.v || 0; g.weekViews = s.w || 0; g.flowers = s.f || 0; g.myFlower = !!s.m; }
+});
+function recordStat(g) {
+  statsStore[g.id] = { v: g.views, w: g.weekViews, f: g.flowers, m: g.myFlower ? 1 : 0 };
+  saveStats();
+}
+
+/* ================= 云端：学号登录 / 小红花额度 / 点击与时长 ================= */
+const TOKEN_KEY = 'ninth_token';
+const Cloud = { on: false, token: null, me: null, games: {}, reason: '' };
+try { Cloud.token = localStorage.getItem(TOKEN_KEY) || null; } catch (e) {}
+
+/* 镜像站（香港对象存储等纯静态托管）没有后端，登录/送花/统计统一打回 Cloudflare。
+   在 pages.dev 和本地调试时留空，走同源相对路径。 */
+const API_ORIGIN = 'https://xiaoyoushe.pages.dev';
+const API_BASE = /(^|\.)pages\.dev$/.test(location.hostname) || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+  ? '' : API_ORIGIN;
+
+function api(path, body) {
+  const init = { method: body === undefined ? 'GET' : 'POST', headers: {} };
+  if (body !== undefined) {
+    init.headers['content-type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  if (Cloud.token) init.headers.authorization = 'Bearer ' + Cloud.token;
+  return fetch(API_BASE + '/api/' + path, init)
+    .then(r => r.json().then(j => ({ status: r.status, body: j })).catch(() => ({ status: r.status, body: {} })))
+    .catch(() => ({ status: 0, body: { ok: false, error: 'NETWORK' } }));
+}
+function saveToken(t) {
+  Cloud.token = t || null;
+  try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+}
+function fmtDuration(sec) {
+  const s = Math.round(sec || 0);
+  if (s < 60) return s + ' 秒';
+  if (s < 3600) return Math.floor(s / 60) + ' 分钟';
+  const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+  return h + ' 小时' + (m ? ' ' + m + ' 分' : '');
+}
+function applyCloudStats() {
+  if (!Cloud.on) return;
+  GAMES.forEach(g => {
+    const st = Cloud.games[g.id];
+    if (!st) return;
+    g.views = st.clicks || 0;
+    g.weekViews = st.weekClicks || 0;
+    g.flowers = st.flowers || 0;
+    g.seconds = st.seconds || 0;
+  });
+  if (Cloud.me) {
+    const mine = Cloud.me.myFlowers || [];
+    GAMES.forEach(g => { g.myFlower = mine.includes(g.id); });
+  }
+}
+async function initCloud() {
+  const r = await api('summary');
+  if (r.status === 200 && r.body && r.body.ok) {
+    Cloud.on = true;
+    Cloud.games = r.body.games || {};
+    Cloud.me = r.body.me || null;
+    applyCloudStats();
+    return true;
+  }
+  Cloud.on = false;
+  Cloud.reason = (r.body && (r.body.message || r.body.error)) || '后端还没接上';
+  return false;
+}
+function toast(msg, ms) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('show'), ms || 2200);
+}
+
+/* ---- 登录 / 注册 ---- */
+let authMode = 'login';
+function paintAuth() {
+  const isLogin = authMode === 'login';
+  document.getElementById('auth-tab-login').classList.toggle('on', isLogin);
+  document.getElementById('auth-tab-register').classList.toggle('on', !isLogin);
+  document.getElementById('auth-title').textContent = isLogin ? '登录校游社' : '注册新账号';
+  document.getElementById('auth-reg-extra').style.display = isLogin ? 'none' : 'block';
+  document.getElementById('auth-submit').textContent = isLogin ? '登录' : '注册并登录';
+  document.getElementById('auth-switch').textContent = isLogin ? '没有账号？去注册' : '已经有账号？去登录';
+  document.getElementById('auth-err').textContent = '';
+}
+function openAuth(mode) {
+  authMode = mode || 'login';
+  paintAuth();
+  document.getElementById('auth-mask').classList.add('show');
+  setTimeout(() => document.getElementById('auth-sid').focus(), 60);
+}
+function closeAuth() {
+  document.getElementById('auth-mask').classList.remove('show');
+}
+async function submitAuth() {
+  const sid = document.getElementById('auth-sid').value.trim();
+  const pw = document.getElementById('auth-pw').value;
+  const err = document.getElementById('auth-err');
+  err.textContent = '';
+  if (!/^[0-9A-Za-z]{4,20}$/.test(sid)) { err.textContent = '学号填 4–20 位数字或字母'; return; }
+  if (pw.length < 6) { err.textContent = '密码至少 6 位'; return; }
+  const btn = document.getElementById('auth-submit');
+  btn.disabled = true;
+  const payload = { sid, password: pw };
+  if (authMode !== 'login') {
+    payload.nickname = document.getElementById('auth-nick').value.trim();
+    payload.cls = document.getElementById('auth-cls').value.trim();
+  }
+  const r = await api(authMode === 'login' ? 'login' : 'register', payload);
+  btn.disabled = false;
+  if (r.status === 0) { err.textContent = '连不上服务器，检查一下网络或后端是否已部署'; return; }
+  if (!r.body || !r.body.ok) {
+    err.textContent = (r.body && (r.body.error === 'D1_NOT_BOUND' ? '后端数据库还没绑定' : r.body.error)) || '出错了，再试一次';
+    if (r.body && r.body.error === 'D1_NOT_BOUND') err.textContent = '后端数据库还没绑定，先看部署说明';
+    return;
+  }
+  saveToken(r.body.token);
+  Cloud.me = r.body.user;
+  Cloud.on = true;
+  await initCloud();
+  closeAuth();
+  renderMe();
+  renderTopAvatar();
+  if (currentGame) renderFlowerBtn();
+  toast('欢迎，' + (Cloud.me.nickname || Cloud.me.sid));
+}
+async function doLogout() {
+  await api('logout', {});
+  saveToken(null);
+  Cloud.me = null;
+  GAMES.forEach(g => { g.myFlower = false; });
+  renderMe();
+  renderTopAvatar();
+  if (currentGame) renderFlowerBtn();
+  toast('已退出登录');
+}
+
+/* ---- 个人中心 ---- */
+function renderMe() {
+  const box = document.getElementById('me-page');
+  if (!box) return;
+  if (!Cloud.me) {
+    box.innerHTML =
+      '<div class="me-card">' +
+        '<div class="me-head">' +
+          '<div class="me-avatar">客</div>' +
+          '<div><div class="me-name">游客模式</div>' +
+          '<div class="me-meta">' + (Cloud.on ? '登录后可以送小红花、记录游玩时长' : '云端还没接上，当前是本地记录') + '</div></div>' +
+        '</div>' +
+        '<div class="me-actions">' +
+          '<button class="btn-primary" id="me-login">学号登录</button>' +
+          (Cloud.on ? '<button class="btn-ghost" id="me-register">首次注册</button>' : '') +
+        '</div>' +
+        '<p class="me-hint" style="margin-top:14px;">登录后：每个账号每天 10 朵小红花，给喜欢的作品；每款游戏的点击次数与游玩时长会计入全站统计。</p>' +
+      '</div>' +
+      (Cloud.on ? '' : '<div class="me-card"><p class="me-hint">后端未连接：' + (Cloud.reason || '') + '</p></div>');
+    const b1 = document.getElementById('me-login');
+    if (b1) b1.addEventListener('click', () => openAuth('login'));
+    const b2 = document.getElementById('me-register');
+    if (b2) b2.addEventListener('click', () => openAuth('register'));
+    return;
+  }
+  const me = Cloud.me;
+  const left = Math.max(0, (me.dailyLimit || 10) - (me.todayFlowers || 0));
+  const mine = GAMES.filter(g => authorName(g) === (me.nickname || '')).length;
+  box.innerHTML =
+    '<div class="me-card">' +
+      '<div class="me-head">' +
+        '<div class="me-avatar">' + (me.nickname || me.sid).slice(0, 1) + '</div>' +
+        '<div><div class="me-name">' + (me.nickname || ('学号 ' + me.sid)) + '</div>' +
+        '<div class="me-meta">' + (me.cls ? me.cls + ' · ' : '') + '学号 ' + me.sid + '</div></div>' +
+      '</div>' +
+      '<div class="me-rows">' +
+        '<div class="me-row"><div class="k">今天剩余小红花</div><div class="v">' + left + ' / ' + (me.dailyLimit || 10) + '</div></div>' +
+        '<div class="me-row"><div class="k">今天已送出</div><div class="v">' + (me.todayFlowers || 0) + '</div></div>' +
+        '<div class="me-row"><div class="k">我的作品</div><div class="v">' + mine + ' 部</div></div>' +
+      '</div>' +
+      '<div class="quota-bar"><i style="width:' + Math.round((me.todayFlowers || 0) / (me.dailyLimit || 10) * 100) + '%"></i></div>' +
+      '<div class="me-actions">' +
+        '<button class="btn-ghost" id="me-logout">退出登录</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="me-card"><p class="me-hint">送花规则：每个账号每天 10 朵，同一款作品当天只能送 1 朵，隔天可以再送。点开作品就算一次点击，在弹窗里玩的时间会计入游玩时长。</p></div>';
+  document.getElementById('me-logout').addEventListener('click', doLogout);
+}
+function renderTopAvatar() {
+  const el = document.querySelector('.avatar');
+  if (!el) return;
+  if (Cloud.me) {
+    el.textContent = (Cloud.me.nickname || Cloud.me.sid).slice(0, 1);
+    el.title = (Cloud.me.nickname || Cloud.me.sid) + ' · 个人中心';
+  } else {
+    el.textContent = '客';
+    el.title = '游客模式';
+  }
+}
+
+/* ---- 游玩时长上报 ---- */
+let playTimer = null, playStart = 0, playGameId = null;
+function flushPlay() {
+  if (!playGameId || !Cloud.on) { playStart = Date.now(); return; }
+  const sec = Math.round((Date.now() - playStart) / 1000);
+  playStart = Date.now();
+  if (sec >= 5) api('play', { gameId: playGameId, seconds: sec });
+}
+function startPlayTimer(g) {
+  stopPlayTimer();
+  if (!Cloud.on) return;
+  playGameId = g.id;
+  playStart = Date.now();
+  playTimer = setInterval(flushPlay, 20000);
+}
+function stopPlayTimer() {
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  if (playGameId) flushPlay();
+  playGameId = null;
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) flushPlay();
+  else playStart = Date.now();
+});
+
+/* SVG 小图标：小红花 / 小眼睛 */
+const FLOWER_ICON = '<svg width="13" height="13" viewBox="0 0 20 20" style="vertical-align:-2px;"><g fill="#E24B4A"><circle cx="10" cy="4" r="3.4"/><circle cx="15.7" cy="8.1" r="3.4"/><circle cx="13.5" cy="14.9" r="3.4"/><circle cx="6.5" cy="14.9" r="3.4"/><circle cx="4.3" cy="8.1" r="3.4"/></g><circle cx="10" cy="10" r="3.1" fill="#FAC775"/></svg>';
+const EYE_ICON = '<svg width="13" height="13" viewBox="0 0 20 20" style="vertical-align:-2px;" fill="none"><path d="M1.5 10 C4 5.5, 16 5.5, 18.5 10 C16 14.5, 4 14.5, 1.5 10 Z" stroke="#C7C4BA" stroke-width="1.6"/><circle cx="10" cy="10" r="2.6" fill="#C7C4BA"/></svg>';
+
+/* ================= 详情页媒体区（演示视频 + 截图） =================
+   只有带 demo: true 的作品开启；其余仍是原来的 260×146 封面图。 */
+const M = {
+  wrap: document.getElementById('detail-media'),
+  stage: document.getElementById('media-stage'),
+  video: document.getElementById('media-video'),
+  photo: document.getElementById('media-photo'),
+  fallback: document.getElementById('media-fallback'),
+  playBtn: document.getElementById('media-play'),
+  thumbs: document.getElementById('media-thumbs'),
+  dur: document.getElementById('media-dur'),
+  full: document.getElementById('media-full')
+};
+let mediaItems = [], mediaIdx = 0;
+
+function mediaDir(g) {
+  const m = String(g.previewVid || '').match(/\/games\/([^/]+)\//);
+  return m ? 'games/' + m[1] + '/' : '';
+}
+function fmtDur(sec) {
+  if (!isFinite(sec) || sec <= 0) return '';
+  const t = Math.round(sec);
+  return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+}
+function mediaMode(mode) {
+  M.stage.classList.remove('show-video', 'show-photo', 'show-fallback');
+  M.stage.classList.add('show-' + mode);
+}
+function pauseMedia() {
+  if (M.video && !M.video.paused) M.video.pause();
+}
+function renderMedia(g) {
+  pauseMedia();
+  M.video.removeAttribute('src');
+  M.video.removeAttribute('poster');
+  M.video.load();
+  M.thumbs.innerHTML = '';
+  mediaItems = []; mediaIdx = 0;
+  M.dur.textContent = '';
+  M.fallback.style.background = g.coverBg || '#20222B';
+  M.fallback.style.color = g.coverFg || '#F7F5F0';
+  M.fallback.textContent = g.title;
+  if (g.coverImg) M.photo.src = g.coverImg;
+
+  const dir = mediaDir(g);
+  const demo = !!(g.demo && g.previewVid && dir);
+  M.wrap.classList.toggle('no-demo', !demo);
+  if (!demo) {
+    mediaMode(g.coverImg ? 'photo' : 'fallback');
+    return;
+  }
+
+  const poster = dir + 'shot-1.jpg'; // 用真实游戏帧当海报，封面有的是拼贴图，放大后看不清
+  mediaItems = [
+    { type: 'video', src: g.previewVid, poster: poster, label: '演示视频' },
+    { type: 'photo', src: dir + 'shot-2.jpg', label: '游戏画面' }
+  ];
+  if (g.coverImg) mediaItems.push({ type: 'photo', src: g.coverImg, label: '封面' });
+
+  mediaItems.forEach((it, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'media-thumb';
+    b.title = it.label;
+    b.style.backgroundImage = 'url("' + (it.type === 'video' ? (it.poster || it.src) : it.src) + '")';
+    b.innerHTML = (it.type === 'video'
+      ? '<span class="tplay"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2v13.6L19 12z"/></svg></span>'
+      : '') + '<span class="tlbl">' + it.label + '</span>';
+    b.addEventListener('click', () => selectMedia(i, true));
+    M.thumbs.appendChild(b);
+  });
+  selectMedia(0, false);
+}
+function selectMedia(i, autoplay) {
+  const it = mediaItems[i];
+  if (!it) return;
+  mediaIdx = i;
+  Array.from(M.thumbs.children).forEach((el, k) => el.classList.toggle('on', k === i));
+  if (it.type === 'video') {
+    mediaMode('video');
+    if (M.video.getAttribute('src') !== it.src) {
+      M.video.setAttribute('src', it.src);
+      if (it.poster) M.video.setAttribute('poster', it.poster);
+      M.video.load();
+    }
+    if (autoplay) {
+      M.stage.classList.remove('paused');
+      M.video.play().catch(() => M.stage.classList.add('paused'));
+    } else {
+      M.stage.classList.add('paused');
+    }
+  } else {
+    pauseMedia();
+    mediaMode('photo');
+    M.photo.src = it.src;
+    M.stage.classList.remove('paused');
+  }
+}
+M.video.addEventListener('play', () => M.stage.classList.remove('paused'));
+M.video.addEventListener('pause', () => {
+  if (M.stage.classList.contains('show-video')) M.stage.classList.add('paused');
+});
+M.video.addEventListener('loadedmetadata', () => { M.dur.textContent = fmtDur(M.video.duration); });
+M.video.addEventListener('ended', () => M.stage.classList.add('paused'));
+M.stage.addEventListener('click', (e) => {
+  if (e.target.closest('.media-btn') || e.target.closest('.media-play')) return;
+  if (!M.stage.classList.contains('show-video')) return;
+  if (M.video.paused) M.video.play().catch(() => {});
+  else M.video.pause();
+});
+M.playBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  M.video.play().catch(() => {});
+});
+M.full.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (M.stage.classList.contains('show-video') && M.video.webkitEnterFullscreen) {
+    M.video.webkitEnterFullscreen();
+  } else if (M.stage.requestFullscreen) {
+    M.stage.requestFullscreen().catch(() => {});
+  }
+});
+
+/* ================= 视图切换 ================= */
+let curFilter = 'all';
+let authorFilter = '';   // 只看某位同学的作品
+
+/* ================= 视图切换 + 浏览器历史 =================
+   首页/排行榜/详情/游玩 都记一条 history，浏览器 ← 回到上一屏，而不是跳出站外。 */
+function paintView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const el = document.getElementById('view-' + name);
+  if (el) el.classList.add('active');
+  document.querySelectorAll('.nav-tabs button, .tabbar button').forEach(b => {
+    b.classList.toggle('active', b.dataset.nav === name);
+  });
+  // 回到首页/排行榜时重渲染，让小红花和浏览量显示最新值
+  if (name === 'home') { renderGrid(curFilter); renderNews(); }
+  if (name === 'rank') renderRankTable();
+  if (name === 'me') renderMe();
+  if (name !== 'detail') pauseMedia();
+  window.scrollTo(0, 0);
+}
+function showView(name, opts) {
+  opts = opts || {};
+  paintView(name);
+  if (!opts.fromHistory) {
+    try { history.pushState({ v: name }, '', '#' + name); } catch (e) {}
+  }
+}
+document.querySelectorAll('[data-nav]').forEach(el => {
+  el.addEventListener('click', () => showView(el.dataset.nav));
+});
+
+window.addEventListener('popstate', (e) => {
+  const st = e.state || { v: 'home' };
+  if (st.v === 'play') return;                     // 已经在这一层
+  if (document.getElementById('play-modal').classList.contains('show')) {
+    closePlayModal({ fromHistory: true });
+    if (st.v === 'detail') return;                 // 弹窗关掉正好是详情页
+  }
+  if (st.v === 'detail' && st.id) {
+    // 已经在这一页就别重复 openDetail，否则浏览数会被点一次算两次
+    const same = currentGame && currentGame.id === st.id &&
+      document.getElementById('view-detail').classList.contains('active');
+    if (!same) openDetail(st.id, { fromHistory: true });
+    return;
+  }
+  paintView(st.v || 'home');
+});
+
+/* ================= 首页横幅（日间 / 夜间双图） ================= */
+/* 每套图两个尺寸：960w 给手机，1920w 给桌面。之前手机上也是 200KB 的 1920 图，
+   切换主题后要等 4 秒才换过来，看起来就像"海报一直是夜色那张"。 */
+const POSTERS = {
+  day:   { small: 'covers/carousel-1-day-960.webp',   big: 'covers/carousel-1-day.webp' },
+  night: { small: 'covers/carousel-1-night-960.webp', big: 'covers/carousel-1-night.webp' }
+};
+const POSTER_SIZES = '(max-width: 640px) 100vw, 1720px';
+const CAROUSEL = [
+  { id: 19, poster: POSTERS }
+];
+const THEME_KEY = 'ninth_theme';
+let carIdx = 0;
+
+function currentTheme() {
+  return document.body.dataset.theme === 'day' ? 'day' : 'night';
+}
+function applyPoster(img, key) {
+  const p = POSTERS[key] || POSTERS.night;
+  img.setAttribute('srcset', p.small + ' 960w, ' + p.big + ' 1920w');
+  img.setAttribute('sizes', POSTER_SIZES);
+  img.src = p.big;                       // 老浏览器不支持 srcset 时兜底
+}
+function renderCarousel() {
+  const item = CAROUSEL[carIdx];
+  const img = document.getElementById('carousel-bg');
+  if (!img || !item) return;
+  applyPoster(img, currentTheme());
+  /* 慢网下换图要等一会儿，这期间把海报压暗一点，让人知道在换，不是点坏了 */
+  const box = document.getElementById('carousel');
+  const done = () => { if (box) box.classList.remove('poster-loading'); };
+  if (box) {
+    box.classList.add('poster-loading');
+    if (img.decode) img.decode().then(done, done);
+    else img.addEventListener('load', done, { once: true });
+    setTimeout(done, 6000);          // 兜底，别一直暗着
+  }
+  /* 当前这张加载完就悄悄把另一套拉进缓存：等用户真去点切换时基本是秒换 */
+  if (!warmed) {
+    img.addEventListener('load', () => { if (!warmed) { warmed = true; warmPoster(); } }, { once: true });
+  }
+}
+let warmed = false;
+/* 页面闲下来再补一次（有些浏览器上 load 事件会被缓存命中直接跳过） */
+function warmPoster() {
+  const other = currentTheme() === 'day' ? 'night' : 'day';
+  const p = POSTERS[other];
+  const im = new Image();
+  im.fetchPriority = 'low';
+  im.setAttribute('srcset', p.small + ' 960w, ' + p.big + ' 1920w');
+  im.setAttribute('sizes', POSTER_SIZES);
+  im.src = p.big;
+}
+function applyTheme(t) {
+  document.body.dataset.theme = (t === 'day' ? 'day' : 'night');
+  try { localStorage.setItem(THEME_KEY, document.body.dataset.theme); } catch (e) {}
+  renderCarousel();
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.title = currentTheme() === 'day' ? '切换到夜间模式' : '切换到日间模式';
+}
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  applyTheme(currentTheme() === 'day' ? 'night' : 'day');
+});
+
+/* ================= 联系我们：QQ 群 ================= */
+const QQ_GROUP = '1129620477';
+(function initContact() {
+  const copyBtn = document.getElementById('qq-copy');
+  const openLink = document.getElementById('qq-open');
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      let ok = false;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(QQ_GROUP);
+          ok = true;
+        }
+      } catch (e) { ok = false; }
+      if (!ok) ok = fallbackCopy(QQ_GROUP);
+      toast(ok ? '群号已复制：' + QQ_GROUP : '复制失败，请记下群号 ' + QQ_GROUP);
+    });
+  }
+
+  if (openLink) {
+    openLink.addEventListener('click', (e) => {
+      // 桌面浏览器点 mqqapi 不会有任何反应，给个提示，别让人以为坏了
+      if (window.matchMedia('(hover: hover)').matches) {
+        e.preventDefault();
+        toast('手机端点击可直接跳转 QQ，电脑上请复制群号搜索加入');
+      }
+    });
+  }
+})();
+const carBox = document.getElementById('carousel');
+/* 大海报是站内门面，不再直接跳进某一款游戏；点进去是个人中心（未登录即游客界面） */
+carBox.addEventListener('click', () => showView('me'));
+function startCoverVid(el, src) {
+  let v = el.querySelector('.cover-vid');
+  if (!v) {
+    v = document.createElement('video');
+    v.className = 'cover-vid';
+    v.src = src; v.muted = true; v.loop = true;
+    v.playsInline = true; v.preload = 'none';
+    el.appendChild(v);
+  }
+  v.play().catch(() => {});
+}
+function stopCoverVid(el) {
+  const v = el.querySelector('.cover-vid');
+  if (v) v.pause();
+}
+function renderGrid(filter) {
+  curFilter = filter;
+  const grid = document.getElementById('game-grid');
+  let list = GAMES.filter(g => filter === 'all' || g.cat === filter);
+  if (authorFilter) list = list.filter(g => authorName(g) === authorFilter);
+  grid.innerHTML = '';
+  list.forEach(g => {
+    const tagCls = g.tag === '校园' ? 'tag-school' : 'tag-import';
+    const modeTxt = g.mode === '双人同屏' ? '双人' : (g.mode === '多人' ? '多人' : '单人');
+    const card = document.createElement('div');
+    card.className = 'game-card';
+    const coverText = g.coverImg ? '' : '<span class="cover-title">' + g.title + '</span>';
+    const coverImg = g.coverImg ? '<img class="cover-img" src="' + g.coverImg + '" alt="' + g.title + '" loading="lazy">' : '';
+    card.innerHTML =
+      '<div class="game-cover" style="background:' + g.coverBg + '; color:' + g.coverFg + ';">' + coverImg + coverText + '</div>' +
+      '<div class="game-card-body">' +
+        '<div class="title">' + g.title + (g.featured ? '<span class="badge badge-teal" style="font-size:10px; padding:1px 6px; flex:none;">精选</span>' : '') + '</div>' +
+        '<div class="meta">' +
+          '<span class="' + tagCls + '">' + g.tag + '</span>' +
+          '<span class="dot"></span><span>' + g.genre + '</span>' +
+          '<span class="dot"></span><span>' + modeTxt + '</span>' +
+        '</div>' +
+        '<div class="heat-row">' +
+          '<span class="h-item" title="小红花">' + FLOWER_ICON + '<span class="num">' + g.flowers.toLocaleString() + '</span></span>' +
+          '<span class="h-item" title="浏览量">' + EYE_ICON + '<span class="num">' + g.views.toLocaleString() + '</span></span>' +
+        '</div>' +
+      '</div>';
+    card.addEventListener('click', () => openDetail(g.id));
+    if (g.previewVid) {
+      const coverEl = card.querySelector('.game-cover');
+      card.addEventListener('mouseenter', () => startCoverVid(coverEl, g.previewVid));
+      card.addEventListener('mouseleave', () => stopCoverVid(coverEl));
+    }
+    grid.appendChild(card);
+  });
+  if (!list.length) grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#A9A69D; padding:40px 0;">这个筛选下暂时没有游戏</div>';
+}
+document.querySelectorAll('.filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    renderGrid(chip.dataset.filter);
+  });
+});
+
+document.querySelectorAll('[data-open]').forEach(el => {
+  el.addEventListener('click', () => openDetail(parseInt(el.dataset.open)));
+});
+
+/* ================= 详情页 ================= */
+let currentGame = null;
+function openDetail(id, opts) {
+  opts = opts || {};
+  const g = GAMES.find(x => x.id === id);
+  if (!g) return;
+  currentGame = g;
+  document.getElementById('crumb-tag').textContent = g.tag === '校园' ? '校园作品' : '引进游戏';
+  document.getElementById('crumb-title').textContent = g.title;
+  renderMedia(g);
+  document.getElementById('detail-title').textContent = g.title;
+  document.getElementById('detail-badges').innerHTML =
+    (g.tag === '校园' ? '<span class="badge badge-teal">校园作品</span>' : '<span class="badge badge-amber">引进游戏</span>') +
+    (g.featured ? '<span class="badge badge-blue">本周精选</span>' : '');
+  document.getElementById('detail-byline').textContent = g.byline;
+  document.getElementById('detail-tags').innerHTML = g.tags.map(t => '<span class="tag-chip">' + t + '</span>').join('');
+  g.views++; // 游客每次点开，浏览数 +1（存本机 localStorage，刷新不丢）
+  recordStat(g);
+  document.getElementById('detail-stats').innerHTML =
+    stat('累计点击', g.views.toLocaleString()) +
+    stat('本周点击', g.weekViews.toLocaleString()) +
+    stat('小红花', g.flowers.toLocaleString(), 'pink') +
+    stat('累计游玩', fmtDuration(g.seconds));
+  if (Cloud.on) {
+    api('click', { gameId: g.id }).then(r => {
+      if (r.body && r.body.ok && typeof r.body.clicks === 'number') g.views = r.body.clicks;
+    });
+  }
+  document.getElementById('detail-desc').textContent = g.desc;
+  document.getElementById('devlog-text').textContent = g.devlog || '暂无日志。';
+  renderFlowerBtn();
+  showView('detail', { fromHistory: opts.fromHistory });
+  if (!opts.fromHistory) {
+    try { history.replaceState({ v: 'detail', id: g.id }, '', '#game-' + g.id); } catch (e) {}
+  }
+}
+function renderFlowerBtn() {
+  const g = currentGame;
+  document.getElementById('detail-flower-count').textContent = g.flowers.toLocaleString();
+  document.getElementById('detail-flower').classList.toggle('on', !!g.myFlower);
+}
+document.getElementById('detail-flower').addEventListener('click', async () => {
+  const g = currentGame;
+  if (!g) return;
+  if (Cloud.on && !Cloud.me) { openAuth('login'); toast('先登录才能送小红花'); return; }
+  if (Cloud.on && Cloud.me) {
+    const want = !g.myFlower;
+    const r = await api('flower', { gameId: g.id, on: want });
+    if (!r.body || !r.body.ok) {
+      if (r.body && r.body.code === 'QUOTA') toast('今天的 10 朵已经送完了，明天再来');
+      else if (r.status === 401) { Cloud.me = null; openAuth('login'); }
+      else toast((r.body && r.body.error) || '送花失败');
+      return;
+    }
+    g.myFlower = want;
+    g.flowers = r.body.flowers;
+    Cloud.me = r.body.me;
+    renderFlowerBtn();
+    if (want) toast('送出一朵小红花 · 今天还剩 ' + Math.max(0, (Cloud.me.dailyLimit || 10) - (Cloud.me.todayFlowers || 0)) + ' 朵');
+    return;
+  }
+  g.myFlower = !g.myFlower;
+  g.flowers += g.myFlower ? 1 : -1;
+  recordStat(g);
+  renderFlowerBtn();
+});
+function stat(label, value, cls) {
+  return '<div class="stat-card"><div class="label">' + label + '</div><div class="value ' + (cls || '') + '">' + value + '</div></div>';
+}
+document.getElementById('detail-play').addEventListener('click', () => {
+  if (currentGame) openPlayModal(currentGame);
+});
+document.querySelectorAll('.detail-tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.detail-tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector('[data-dpanel="' + btn.dataset.dtab + '"]').classList.add('active');
+  });
+});
+
+/* ================= 作者 / 同学 ================= */
+function authorName(g) {
+  const p = String(g.byline || '').split('·');
+  return p.length > 1 ? p[1].trim() : '';
+}
+function authorClass(g) {
+  const p = String(g.byline || '').split('·');
+  return p.length > 1 ? p[0].trim() : '';
+}
+function studentsIndex() {
+  const map = new Map();
+  GAMES.forEach(g => {
+    const n = authorName(g);
+    if (!n) return;
+    if (!map.has(n)) map.set(n, { name: n, cls: authorClass(g), games: [] });
+    map.get(n).games.push(g);
+  });
+  return [...map.values()].sort((a, b) => b.games.length - a.games.length || a.name.localeCompare(b.name, 'zh'));
+}
+const STUDENTS = studentsIndex();
+function setAuthorFilter(name) {
+  authorFilter = name || '';
+  const bar = document.getElementById('author-bar');
+  if (!authorFilter) {
+    bar.classList.remove('show');
+  } else {
+    const stu = STUDENTS.find(s => s.name === authorFilter);
+    const n = GAMES.filter(g => authorName(g) === authorFilter).length;
+    document.getElementById('author-bar-text').textContent =
+      '只看 ' + authorFilter + (stu && stu.cls ? ' · ' + stu.cls : '') + ' 的 ' + n + ' 部作品';
+    bar.classList.add('show');
+  }
+  renderGrid(curFilter);
+}
+document.getElementById('author-bar-x').addEventListener('click', () => setAuthorFilter(''));
+
+/* ================= 新品速递（按上架时间，每次回首页轮换一批） ================= */
+const NEWS_PER = 4;
+const NEWS_POOL = 12;
+let newsPage = 0;
+function relDay(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return '';
+  const now = new Date();
+  const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((t0 - d) / 86400000);
+  if (days <= 0) return '今天上架';
+  if (days === 1) return '昨天上架';
+  if (days < 7) return days + ' 天前';
+  return (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日上架';
+}
+function renderNews() {
+  const pool = [...GAMES]
+    .sort((a, b) => String(b.addedAt || '').localeCompare(String(a.addedAt || '')) || b.id - a.id)
+    .slice(0, NEWS_POOL);
+  const total = pool.length;
+  if (!total) return;
+  const per = Math.min(NEWS_PER, total);
+  const start = (newsPage * per) % total;
+  const picks = [];
+  for (let i = 0; i < per; i++) picks.push(pool[(start + i) % total]);
+  newsPage++;
+  const box = document.getElementById('news-list');
+  box.innerHTML = picks.map(g => {
+    const when = relDay(g.addedAt);
+    const short = String(g.title).split(' · ')[0];
+    return '<div class="news-item" data-gid="' + g.id + '" title="' + g.title + '">' +
+      short + ' · ' + when + (when === '今天上架' ? '<span class="new-flag">NEW</span>' : '') + '</div>';
+  }).join('');
+  box.querySelectorAll('.news-item').forEach(el => {
+    el.addEventListener('click', () => openDetail(parseInt(el.dataset.gid, 10)));
+  });
+}
+
+/* ================= 搜索：游戏 + 同学 ================= */
+const searchInput = document.getElementById('search-input');
+const searchPanel = document.getElementById('search-panel');
+let searchHits = [];
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+function runSearch(q) {
+  const kw = q.trim().toLowerCase();
+  if (!kw) return { games: [], students: [] };
+  const games = GAMES.filter(g =>
+    (g.title + ' ' + g.genre + ' ' + (g.tags || []).join(' ') + ' ' + g.byline).toLowerCase().includes(kw)
+  ).slice(0, 5);
+  const students = STUDENTS.filter(s =>
+    (s.name + ' ' + s.cls).toLowerCase().includes(kw)
+  ).slice(0, 4);
+  return { games, students };
+}
+function renderSearch(q) {
+  const { games, students } = runSearch(q);
+  searchHits = games.map(g => ({ type: 'game', id: g.id }));
+  if (!q.trim()) {
+    searchPanel.classList.remove('show');
+    searchPanel.innerHTML = '';
+    return;
+  }
+  let html = '';
+  if (games.length) {
+    html += '<div class="search-sec">游戏</div>' + games.map((g, i) => {
+      const thumb = g.coverImg ? 'background-image:url(\'' + g.coverImg + '\')' : 'background:' + g.coverBg;
+      return '<div class="search-row' + (i === 0 ? ' active' : '') + '" data-kind="game" data-id="' + g.id + '">' +
+        '<div class="sr-thumb" style="' + thumb + '"></div>' +
+        '<div class="sr-main"><div class="sr-title">' + esc(g.title) + '</div>' +
+        '<div class="sr-sub">' + esc(g.genre) + ' · ' + esc(authorName(g)) + '</div></div></div>';
+    }).join('');
+  }
+  if (students.length) {
+    html += '<div class="search-sec">同学</div>' + students.map(s =>
+      '<div class="search-row" data-kind="student" data-name="' + esc(s.name) + '">' +
+      '<div class="sr-avatar">' + esc(s.name.slice(0, 1)) + '</div>' +
+      '<div class="sr-main"><div class="sr-title">' + esc(s.name) + '</div>' +
+      '<div class="sr-sub">' + esc(s.cls) + ' · ' + s.games.length + ' 部作品</div></div></div>'
+    ).join('');
+  }
+  if (!html) html = '<div class="search-empty">没有找到「' + esc(q.trim()) + '」相关的内容</div>';
+  searchPanel.innerHTML = html;
+  searchPanel.classList.add('show');
+  searchPanel.querySelectorAll('.search-row').forEach(row => {
+    row.addEventListener('mousedown', (ev) => {
+      ev.preventDefault();
+      if (row.dataset.kind === 'game') {
+        closeSearch();
+        openDetail(parseInt(row.dataset.id, 10));
+      } else {
+        closeSearch();
+        setAuthorFilter(row.dataset.name);
+        showView('home');
+      }
+    });
+  });
+}
+function closeSearch() {
+  searchPanel.classList.remove('show');
+  searchPanel.innerHTML = '';
+  searchInput.blur();
+}
+searchInput.addEventListener('input', () => renderSearch(searchInput.value));
+searchInput.addEventListener('focus', () => { if (searchInput.value.trim()) renderSearch(searchInput.value); });
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeSearch(); return; }
+  if (e.key === 'Enter') {
+    const first = searchPanel.querySelector('.search-row');
+    if (first) first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  }
+});
+document.addEventListener('mousedown', (e) => {
+  if (!searchPanel.contains(e.target) && e.target !== searchInput) {
+    searchPanel.classList.remove('show');
+  }
+});
+
+/* ================= 排行榜 ================= */
+function renderRankTable() {
+  const list = [...GAMES].sort((a, b) => b.views - a.views);
+  const body = document.getElementById('rank-table-body');
+  body.innerHTML = '';
+  list.forEach((g, i) => {
+    const tr = document.createElement('tr');
+    tr.className = 'row-click';
+    tr.innerHTML =
+      '<td class="rk-num" style="color:' + (i === 0 ? '#EF9F27' : i < 3 ? '#C7C4BA' : '#A9A69D') + ';">' + (i + 1) + '</td>' +
+      '<td>' + g.title + '</td>' +
+      '<td style="color:#C7C4BA;">' + g.genre + '</td>' +
+      '<td>' + g.views.toLocaleString() + '</td>' +
+      '<td style="color:#F09595;">' + g.flowers.toLocaleString() + '</td>' +
+      '<td style="color:#C7C4BA;">' + g.cleared.toLocaleString() + '</td>';
+    tr.addEventListener('click', () => openDetail(g.id));
+    body.appendChild(tr);
+  });
+}
+
+/* ================= 游玩弹窗（游客模式，无计时记录） ================= */
+function openPlayModal(g, opts) {
+  opts = opts || {};
+  pauseMedia(); // 进游戏时停掉详情页的演示视频，别白占解码
+  const box = document.getElementById('play-modal-box');
+  const ph = document.getElementById('modal-placeholder');
+  const gm = document.getElementById('modal-game');
+  const frame = document.getElementById('game-frame');
+  if (g.playUrl) {
+    document.getElementById('modal-title-playing').textContent = '正在游玩 · 《' + g.title + '》';
+    frame.src = g.playUrl;
+    document.getElementById('game-newtab').href = g.playUrl;
+    ph.style.display = 'none';
+    gm.style.display = 'block';
+    box.classList.add('playing');
+  } else {
+    document.getElementById('modal-title').textContent = '《' + g.title + '》';
+    ph.style.display = 'block';
+    gm.style.display = 'none';
+    frame.src = 'about:blank';
+    box.classList.remove('playing');
+  }
+  document.getElementById('play-modal').classList.add('show');
+  if (g.playUrl) startPlayTimer(g);
+  if (!opts.fromHistory) {
+    try { history.pushState({ v: 'play', id: g.id }, '', '#play-' + g.id); } catch (e) {}
+  }
+}
+function closePlayModal(opts) {
+  opts = opts || {};
+  stopPlayTimer();
+  document.getElementById('play-modal').classList.remove('show');
+  // 直接换掉 iframe 元素来卸载游戏：改 src 会往浏览器历史里塞一条记录，按 ← 时会白跳一次
+  const oldFrame = document.getElementById('game-frame');
+  if (oldFrame) {
+    const fresh = oldFrame.cloneNode(false);
+    fresh.removeAttribute('src');
+    oldFrame.parentNode.replaceChild(fresh, oldFrame);
+  }
+  if (!opts.fromHistory && history.state && history.state.v === 'play') {
+    history.back();   // 让 history 和界面保持一致，按 ← 也不会再跳一次
+  }
+}
+document.getElementById('modal-close').addEventListener('click', closePlayModal);
+document.getElementById('modal-close-top').addEventListener('click', closePlayModal);
+document.getElementById('play-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closePlayModal();
+});
+document.addEventListener('keydown', e => { // Esc 快捷关闭（鼠标被游戏抓住时按 Esc 先解锁指针，松开后此快捷键生效）
+  if (e.key === 'Escape' && document.getElementById('play-modal').classList.contains('show')) closePlayModal();
+});
+
+/* ================= 登录弹窗事件 ================= */
+document.getElementById('auth-tab-login').addEventListener('click', () => { authMode = 'login'; paintAuth(); });
+document.getElementById('auth-tab-register').addEventListener('click', () => { authMode = 'register'; paintAuth(); });
+document.getElementById('auth-switch').addEventListener('click', () => { authMode = authMode === 'login' ? 'register' : 'login'; paintAuth(); });
+document.getElementById('auth-guest').addEventListener('click', closeAuth);
+document.getElementById('auth-submit').addEventListener('click', submitAuth);
+document.getElementById('auth-mask').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeAuth();
+});
+['auth-sid', 'auth-pw', 'auth-nick', 'auth-cls'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitAuth(); });
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('auth-mask').classList.contains('show')) closeAuth();
+});
+
+/* ================= 侧栏：站点数据 ================= */
+function renderSideStats() {
+  const box = document.getElementById('side-stats');
+  if (!box) return;
+  const rows = [
+    [GAMES.length, '部作品'],
+    [GAMES.filter(g => g.cat === 'play').length, '即点即玩'],
+    [GAMES.filter(g => g.cat === 'video' || g.cat === 'dl').length, '视频 / 下载']
+  ];
+  box.innerHTML = rows.map(r =>
+    '<div><div class="n">' + r[0] + '</div><div class="l">' + r[1] + '</div></div>'
+  ).join('');
+}
+
+/* ================= 初始化 ================= */
+let savedTheme = 'night';
+try { savedTheme = localStorage.getItem(THEME_KEY) || 'night'; } catch (e) {}
+applyTheme(savedTheme);
+/* 首屏稳定后把另一套海报悄悄预取，切主题时不出现"点了没反应" */
+if ('requestIdleCallback' in window) requestIdleCallback(warmPoster, { timeout: 3000 });
+else setTimeout(warmPoster, 2500);
+renderGrid('all');
+renderRankTable();
+renderSideStats();
+renderNews();
+renderMe();
+renderTopAvatar();
+initCloud().then(ok => {
+  if (ok) { renderGrid(curFilter); renderRankTable(); renderSideStats(); }
+  renderMe();
+  renderTopAvatar();
+});
+// 首页也算历史里的一层，这样第一次按 ← 也有地方可回
+try { history.replaceState({ v: 'home' }, '', location.pathname + location.search); } catch (e) {}
+</script>
+</body>
+</html>

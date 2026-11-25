@@ -1,0 +1,4113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>孤剑试炼 · Lone Blade Trials · 原型 v0.8</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#0b0d10;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+  canvas{display:block;background:#0b0d10;}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<script>
+"use strict";
+/* ============================================================
+   孤剑试炼 原型 v0.8 —— 火柴人刀剑横版动作
+   对应 GDD：§4 招式表 / §4.3 敌人 / §5 经济 / §6 层级强度 / §6D 弓枪技能 / §6E 丝滑操作 / §7 反馈通道 / §9 埋点
+   ============================================================ */
+
+// ---------- 画布与逻辑分辨率 ----------
+const W = 1280, H = 720;
+const cv = document.getElementById("cv");
+// v0.8：alpha:false 免 alpha 合成、desynchronized 低延迟上屏——输入到出帧少一拍
+const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
+// v0.8 帧率治理：渲染分辨率动态调档——高性能机 2x 全清，连续掉帧自动降档（2→1.5→1.25→1）
+const DPR_STEPS = [2, 1.5, 1.25, 1];
+let dprCap = Math.min(window.devicePixelRatio || 1, 2);
+let renderDpr = dprCap, dprStep = 0;
+function setRenderDpr(step){
+  if (step === dprStep) return;
+  dprStep = step; renderDpr = Math.min(dprCap, DPR_STEPS[step]);
+  resize();
+}
+function resize(){
+  const s = Math.min(window.innerWidth / W, window.innerHeight / H);
+  const d = Math.min(window.devicePixelRatio || 1, renderDpr);
+  cv.width = W * d;
+  cv.height = H * d;
+  cv.style.width = (W * s) + "px";
+  cv.style.height = (H * s) + "px";
+}
+window.addEventListener("resize", resize); resize();
+
+// ---------- 工具 ----------
+const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+
+// ---------- 存档（对应 GDD §8：wx.setStorageSync 同构） ----------
+const SAVE_KEY = "lone_blade_save_v02";
+const DEFAULT_SAVE = { xt: 0, jp: 0, cy: 0, forgeLv: 0, wLv: { sword: 0, bow: 0, spear: 0 }, quenchHp: 0, quenchAtk: 0, relics: {}, trialLevel: 1, bestTrial: 1, pLv: 1, xp: 0, petKind: "fox", pickHp: 0, pickAtk: 0, gemsGot: 0 };
+let SAVE = loadSave();
+if (!SAVE.wLv) SAVE.wLv = { sword: 0, bow: 0, spear: 0 };   // v01 存档迁移：全局 forgeLv 折算到三武器
+if (SAVE.forgeLv > 0 && SAVE.wLv.sword === 0 && SAVE.wLv.bow === 0 && SAVE.wLv.spear === 0) {
+  SAVE.wLv.sword = SAVE.forgeLv; SAVE.wLv.bow = SAVE.forgeLv; SAVE.wLv.spear = SAVE.forgeLv;
+}
+if (!SAVE.pLv) SAVE.pLv = 1;
+if (SAVE.xp === undefined) SAVE.xp = 0;
+if (SAVE.pickHp === undefined) SAVE.pickHp = 0;   // v0.4：局内拾取升级物品（死亡不丢）
+if (SAVE.pickAtk === undefined) SAVE.pickAtk = 0;
+if (SAVE.gemsGot === undefined) SAVE.gemsGot = 0;
+function loadSave(){
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return JSON.parse(JSON.stringify(DEFAULT_SAVE));
+    const s = JSON.parse(raw);
+    return Object.assign(JSON.parse(JSON.stringify(DEFAULT_SAVE)), s);
+  } catch(e){ return JSON.parse(JSON.stringify(DEFAULT_SAVE)); }
+}
+function persist(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE)); } catch(e){} }
+
+// ---------- 玩家数值（GDD §10，全部 PLACEHOLDER 待埋点校准） ----------
+const BASE = {
+  hp: 100,          // + 淬炼气血 10/条
+  speed: 330,
+  jumpV: -800,
+  gravity: 2300,
+  atk: [10, 12, 18],     // 轻三连
+  heavy: 30,
+  critMul: 1.8,
+  iFrames: 0.25,         // 闪避 i-frames
+  dodgeDur: 0.35,
+  dodgeSpeed: 640,
+  dodgeCD: 0.3,   // v0.5：0.5→0.3，总闪避间隔 0.65s，连闪更跟手
+  comboWindow: 0.5,
+  // 弓与技能（GDD §4.4；武器技能 CD 见 SKILLS 表）
+  skillWave: 14,        // 剑气伤害
+  skillWhirl: 8,        // 乱舞每段伤害（×4 段）
+  bow: 11,              // 普通箭
+  bowPower: 26,         // 蓄力强箭（破盾）
+  arrowSpeed: 950,
+  spear: [8, 9, 14],    // 长枪三突刺（远判定低单发）
+  spearHeavy: 24,       // 蓄力大突刺（超远判定 + 大击退）
+  airAtk: 16,           // 空中下劈
+  // ---- v0.7 弓/枪技能重制（所有数值 [PLACEHOLDER]，验证路径见 GDD §6D） ----
+  bowPierce: 20,        // 裂云·贯日 单支贯穿箭（×3 支，可叠打同一目标）
+  bowRain: 13,          // 万箭·天罗 单支落箭（×14 支）
+  bowRainHeavy: 32,     // 万箭·天罗 收尾天箭（×3 支）
+  bowWind: 42,          // 疾风·回锋 原地风爆
+  spearLunge: 17,       // 游龙·破阵 单段穿刺（×3 段，每段可重击同一目标）
+  spearSweep: 26,       // 横扫·千军破 单段横扫（×2 段，无视盾牌）
+  spearDrop: 46,        // 坠天·裂地 落地主冲击
+  spearWave: 22,        // 坠天·裂地 扩散冲击波（×2 段，逐段衰减 0.8）
+};
+const WEAPON_ORDER = ["sword", "bow", "spear"];   // Q 轮换顺序：刀→长弓→长枪
+// ---------- 武器技能表（U/I/O 三槽，每武器三技能，CD 全部 [PLACEHOLDER] 待 playtest 校准） ----------
+const SKILLS = {
+  sword: [
+    { name: "剑气·裂空", cd: 6,  desc: "穿透剑气波" },
+    { name: "疾风乱舞", cd: 12, desc: "周身四段·全程无敌" },
+    { name: "居合·一闪", cd: 10, desc: "前冲穿阵·沿途重创" },
+  ],
+  bow: [
+    { name: "裂云·贯日", cd: 6.5, desc: "三连贯穿箭·越阵破甲" },
+    { name: "万箭·天罗", cd: 14,  desc: "十七箭覆地·收尾三天箭" },
+    { name: "疾风·回锋", cd: 9,   desc: "后撤留风爆·回身双箭" },
+  ],
+  spear: [
+    { name: "游龙·破阵", cd: 8,   desc: "三段龙形穿刺·收招枪气" },
+    { name: "横扫·千军破", cd: 10, desc: "双段360°横扫·无视盾牌" },
+    { name: "坠天·裂地", cd: 13,  desc: "三叠冲击波·裂地大击退" },
+  ],
+};
+// 层级强度（GDD §6）
+const floorHp = n => 1 + 0.35 * (n - 1);
+const floorAtk = n => 1 + 0.28 * (n - 1);
+// ---------- 人物等级（经验升级） ----------
+function xpNeed(lv){ return Math.round(30 * Math.pow(1.32, lv - 1)); }   // Lv1→30 · Lv5→96 · Lv10→388
+const HP_PER_LV = 12;   // 每升一级气血上限 +12（v0.4：升级加血更明显）
+function playerMaxHp(){ return BASE.hp + SAVE.quenchHp * 10 + (SAVE.pLv - 1) * HP_PER_LV + (SAVE.pickHp || 0) * 5; }
+// 武器分体锻造：每把武器独立等级，+12%/级；人物等级 +4%/级；局内拾取锐牙 +2%/个
+function weaponMult(w){ return Math.pow(1.12, (SAVE.wLv[w] || 0)); }
+function dmgMult(w){ return weaponMult(w || player.weapon) * (1 + SAVE.quenchAtk * 0.05) * (1 + (SAVE.pLv - 1) * 0.04) * (1 + (SAVE.pickAtk || 0) * 0.02); }
+// 武器品阶（外观随锻造等级进化：凡铁→青锋→赤金→寒光→紫电→神兵）
+const TIER_NAMES = ["凡铁", "青锋", "赤金", "寒光", "紫电", "神兵"];
+const TIER_COLOR = ["#c8ccd2", "#7fd4ff", "#ffb347", "#eef4ff", "#c9a0ff", "#ffe66e"];
+function tierOf(w){ return clamp(SAVE.wLv[w] || 0, 0, 5); }
+function grantXp(n){
+  SAVE.xp += n;
+  let ups = 0;
+  while (SAVE.xp >= xpNeed(SAVE.pLv)) {
+    SAVE.xp -= xpNeed(SAVE.pLv);
+    SAVE.pLv++; ups++;
+  }
+  if (ups > 0) {
+    persist();
+    S().levelup();
+    player.hp = playerMaxHp();   // v0.4：升阶瞬间气血回满
+    ring(player.x, player.y - 55, 130, "#ffe66e");
+    burst(player.x, player.y - 55, "#ffe66e", 18, 380);
+    flash("rgba(255,238,120,0.25)", 0.15);
+    shake = Math.max(shake, 5);
+    dmgText(player.x, player.y - 140, "升阶 Lv." + SAVE.pLv, "#ffe66e", true);
+    dmgText(player.x, player.y - 112, "气血上限 +" + ups * HP_PER_LV + " · 伤害 +" + Math.round(ups * 4) + "% · 气血回满", "#c9e08a", false);
+    if (pet) { ring(pet.x, pet.y, 70, "#b0e8ff"); burst(pet.x, pet.y, "#b0e8ff", 10, 260); }   // 宠物一同升阶
+    return ups;
+  }
+  return 0;
+}
+function atkSpeedMult(){ return SAVE.relics.swift ? 1.15 : 1; }
+function critChance(){ return SAVE.relics.critUp ? 0.15 : 0; }
+
+// ---------- 输入（键盘 + 触屏，GDD §4.1） ----------
+const keys = {};
+window.addEventListener("keydown", e => {
+  if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," ","j","J","k","K","l","L","u","U","i","I","o","O","s","S","q","Q","Tab","p","P","b","B","m","M","Escape"].includes(e.key)) e.preventDefault();
+  const first = !keys[e.key];
+  keys[e.key] = true;
+  if (first) pressedThisFrame.add(e.key);
+  if (first && (e.key === "j" || e.key === "J")) onAtkDown();
+  handleUIKey(e.key);
+});
+window.addEventListener("keyup", e => {
+  keys[e.key] = false;
+  if (e.key === "j" || e.key === "J") onAtkUp();
+});
+
+const pressedThisFrame = new Set();
+// 统一"攻击键按下/抬起"事件流（键盘 J + 触屏 ATK 键）
+let atkBtnDown = false, atkBtnDownAt = -1, atkBtnReleased = false, atkPressBufferedAt = -1;
+function onAtkDown(){ atkBtnDown = true; atkBtnDownAt = nowSec; atkPressBufferedAt = nowSec; }
+function onAtkUp(){ atkBtnDown = false; atkBtnReleased = true; }
+let dodgeBtn = false, jumpBtnPressed = false;
+// v0.5：跳跃/闪避/换武器输入缓冲（攻击硬直中预输入 → 硬直一结束立即响应，降延迟）
+let jumpBufAt = -1, dodgeBufAt = -1, switchBufAt = -1;
+let skillBufAt = [-1, -1, -1];   // v0.8：技能输入缓冲——任何状态下按下都记录，0.35s 内可施放即触发
+function onDodgeDown(){ dodgeBtn = true; }
+function onJumpDown(){ jumpBtnPressed = true; }
+let skillReq = [false, false, false], switchReq = false, blockBtn = false;
+function onSkillDown(slot){ skillReq[slot] = true; }
+function onSwitchDown(){ switchReq = true; }
+function touchAction(id){
+  if (id === "atk") onAtkDown();
+  if (id === "dodge") onDodgeDown();
+  if (id === "jump") onJumpDown();
+  if (id === "skill0") onSkillDown(0);
+  if (id === "skill1") onSkillDown(1);
+  if (id === "skill2") onSkillDown(2);
+  if (id === "switch") onSwitchDown();
+  if (id === "block") blockBtn = true;
+}
+
+// 触屏：左 1/3 为方向区，右侧按钮由 Button 布局判定
+const touchState = { active: false, x: 0, dir: 0 };
+cv.addEventListener("pointerdown", e => {
+  const p = toLogical(e);
+  if (handleUIPoint(p)) return;
+  if (game.state !== "play") return;
+  // 右侧按钮（点按即触发，不依赖 move）
+  for (const b of touchButtons) {
+    if (Math.hypot(p.x - b.x, p.y - b.y) < b.r + 14) {
+      b.pressed = true;
+      touchAction(b.id);
+      return;
+    }
+  }
+  // 左侧方向区
+  if (p.x < W * 0.38 && p.y > H * 0.45) {
+    touchState.active = true; touchState.x = p.x; touchState.dir = p.x < (W * 0.19) ? -1 : 1;
+  }
+});
+cv.addEventListener("pointermove", e => {
+  if (touchState.active) { const p = toLogical(e); touchState.dir = p.x < touchState.x - 60 ? -1 : (p.x > touchState.x + 60 ? 1 : touchState.dir); }
+});
+const upHandler = e => {
+  if (touchState.active) { touchState.active = false; touchState.dir = 0; }
+  blockBtn = false;
+  for (const b of touchButtons) {
+    if (b.id === "atk" && b.pressed) { b.pressed = false; onAtkUp(); }
+    else b.pressed = false;
+  }
+};
+cv.addEventListener("pointerup", upHandler);
+cv.addEventListener("pointercancel", upHandler);
+function toLogical(e){
+  const r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+}
+// 触屏按钮按住检测（e.buttons>0 排除鼠标悬停误触）
+cv.addEventListener("pointermove", e => {
+  if (game.state !== "play" || e.buttons === 0) return;
+  const p = toLogical(e);
+  for (const b of touchButtons) {
+    const hit = Math.hypot(p.x - b.x, p.y - b.y) < b.r + 14;
+    if (hit && !b.pressed) {
+      b.pressed = true;
+      touchAction(b.id);
+    }
+    if (!hit && b.pressed && b.id === "atk") { b.pressed = false; onAtkUp(); }
+  }
+});
+const touchButtons = [
+  { id: "atk",    label: "斩", x: W - 130, y: H - 130, r: 58 },
+  { id: "dodge",  label: "闪", x: W - 250, y: H - 90,  r: 52 },
+  { id: "jump",   label: "跳", x: W - 80,  y: H - 260, r: 38 },
+  { id: "skill0", label: "壹", x: W - 168, y: H - 250, r: 42 },
+  { id: "skill1", label: "贰", x: W - 278, y: H - 195, r: 46 },
+  { id: "skill2", label: "叁", x: W - 190, y: H - 355, r: 40 },
+  { id: "block",  label: "格", x: W - 90,  y: H - 360, r: 40 },
+  { id: "switch", label: "换", x: W - 80,  y: H - 460, r: 34 },
+];
+
+function inputDir(){
+  let d = 0;
+  if (keys["ArrowLeft"] || keys["a"] || keys["A"]) d -= 1;
+  if (keys["ArrowRight"] || keys["d"] || keys["D"]) d += 1;
+  if (touchState.active) d = touchState.dir;
+  return d;
+}
+function isTouchDevice(){ return "ontouchstart" in window || navigator.maxTouchPoints > 0; }
+
+// ---------- 计时 ----------
+let nowSec = 0, lastTs = 0;
+let timeScale = 1;        // 剑意时刻：敌人侧 0.3 倍
+let enemyTimeScale = 1;
+let hitstop = 0;          // 全局打击停顿（秒，真实时间）
+let shake = 0, shakeX = 0, shakeY = 0, shakeDir = 0;
+let zoom = 0;             // 重击镜头推近量
+let flashT = 0, flashColor = "rgba(255,255,255,0.2)";
+
+// ---------- 音频（WebAudio 程序化合成，零素材；无 AudioContext 环境全静默兜底） ----------
+const AudioSys = (() => {
+  let ac = null, master = null, sfxG = null, bgmG = null, windSrc = null;
+  let muted = !!(SAVE.muted);
+  let nextBellAt = 0, started = false;
+  // 五声音阶（宫商角徵羽，D 调）：江湖/古琴风骨架
+  const PENTA = [146.83, 164.81, 196.00, 220.00, 261.63, 293.66, 329.63, 392.00];
+
+  function ensure(){
+    if (ac) { if (ac.state === "suspended") ac.resume(); return true; }
+    try {
+      const AC = (typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext));
+      if (!AC) return false;
+      ac = new AC();
+      master = ac.createGain(); master.gain.value = muted ? 0 : 0.85; master.connect(ac.destination);
+      sfxG = ac.createGain(); sfxG.gain.value = 0.8; sfxG.connect(master);
+      bgmG = ac.createGain(); bgmG.gain.value = 0.5; bgmG.connect(master);
+      startBGM();
+      return true;
+    } catch(e){ return false; }
+  }
+  function noiseBuf(dur){
+    const n = Math.max(1, Math.floor(ac.sampleRate * dur));
+    const b = ac.createBuffer(1, n, ac.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  }
+  // 通用音色：滤波噪声（挥砍/打击的"肉感"）
+  function noise(dur, f0, f1, vol, type){
+    if (!ac || muted) return;
+    const src = ac.createBufferSource(); src.buffer = noiseBuf(dur);
+    const fl = ac.createBiquadFilter(); fl.type = type || "bandpass"; fl.Q.value = 1.1;
+    fl.frequency.setValueAtTime(f0, ac.currentTime);
+    if (f1 && f1 !== f0) fl.frequency.exponentialRampToValueAtTime(f1, ac.currentTime + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(vol, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur);
+    src.connect(fl); fl.connect(g); g.connect(sfxG);
+    src.start(); src.stop(ac.currentTime + dur + 0.02);
+  }
+  // 通用音色：单音（金属/木质感）
+  function tone(freq, dur, type, vol, slideTo, delay){
+    if (!ac || muted) return;
+    const t0 = ac.currentTime + (delay || 0);
+    const o = ac.createOscillator(); o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t0);
+    if (slideTo && slideTo !== freq) o.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), t0 + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(g); g.connect(sfxG);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  // ---- 打击音效组 ----
+  const sfx = {
+    swing(heavy){ noise(heavy ? 0.16 : 0.10, 380, heavy ? 1500 : 1100, heavy ? 0.5 : 0.34); },
+    hitLight(){ noise(0.06, 2400, 900, 0.5); tone(240, 0.07, "triangle", 0.3, 120); },
+    hitHeavy(){ noise(0.13, 1600, 300, 0.7); tone(120, 0.16, "square", 0.45, 55); tone(75, 0.2, "sine", 0.4, 40); },
+    crit(){ tone(1750, 0.09, "sine", 0.5, 900); noise(0.08, 3200, 1200, 0.55); tone(880, 0.12, "triangle", 0.3, 440, 0.01); },
+    kill(){ noise(0.22, 900, 120, 0.75); tone(160, 0.3, "sine", 0.5, 42); tone(660, 0.14, "triangle", 0.22, 130); },
+    parry(){ tone(1240, 0.12, "sine", 0.5, 620); tone(1860, 0.16, "sine", 0.35, 930, 0.015); noise(0.05, 4200, 2000, 0.4); },
+    block(){ tone(140, 0.12, "square", 0.32, 70); noise(0.08, 700, 260, 0.3); },
+    shieldBreak(){ noise(0.3, 2600, 200, 0.85, "highpass"); tone(420, 0.25, "square", 0.4, 90); tone(210, 0.3, "triangle", 0.35, 60, 0.03); },
+    hurt(){ tone(90, 0.18, "sawtooth", 0.5, 45); noise(0.1, 500, 150, 0.4); },
+    dodge(){ noise(0.13, 500, 1600, 0.25); },
+    jump(){ tone(300, 0.09, "sine", 0.18, 480); },
+    bowShoot(power){ noise(power ? 0.16 : 0.1, 600, power ? 2600 : 1800, power ? 0.5 : 0.32); if (power) tone(520, 0.1, "triangle", 0.25, 180); },
+    bowFull(){ tone(880, 0.08, "sine", 0.22); tone(1320, 0.1, "sine", 0.18, 1320, 0.05); },
+    switch(){ tone(1560, 0.05, "sine", 0.25); tone(2080, 0.07, "sine", 0.2, 2080, 0.03); },
+    levelup(){ [0, 0.09, 0.18, 0.3].forEach((d, i) => tone(PENTA[4 + i] * 2, 0.22, "sine", 0.3, null, d)); },
+    pickup(){ tone(1320, 0.07, "sine", 0.28); tone(1760, 0.1, "sine", 0.22, 1760, 0.06); },
+    victory(){ [0, 0.14, 0.28, 0.42, 0.62].forEach((d, i) => tone([293.66, 349.23, 392, 440, 587.33][i], 0.3, "sine", 0.3, null, d)); },
+    death(){ tone(220, 0.9, "sine", 0.4, 55); tone(110, 1.1, "triangle", 0.35, 40, 0.05); noise(0.6, 300, 60, 0.3); },
+    bossIn(){ tone(65, 0.8, "sine", 0.55, 30); noise(0.5, 200, 50, 0.4); tone(98, 0.7, "triangle", 0.3, 49, 0.1); },
+    // v0.6：关口 / 通路 / 山门
+    gate(){ noise(0.24, 500, 130, 0.5); tone(150, 0.22, "square", 0.3, 70); tone(300, 0.12, "triangle", 0.2, 180, 0.04); },
+    gateOpen(){ [0, 0.1, 0.2].forEach((d, i) => tone([392, 523.25, 659.25][i], 0.28, "sine", 0.24, null, d)); noise(0.2, 900, 300, 0.16); },
+    portalOpen(){ [0, 0.12, 0.24, 0.4].forEach((d, i) => tone([293.66, 440, 587.33, 880][i], 0.5, "sine", 0.26, null, d)); noise(0.5, 400, 2400, 0.2); },
+    portalEnter(){ tone(220, 0.7, "triangle", 0.3, 880); noise(0.6, 300, 3200, 0.28); [0, 0.15, 0.3].forEach((d, i) => tone([523.25, 659.25, 987.77][i], 0.4, "sine", 0.22, null, d)); },
+  };
+  // ---- 江湖风 BGM（v0.6）：五声音阶原创主题 —— 笛子主旋律 + 古筝分解和弦 + 梆子/鼓 + 低音 + 远钟 + 风声 ----
+  // 说明：完全程序化合成的原创曲子（不是采样 / 不是任何既有歌曲的旋律），只取“一笑江湖”那类
+  //      快意恩仇的江湖气：五声音阶、行板、笛主奏、筝伴奏、板鼓点。
+  const BPM = 92, BEAT = 60 / BPM, STEP = BEAT / 2;   // 八分音符网格
+  const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+  let mood = "explore", keyShift = 0;
+  let stepAt = 0, stepIdx = 0;
+  // 主题（8 小节 × 8 个八分步 = 64 步）：[起始步, MIDI, 时值(步)]；D 宫五声 D E F# A B
+  const THEME = [
+    [0, 69, 2], [2, 74, 2], [4, 76, 2], [6, 74, 4],
+    [10, 71, 2], [12, 69, 2], [14, 66, 2], [18, 69, 4],
+    [22, 74, 2], [24, 76, 2], [26, 78, 2], [28, 76, 4],
+    [34, 74, 2], [36, 71, 2], [38, 69, 2], [42, 66, 6],
+    [48, 69, 2], [50, 71, 2], [52, 74, 2], [54, 76, 4],
+    [58, 74, 2], [60, 71, 2], [62, 69, 4],
+  ];
+  const THEME_MAP = {};
+  for (const [s, n, d] of THEME) THEME_MAP[s] = { n, d };
+  // 和声骨架（每小节）：D / A / Bm / D（五声内取音）
+  const CHORDS = [[62, 69, 74], [57, 64, 69], [59, 66, 71], [62, 69, 74]];
+  function startBGM(){
+    if (!ac || started) return;
+    started = true;
+    // 风声底噪：循环噪声 → 低通，音量极低
+    try {
+      const n = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+      const d = n.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      windSrc = ac.createBufferSource(); windSrc.buffer = n; windSrc.loop = true;
+      const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 320; lp.Q.value = 0.4;
+      const wg = ac.createGain(); wg.gain.value = 0.04;
+      windSrc.connect(lp); lp.connect(wg); wg.connect(bgmG);
+      windSrc.start();
+    } catch(e){}
+    stepAt = ac.currentTime + 0.6;
+    nextBellAt = ac.currentTime + 16 + Math.random() * 10;
+  }
+  // 古筝/古琴：正弦 + 三角泛音，1.6s 自然衰减
+  function pluck(freq, at, vol){
+    const o = ac.createOscillator(); o.type = "sine"; o.frequency.value = freq;
+    const o2 = ac.createOscillator(); o2.type = "triangle"; o2.frequency.value = freq * 2;
+    const g = ac.createGain(); const g2 = ac.createGain();
+    g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(vol, at + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 1.5);
+    g2.gain.setValueAtTime(0.0001, at); g2.gain.exponentialRampToValueAtTime(vol * 0.25, at + 0.008);
+    g2.gain.exponentialRampToValueAtTime(0.0001, at + 0.7);
+    o.connect(g); o2.connect(g2); g.connect(bgmG); g2.connect(bgmG);
+    o.start(at); o.stop(at + 1.6); o2.start(at); o2.stop(at + 0.8);
+  }
+  // 笛 / 箫：三角波主音 + 八度泛音 + 揉弦（5Hz 颤音）
+  function flute(midiN, at, dur, vol){
+    const f = mtof(midiN);
+    const o = ac.createOscillator(); o.type = "triangle"; o.frequency.setValueAtTime(f, at);
+    const o2 = ac.createOscillator(); o2.type = "sine"; o2.frequency.setValueAtTime(f * 2, at);
+    const g = ac.createGain(), g2 = ac.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(vol, at + 0.06);
+    g.gain.exponentialRampToValueAtTime(vol * 0.72, at + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    g2.gain.setValueAtTime(0.0001, at);
+    g2.gain.exponentialRampToValueAtTime(vol * 0.16, at + 0.05);
+    g2.gain.exponentialRampToValueAtTime(0.0001, at + dur * 0.75);
+    const lfo = ac.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 5.2;
+    const lg = ac.createGain(); lg.gain.value = f * 0.006;
+    lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency);
+    o.connect(g); o2.connect(g2); g.connect(bgmG); g2.connect(bgmG);
+    o.start(at); o.stop(at + dur + 0.06); o2.start(at); o2.stop(at + dur + 0.06);
+    lfo.start(at); lfo.stop(at + dur + 0.06);
+  }
+  // 低音（古琴低音 / 大胡）
+  function bass(midiN, at, dur){
+    const f = mtof(midiN);
+    const o = ac.createOscillator(); o.type = "sine"; o.frequency.setValueAtTime(f, at);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(0.16, at + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g); g.connect(bgmG); o.start(at); o.stop(at + dur + 0.05);
+  }
+  // 板鼓（低频闷击）
+  function drum(at, vol){
+    const o = ac.createOscillator(); o.type = "sine";
+    o.frequency.setValueAtTime(120, at);
+    o.frequency.exponentialRampToValueAtTime(46, at + 0.16);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(vol, at + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.26);
+    o.connect(g); g.connect(bgmG); o.start(at); o.stop(at + 0.3);
+  }
+  // 梆子（木质短促）
+  function clack(at, vol){
+    const src = ac.createBufferSource(); src.buffer = noiseBuf(0.05);
+    const fl = ac.createBiquadFilter(); fl.type = "bandpass"; fl.frequency.value = 2300; fl.Q.value = 3;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(vol, at); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.07);
+    src.connect(fl); fl.connect(g); g.connect(bgmG); src.start(at); src.stop(at + 0.09);
+  }
+  function bell(at){
+    const base = 660;
+    [1, 2.71, 4.05].forEach((m, i) => {
+      const o = ac.createOscillator(); o.type = "sine"; o.frequency.value = base * m;
+      const g = ac.createGain();
+      const v = 0.1 / (i + 1);
+      g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(v, at + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 3.2);
+      o.connect(g); g.connect(bgmG); o.start(at); o.stop(at + 3.3);
+    });
+  }
+  // 单个八分步的编曲
+  function playStep(globalStep, at){
+    const s = ((globalStep % 64) + 64) % 64;
+    const bar = Math.floor(s / 8), bi = s % 8;
+    // 旋律：探索时只留骨架（每 2 步一次），战斗/BOSS 全奏
+    if (mood !== "explore") {
+      const ev = THEME_MAP[s];
+      if (ev) flute(ev.n + keyShift, at, ev.d * STEP * 0.98, mood === "boss" ? 0.15 : 0.12);
+    } else if (bi % 4 === 0) {
+      const chord = CHORDS[bar % 4];
+      pluck(mtof(chord[(bar + bi / 4) % chord.length] + keyShift), at, 0.085);
+    }
+    // 古筝分解和弦（战斗中密一点）
+    if (mood !== "explore" && bi % 2 === 0) {
+      const chord = CHORDS[bar % 4];
+      pluck(mtof(chord[(bi / 2) % chord.length] + keyShift), at, 0.075);
+    }
+    // 低音：每小节根音
+    if (bi === 0) bass(CHORDS[bar % 4][0] - 12 + keyShift, at, BEAT * 1.7);
+    // 鼓板：只有交战/BOSS 起
+    if (mood !== "explore") {
+      if (bi === 0 || bi === 4) drum(at, mood === "boss" ? 0.42 : 0.28);
+      if (bi === 2 || bi === 6) clack(at, mood === "boss" ? 0.2 : 0.14);
+      if (mood === "boss" && bi % 2 === 1) clack(at, 0.08);
+    }
+  }
+  // 每帧推进 BGM 调度（不依赖 setInterval，测试环境零负担）
+  function tick(){
+    if (!ac || muted || !started || ac.state !== "running") return;
+    const now = ac.currentTime;
+    while (stepAt < now + 0.4) {
+      playStep(stepIdx, Math.max(stepAt, now + 0.02));
+      stepIdx++; stepAt += STEP;
+    }
+    if (nextBellAt < now) { bell(now + 0.1); nextBellAt = now + 22 + Math.random() * 16; }
+  }
+  function setMood(m){ if (m !== mood) mood = m; }
+  // 每关换调：同一主题在不同调上重奏（关卡推进的听觉变化）
+  function setKey(trial){
+    const shifts = [0, 2, 4, 5, 7];
+    const k = shifts[(Math.max(1, trial) - 1) % shifts.length];
+    if (k !== keyShift) {
+      keyShift = k;
+      stepIdx = 0;   // 换调从主题头开始
+      if (ac) stepAt = ac.currentTime + 0.35;
+    }
+  }
+  function toggleMute(){
+    muted = !muted;
+    SAVE.muted = muted; persist();
+    if (master) master.gain.value = muted ? 0 : 0.85;
+    return muted;
+  }
+  return {
+    ensure, tick, sfx, toggleMute, setMood, setKey,
+    get muted(){ return muted; },
+    get mood(){ return mood; },
+    get ok(){ return !!ac; },
+  };
+})();
+// 首次交互解锁音频（浏览器自动播放策略）
+window.addEventListener("pointerdown", () => AudioSys.ensure());
+window.addEventListener("keydown", () => AudioSys.ensure());
+function S(){ return AudioSys.sfx; }   // 简写
+
+// 定向冲击：震屏往挥刀方向"砸"过去
+function punch(dir, str){
+  shake = Math.max(shake, str);
+  shakeDir = clamp(shakeDir + dir * 0.9, -1.8, 1.8);
+}
+function flash(color, t){ flashColor = color; flashT = Math.max(flashT, t); }
+function ring(x, y, r, color){ pushParticle({ ring: true, x, y, r0: 8, r1: r, life: 0.28, t: 0, color }); }
+// 八向星芒冲击（v0.4.1：重击/暴击/破盾的"炸开"感）
+function starRing(x, y, r, color){ pushParticle({ star: true, x, y, r0: 10, r1: r, life: 0.22, t: 0, color }); }
+
+// ---------- 粒子 / 飘字 / 素材 ----------
+const particles = [], dmgTexts = [], orbs = [];
+const MAX_PARTICLES = 260;   // 粒子封顶：满屏星芒+乱舞+击杀连发时不再无限膨胀拖帧
+function pushParticle(p){ if (particles.length < MAX_PARTICLES) particles.push(p); else { particles[Math.floor(Math.random() * MAX_PARTICLES)] = p; } }
+function burst(x, y, color, n, spd){
+  for (let i = 0; i < n; i++){
+    const a = rand(0, Math.PI * 2), v = rand(spd * 0.3, spd);
+    pushParticle({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 100, life: rand(0.3, 0.7), t: 0, color, len: rand(8, 20) });
+  }
+}
+function slashFx(x, y, facing, heavy){
+  particles.push({ x, y, vx: facing * 60, vy: 0, life: heavy ? 0.16 : 0.12, t: 0, color: heavy ? "#ff7744" : "#ffeecc", slash: true, len: heavy ? 150 : 110 });
+}
+function dmgText(x, y, txt, color, big){
+  dmgTexts.push({ x, y, txt, color, t: 0, life: 0.7, big: !!big, vy: -120 });
+}
+function dropOrb(x, y, kind, amount, sub){
+  orbs.push({ x, y, vx: rand(-120, 120), vy: rand(-380, -200), kind, amount, sub, t: 0 });
+}
+// ---------- 局内永久升级物品（v0.4：拾取即入档，死亡不丢） ----------
+const GEM_DEFS = {
+  hp:  { name: "血珀", color: "#ff8899", txt: "气血上限 +5" },
+  atk: { name: "锐牙", color: "#ffcc66", txt: "伤害 +2%" },
+  xp:  { name: "魂晶", color: "#ffe66e", txt: "经验 +40" },
+};
+function dropGem(x, y){
+  const sub = ["hp", "atk", "xp"][randi(0, 2)];
+  dropOrb(x, y, "gem", 1, sub);
+}
+function applyGem(sub){
+  const def = GEM_DEFS[sub];
+  if (!def) return;
+  SAVE.gemsGot = (SAVE.gemsGot || 0) + 1;
+  if (sub === "hp") { SAVE.pickHp++; if (player.hp > 0) player.hp = Math.min(playerMaxHp(), player.hp + 5); }
+  else if (sub === "atk") SAVE.pickAtk++;
+  else if (sub === "xp") grantXp(40);
+  persist();   // 拾取瞬间入档：中途死亡也不丢（GDD §6A.5）
+  S().pickup();
+  dmgText(player.x, player.y - 150, def.name + " · " + def.txt + "（已存档）", def.color, true);
+  ring(player.x, player.y - 55, 60, def.color);
+  burst(player.x, player.y - 55, def.color, 8, 240);
+}
+
+// ---------- 投射物（箭 / 剑气波，GDD §4.4） ----------
+const projectiles = [];
+function spawnArrow(power, opt){
+  const o = opt || {};
+  const dmg = (o.dmg !== undefined ? o.dmg : (power ? BASE.bowPower : BASE.bow)) * dmgMult("bow");
+  projectiles.push({
+    kind: "arrow", power, skill: !!o.skill, rain: !!o.rain,
+    x: player.x + player.facing * 34, y: player.y - 64 + (o.dy || 0),
+    vx: player.facing * (o.spd || (power ? 1250 : BASE.arrowSpeed)),
+    life: o.life || 1.2,
+    dmg,
+    st: o.st || (power ? { heavy: true, knock: 200, stagger: 0.6 } : { heavy: false, knock: 60, stagger: 0.25 }),
+    pierce: o.pierce !== undefined ? o.pierce : !!power,
+    hitSet: (o.pierce !== undefined ? o.pierce : !!power) ? new Set() : null,   // 强箭穿透：每个敌人只结算一次
+  });
+  burst(player.x + player.facing * 36, player.y - 64 + (o.dy || 0), power ? "#ffee88" : "#cccccc", power ? 8 : 4, 220);
+  S().bowShoot(power);
+  if (power) { shake = Math.max(shake, 4); zoom = Math.max(zoom, 0.03); }
+}
+// ---------- v0.7 冲击波 / 延迟爆破（枪技三叠冲击、弓技风爆共用） ----------
+// 一次 addBlast = 一次"延迟 → 判定 → 扩散"的完整生命周期：
+//   fuse 前是预警圈（给玩家读招窗口），fuse 瞬间结算一次 AoE，之后 dur 内画扩散环。
+const MAX_BLASTS = 14;
+const blasts = [];
+function addBlast(o){
+  if (blasts.length >= MAX_BLASTS) blasts.shift();
+  blasts.push({
+    x: o.x, y: o.y === undefined ? GROUND : o.y, t: 0,
+    fuse: o.fuse || 0, dur: o.dur || 0.42,
+    r: o.r || 170, dmg: o.dmg || 30,
+    st: o.st || { heavy: true, knock: 300, stagger: 0.7 },
+    color: o.color || "#a0ffd0",
+    kind: o.kind || "shock",       // shock 扩散冲击 / wind 蓄风爆破 / slam 落地重击
+    fired: false, dir: o.dir || 1,
+  });
+}
+function updateBlasts(dt){
+  for (let i = blasts.length - 1; i >= 0; i--) {
+    const b = blasts[i];
+    b.t += dt;
+    if (!b.fired && b.t >= b.fuse) {
+      b.fired = true;
+      // 判定：一次半径内全体
+      for (const e of enemies) {
+        if (e.dead) continue;
+        if (Math.abs(e.x - b.x) < b.r && Math.abs(e.y - b.y) < 160) {
+          hitEnemy(e, b.dmg, b.st, Math.sign(e.x - b.x) || b.dir);
+        }
+      }
+      // 反馈通道（GDD §7）：环 + 星芒 + 震屏 + 闪屏 + 触感
+      ring(b.x, b.y - 40, b.r, b.color);
+      starRing(b.x, b.y - 40, b.r * 0.72, b.color);
+      burst(b.x, b.y - 30, b.color, b.kind === "slam" ? 22 : 14, b.kind === "slam" ? 620 : 460);
+      burst(b.x, b.y - 30, "#ffffff", 6, 520);
+      shake = Math.max(shake, b.kind === "slam" ? 13 : 8);
+      zoom = Math.max(zoom, b.kind === "slam" ? 0.06 : 0.035);
+      flash(b.kind === "slam" ? "rgba(200,255,225,0.26)" : "rgba(180,240,255,0.18)", 0.11);
+      if (navigator.vibrate) navigator.vibrate(b.kind === "slam" ? 55 : 25);
+    }
+    const end = b.fuse + b.dur;
+    if (b.t >= end) blasts.splice(i, 1);
+  }
+}
+function drawBlasts(){
+  for (const b of blasts) {
+    const cy = b.y - 40;
+    if (!b.fired) {
+      // 预警：呼吸圈 + 向内收束的碎线（读招窗口 ≥0.2s，GDD §6A.7）
+      const q = clamp(b.t / Math.max(b.fuse, 0.001), 0, 1);
+      ctx.save();
+      ctx.globalAlpha = 0.25 + 0.45 * q;
+      ctx.strokeStyle = b.color; ctx.lineWidth = 2 + 2 * q;
+      ctx.setLineDash([7, 7]);
+      ctx.beginPath(); ctx.arc(b.x, cy, b.r * (0.55 + 0.45 * q), 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 0.5 * (1 - q);
+      for (let i = 0; i < 6; i++) {
+        const a = nowSec * 4 + i * 1.047;
+        const r0 = b.r * (1.15 - 0.3 * q);
+        ctx.beginPath();
+        ctx.moveTo(b.x + Math.cos(a) * r0, cy + Math.sin(a) * r0 * 0.55);
+        ctx.lineTo(b.x + Math.cos(a) * (r0 - 26), cy + Math.sin(a) * (r0 - 26) * 0.55);
+        ctx.stroke();
+      }
+      ctx.restore();
+      continue;
+    }
+    const p = clamp((b.t - b.fuse) / b.dur, 0, 1);
+    ctx.save();
+    // 主扩散环（粗→细，快出慢收）
+    ctx.globalAlpha = (1 - p) * 0.85;
+    ctx.strokeStyle = b.color; ctx.lineWidth = 6 * (1 - p) + 1.5;
+    ctx.beginPath(); ctx.ellipse(b.x, cy, b.r * (0.35 + 0.75 * p), b.r * (0.14 + 0.3 * p), 0, 0, Math.PI * 2); ctx.stroke();
+    // 内侧白芯环 + 地面裂线
+    ctx.globalAlpha = (1 - p) * 0.55;
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(b.x, cy, b.r * (0.25 + 0.55 * p), b.r * (0.1 + 0.22 * p), 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = (1 - p) * 0.5;
+    ctx.strokeStyle = b.color; ctx.lineWidth = 2;
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.047 + (b.kind === "wind" ? nowSec * 2 : 0);
+      const rr = b.r * (0.4 + 0.6 * p);
+      ctx.beginPath();
+      ctx.moveTo(b.x + Math.cos(a) * rr * 0.55, cy + Math.sin(a) * rr * 0.22);
+      ctx.lineTo(b.x + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.4);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+function spawnWave(){
+  projectiles.push({
+    kind: "wave",
+    x: player.x + player.facing * 40, y: player.y - 58,
+    vx: player.facing * 780,
+    life: 0.9,
+    dmg: BASE.skillWave * dmgMult("sword"),
+    st: { heavy: false, knock: 90, stagger: 0.35 },
+    pierce: true, hitSet: new Set(),
+  });
+  flash("rgba(180,225,255,0.25)", 0.08);
+  shake = Math.max(shake, 3); zoom = Math.max(zoom, 0.02);
+}
+function updateProjectiles(dt){
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const pr = projectiles[i];
+    // 灵狐灵弹：追踪目标（目标死亡则自动锁最近敌人）
+    if (pr.kind === "pet") {
+      if (!pr.target || pr.target.dead) pr.target = nearestEnemy(pr.x, pr.y);
+      if (pr.target) {
+        const dx = pr.target.x - pr.x, dy = (pr.target.y - 55 * pr.target.scale) - pr.y;
+        const dist = Math.hypot(dx, dy) + 0.01;
+        const spd = 760;
+        pr.vx = lerp(pr.vx, dx / dist * spd, 1 - Math.pow(0.02, dt));
+        pr.vy = lerp(pr.vy, dy / dist * spd, 1 - Math.pow(0.02, dt));
+      }
+    }
+    pr.x += pr.vx * dt; pr.y += (pr.vy || 0) * dt; pr.life -= dt;
+    let dead = pr.life <= 0 || pr.x < 20 || pr.x > WORLD_W - 20 || pr.y > GROUND + 30;
+    for (const e of enemies) {
+      if (e.dead || (pr.hitSet && pr.hitSet.has(e))) continue;
+      const ew = 34 * e.scale;
+      if (pr.x + 22 > e.x - ew && pr.x - 22 < e.x + ew && Math.abs((e.y - 50 * e.scale) - pr.y) < 85) {
+        if (pr.hitSet) pr.hitSet.add(e);
+        hitEnemy(e, pr.dmg, pr.st, Math.sign(pr.vx) || 1, pr.x);
+        if (!pr.pierce) { dead = true; break; }
+      }
+    }
+    if (dead) {
+      if (pr.rain) {
+        // 落箭着地：小范围尘爆（一眼能读出"这片区域被覆盖了"）
+        burst(pr.x, Math.min(pr.y, GROUND + 6), pr.heavyRain ? "#ffe9a0" : "#9fe8ff", pr.heavyRain ? 9 : 4, 220);
+        ring(pr.x, GROUND + 6, pr.heavyRain ? 70 : 34, pr.heavyRain ? "#ffe9a0" : "#9fe8ff");
+        if (pr.heavyRain) { starRing(pr.x, GROUND + 6, 96, "#fff2c4"); shake = Math.max(shake, 5); }
+      } else {
+        burst(pr.x, pr.y, pr.kind === "wave" ? "#8fd6ff" : (pr.skill ? "#ffe9a0" : "#d8c9a0"), pr.skill ? 8 : 4, pr.skill ? 240 : 160);
+      }
+      projectiles.splice(i, 1);
+    }
+  }
+}
+function drawProjectile(pr){
+  ctx.save();
+  ctx.translate(pr.x, pr.y);
+  ctx.scale(Math.sign(pr.vx) || 1, 1);
+  if (pr.kind === "pet") {
+    // 灵狐灵弹：辉光彗星（头亮尾散）
+    const look = petLook();
+    const ang = Math.atan2(pr.vy || 0, Math.abs(pr.vx) || 1);
+    ctx.rotate(ang);
+    ctx.globalAlpha = 0.4;
+    ctx.strokeStyle = look.aura; ctx.lineWidth = 5; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(-4, 0); ctx.stroke();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = look.color;
+    ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.35 + 0.3 * Math.sin(nowSec * 20);
+    ctx.fillStyle = look.aura;
+    ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore(); return;
+  }
+  if (pr.kind === "wave") {
+    // 剑气：新月双弧 + 外层气焰
+    const fade = clamp(pr.life / 0.18, 0, 1);
+    ctx.globalAlpha = 0.9 * fade;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#bfe8ff"; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.arc(-16, 0, 34, -0.9, 0.9); ctx.stroke();
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(-16, 0, 34, -0.7, 0.7); ctx.stroke();
+    ctx.globalAlpha = 0.5 * fade;
+    ctx.strokeStyle = "#8fd6ff"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(-16, 0, 46, -0.8, 0.8); ctx.stroke();
+  } else {
+    // 箭：箭杆 + 箭头 + 尾迹（箭雨为竖直下落，按速度方向旋转）
+    if (pr.rain) ctx.rotate(Math.PI / 2);
+    const hot = pr.power || pr.skill || pr.heavyRain;
+    if (pr.rain) {
+      // 落箭尾光：浅青渐隐，让"天罗"能一眼读出密集箭幕
+      ctx.globalAlpha = pr.heavyRain ? 0.4 : 0.2;
+      ctx.strokeStyle = pr.heavyRain ? "#ffe9a0" : "#9fe8ff"; ctx.lineWidth = pr.heavyRain ? 7 : 4;
+      ctx.beginPath(); ctx.moveTo(-96, 0); ctx.lineTo(-8, 0); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    if (hot) {
+      // v0.7：强力箭 = 细长拖光 + 箭头菱环（不做旋转星芒，避免看成"轮子"）
+      const fade = clamp(pr.life / 0.25, 0, 1);
+      const gold = pr.heavyRain ? "#fff0b8" : "#ffd76e";
+      ctx.globalAlpha = 0.30 * fade;
+      ctx.strokeStyle = gold; ctx.lineWidth = 5; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-72, 0); ctx.lineTo(-6, 0); ctx.stroke();
+      ctx.globalAlpha = 0.75 * fade;
+      ctx.strokeStyle = "#fff6cc"; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(-44, 0); ctx.lineTo(-4, 0); ctx.stroke();
+      // 箭头菱环
+      ctx.globalAlpha = 0.5 * fade;
+      ctx.strokeStyle = gold; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(8, -8); ctx.lineTo(30, 0); ctx.lineTo(8, 8); ctx.lineTo(2, 0); ctx.closePath(); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = hot ? (pr.heavyRain ? "#fff0b8" : "#ffe27a") : "#d8c9a0"; ctx.lineWidth = hot ? 4 : 3; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(8, 0); ctx.stroke();
+    ctx.fillStyle = hot ? "#fffbe8" : "#eef2f7";
+    ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(hot ? 26 : 20, hot ? -6 : -4); ctx.lineTo(hot ? 26 : 20, hot ? 6 : 4); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 0.45;
+    ctx.strokeStyle = hot ? "#ffdd6699" : "#ffffff88"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(-58, 0); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---------- 世界 ----------
+const GROUND = H - 110;
+// v0.6：世界长度按关卡动态生成（向前探索的长路），不再是固定擂台
+let WORLD_W = 4600;
+let camera = { x: 0 };
+// 玩家可前进的右边界：被关口拦路时收窄，清怪后放开（防跑图刷怪）
+function maxX(){ return Math.min(WORLD_W, game.limitX === undefined ? WORLD_W : game.limitX) - 30; }
+
+// ---------- 玩家 ----------
+const player = {
+  x: 300, y: GROUND, vx: 0, vy: 0, facing: 1, onGround: true,
+  hp: playerMaxHp(),
+  state: "idle",          // idle/run/attack/dodge/hurt/charge
+  stage: 0,               // 连段 1..3（0 = 无）
+  phase: "windup",        // windup/active/recovery
+  phaseT: 0, hitSet: null, swingId: 0,
+  comboT: 0, buffered: false,
+  chargeT: 0, charged: false,
+  dodgeT: 0, dodgeDir: 1, iframesT: 0, dodgeCDT: 0,
+  hurtT: 0, invulnT: 0,
+  nextCrit: false,
+  airOk: true,
+  animT: 0,
+  weapon: "sword",       // sword / bow / spear（Q 轮换）
+  skillCDs: { sword: [0, 0, 0], bow: [0, 0, 0], spear: [0, 0, 0] },  // 武器技能冷却（U/I/O）
+  skillT: 0, skillFired: false, // 技能计时（剑气发射标记）
+  whirlHits: 0,          // 乱舞已判定段数
+  shootCharged: false,   // 弓蓄力标记
+  iaiT: 0, iaiHit: null, // 居合/突龙计时与命中集
+  rainN: 0,              // 箭雨已落下箭数
+  blockT: 0,             // 格挡已持续时长（≤0.18s 内受击 = 完美格挡）
+  stats: { hitsTaken: 0, perfect: 0, threats: 0, deathWhileAttacking: 0, kills: 0, attacks: 0, parries: 0, blocked: 0 },
+  runX: 0,
+};
+function resetPlayer(fullHp){
+  if (fullHp) player.hp = playerMaxHp();
+  player.x = 300; player.y = GROUND; player.vx = 0; player.vy = 0;
+  player.state = "idle"; player.stage = 0; player.comboT = 0; player.chargeT = 0;
+  player.iframesT = 0; player.hurtT = 0; player.invulnT = 0; player.nextCrit = false;
+  player.buffered = false; player.nextStage = 1; player.phase = "windup"; player.phaseT = 0;
+  for (const w of WEAPON_ORDER) player.skillCDs[w] = [0, 0, 0];
+  player.skillT = 0; player.skillFired = false;
+  player.whirlHits = 0; player.shootCharged = false;
+  player.iaiT = 0; player.iaiHit = null; player.rainN = 0; player.blockT = 0;
+  player.volleyN = 0; player.sweepN = 0; player.rainHeavy = false;
+  player.windDir = 1; player.windShot1 = false; player.windShot2 = false; player.lungeTick = -1;
+  player.weapon = "sword";
+  jumpBufAt = -1; dodgeBufAt = -1; switchBufAt = -1;   // v0.5：输入缓冲跨局清零（防泄漏）
+  skillBufAt = [-1, -1, -1];                            // v0.8：技能缓冲同步清零
+  game.paused = false;                                  // 新局强制解除暂停
+  player.stats = { hitsTaken: 0, perfect: 0, threats: 0, deathWhileAttacking: 0, kills: 0, attacks: 0, parries: 0, blocked: 0 };
+}
+const ATK_STAGES = [
+  { windup: 0.10, active: 0.10, recovery: 0.20, range: 80, h: 60, knock: 40, stagger: 0.25, heavy: false },
+  { windup: 0.08, active: 0.10, recovery: 0.20, range: 80, h: 60, knock: 50, stagger: 0.25, heavy: false },
+  { windup: 0.16, active: 0.12, recovery: 0.30, range: 100, h: 70, knock: 160, stagger: 0.5, heavy: false },
+];
+const HEAVY_ATK = { windup: 0.08, active: 0.14, recovery: 0.42, range: 130, h: 80, knock: 240, stagger: 0.8, heavy: true };
+const AIR_ATK = { windup: 0.07, active: 0.30, recovery: 0.16, range: 78, h: 110, knock: 130, stagger: 0.5, heavy: true };  // 空中下劈：判定竖直拉满，重击属性破盾
+const SHOOT = { windup: 0.14, active: 0.06, recovery: 0.26 };   // 弓：拉弦→放箭→收势
+// 长枪突刺段（判定远、出招快、单发轻；第三段大横扫）
+const SPEAR_STAGES = [
+  { windup: 0.07, active: 0.09, recovery: 0.15, range: 150, h: 42, knock: 30, stagger: 0.2, heavy: false },
+  { windup: 0.06, active: 0.09, recovery: 0.15, range: 150, h: 42, knock: 30, stagger: 0.2, heavy: false },
+  { windup: 0.11, active: 0.11, recovery: 0.25, range: 185, h: 48, knock: 130, stagger: 0.4, heavy: false },
+];
+const SPEAR_HEAVY = { windup: 0.07, active: 0.16, recovery: 0.34, range: 215, h: 52, knock: 280, stagger: 0.7, heavy: true };
+// 当前攻击参数统一入口（防 stage 越界，武器感知）
+function stageStats(){
+  const w = player.weapon;
+  if (player.stage === -1) return w === "spear" ? SPEAR_HEAVY : HEAVY_ATK;
+  if (player.stage === 4) return AIR_ATK;
+  const tbl = w === "spear" ? SPEAR_STAGES : ATK_STAGES;
+  return tbl[clamp(player.stage, 1, 3) - 1];
+}
+
+function playerAttackDamage(){
+  let base;
+  const w = player.weapon;
+  if (player.stage === -1) base = w === "spear" ? BASE.spearHeavy : BASE.heavy;
+  else if (player.stage === 4) base = BASE.airAtk;
+  else base = (w === "spear" ? BASE.spear : BASE.atk)[player.stage - 1];
+  return base * dmgMult();
+}
+
+// ---------- 宠物：灵狐（随人物**每一级**进化：颜色渐变 + 特征逐级解锁） ----------
+let pet = null;
+// 灵狐品阶：1-4 白狐 / 5-9 青狐 / 10-14 金狐 / 15+ 紫狐
+function petTier(){ const lv = SAVE.pLv; return lv >= 15 ? 3 : lv >= 10 ? 2 : lv >= 5 ? 1 : 0; }
+const PET_LOOKS = [
+  { name: "白灵狐", color: "#e8f4ff", aura: "#ffffff" },
+  { name: "青霜狐", color: "#7fd4ff", aura: "#9fe8ff" },
+  { name: "金曜狐", color: "#ffe66e", aura: "#ffd700" },
+  { name: "紫电狐", color: "#c9a0ff", aura: "#b08aff" },
+];
+const PET_TIER_START = [1, 5, 10, 15];
+function petLook(){ return PET_LOOKS[petTier()]; }
+// v0.4：颜色在品阶带内向下一品阶逐级渐变——每一级都肉眼可见地"变高级"
+function lerpHex(a, b, t){
+  const pa = [parseInt(a.slice(1,3),16), parseInt(a.slice(3,5),16), parseInt(a.slice(5,7),16)];
+  const pb = [parseInt(b.slice(1,3),16), parseInt(b.slice(3,5),16), parseInt(b.slice(5,7),16)];
+  return "rgb(" + pa.map((v,i) => Math.round(v + (pb[i] - v) * t)).join(",") + ")";
+}
+function petBodyColor(){
+  const tier = petTier(), lv = SAVE.pLv;
+  const start = PET_TIER_START[tier], end = tier < 3 ? PET_TIER_START[tier + 1] : start + 5;
+  const t = clamp((lv - start) / (end - start), 0, 1);
+  return lerpHex(PET_LOOKS[tier].color, PET_LOOKS[Math.min(3, tier + 1)].color, t * 0.85);
+}
+// 特征逐级解锁表（v0.4：样式越来越高级）
+function petFeat(){
+  const lv = SAVE.pLv;
+  return {
+    tailTip:  lv >= 2,    // Lv2  尾尖光点
+    eyeGlow:  lv >= 3,    // Lv3  眼瞳发光（品阶色）
+    tailGleam: lv >= 4,   // Lv4  尾巴描边发光
+    twinTail: lv >= 6,    // Lv6  双尾
+    tailFlame: lv >= 8,   // Lv8  移动带尾焰微粒
+    starOrbit: lv >= 10,  // Lv10 环绕星辉
+    doubleAura: lv >= 12, // Lv12 双层光环
+    haloCrown: lv >= 15,  // Lv15 头顶光环冠冕
+  };
+}
+function petGlow(){ return clamp(0.35 + (SAVE.pLv - 1) * 0.05, 0.35, 1); }   // 辉光强度随级增长
+function petSize(){ return 0.9 + Math.min(0.55, (SAVE.pLv - 1) * 0.045); }
+function petAtkInterval(){ return Math.max(1.7, 3.8 - (SAVE.pLv - 1) * 0.16); }   // 等级越高出手越勤
+function petBoltDmg(){ return 6 + (SAVE.pLv - 1) * 2; }                            // 独立成长曲线
+function petName(){ return petLook().name + " · " + SAVE.pLv + "阶"; }
+function resetPet(){
+  pet = { x: player.x - 60, y: player.y - 100, vx: 0, vy: 0, atkT: 1.2, animT: 0, bobT: 0 };
+}
+function nearestEnemy(x, y){
+  let best = null, bd = Infinity;
+  for (const e of enemies) {
+    if (e.dead) continue;
+    const d = Math.hypot(e.x - x, (e.y - 55 * e.scale) - y);
+    if (d < bd) { bd = d; best = e; }
+  }
+  return best;
+}
+function updatePet(dt){
+  if (!pet) return;
+  pet.animT += dt; pet.bobT += dt;
+  // 弹性跟随：目标悬于人物后上方
+  const tx = clamp(player.x - player.facing * 62, 40, WORLD_W - 40);
+  const ty = player.y - 108 + Math.sin(pet.bobT * 2.6) * 10;
+  const k = 1 - Math.pow(0.0025, dt);
+  pet.vx = (tx - pet.x) * 6.5; pet.vy = (ty - pet.y) * 6.5;
+  pet.x += pet.vx * k * 0.16; pet.y += pet.vy * k * 0.16;
+  // 尾迹微光（等级越高越密）；Lv8+ 尾焰微粒
+  const feat = petFeat();
+  const trailChance = 0.15 + (SAVE.pLv - 1) * 0.02;
+  if (Math.abs(pet.vx) > 200 && Math.random() < trailChance) {
+    particles.push({ x: pet.x, y: pet.y + 4, vx: rand(-40, 40), vy: rand(-20, 30), life: 0.4, t: 0, color: petLook().aura, len: 6 });
+  }
+  if (feat.tailFlame && game.state === "play" && Math.random() < 0.5) {
+    const back = -player.facing;
+    particles.push({ x: pet.x + back * 12, y: pet.y + 2, vx: back * rand(60, 140), vy: rand(-60, -10), life: 0.35, t: 0, color: petLook().aura, len: 8 });
+  }
+  // 自动攻击：周期性对最近敌人放灵弹
+  pet.atkT -= dt;
+  if (pet.atkT <= 0) {
+    const tgt = nearestEnemy(pet.x, pet.y);
+    if (tgt && game.state === "play") {
+      pet.atkT = petAtkInterval();
+      const dx = tgt.x - pet.x, dy = (tgt.y - 55 * tgt.scale) - pet.y;
+      const dist = Math.hypot(dx, dy) + 0.01;
+      const spd = 760;
+      projectiles.push({
+        kind: "pet", pet: true, target: tgt,
+        x: pet.x, y: pet.y, vx: dx / dist * spd, vy: dy / dist * spd,
+        life: 2.6, dmg: petBoltDmg(),
+        st: { heavy: false, knock: 50, stagger: 0.22 },
+        pierce: false, hitSet: null,
+      });
+      ring(pet.x, pet.y, 30, petLook().aura);
+      burst(pet.x, pet.y, petLook().color, 4, 180);
+    } else {
+      pet.atkT = 0.4;   // 无敌人时短轮询
+    }
+  }
+}
+function drawPet(){
+  if (!pet || game.state === "death") return;
+  const look = petLook();
+  const feat = petFeat();
+  const s = petSize();
+  const body = petBodyColor();
+  const glow = petGlow();
+  const bx = pet.x, by = pet.y;
+  // 光环（Lv2+ 起随级增强；Lv12+ 双层）
+  if (petTier() >= 1 || SAVE.pLv >= 2) {
+    ctx.save();
+    ctx.globalAlpha = glow * (0.25 + 0.12 * Math.sin(pet.animT * 6));
+    ctx.strokeStyle = look.aura; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(bx, by + 6, 26 * s, 10 * s, 0, 0, Math.PI * 2); ctx.stroke();
+    if (feat.doubleAura) {
+      ctx.globalAlpha = glow * (0.18 + 0.08 * Math.sin(pet.animT * 6 + 2));
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(bx, by + 6, 36 * s, 14 * s, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // Lv10+ 环绕星辉：三颗小星绕体旋转
+  if (feat.starOrbit) {
+    ctx.save();
+    ctx.fillStyle = look.aura;
+    for (let i = 0; i < 3; i++) {
+      const ang = pet.animT * 2.4 + i * Math.PI * 2 / 3;
+      const sx = bx + Math.cos(ang) * 24 * s, sy = by + Math.sin(ang) * 12 * s - 6;
+      ctx.globalAlpha = 0.5 + 0.4 * Math.sin(pet.animT * 5 + i);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - 3); ctx.lineTo(sx + 2.6, sy); ctx.lineTo(sx, sy + 3); ctx.lineTo(sx - 2.6, sy);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.translate(bx, by);
+  const face = player.facing;
+  ctx.scale(face, 1);
+  ctx.strokeStyle = feat.tailGleam ? body : body;
+  ctx.fillStyle = body;
+  ctx.lineWidth = Math.max(2, 2.6 * s);
+  ctx.lineCap = "round";
+  // 尾巴：S 形摆动；Lv6+ 双尾（辉光用宽描边替代 shadowBlur，便宜 5-10 倍）
+  const wag = Math.sin(pet.animT * 7) * 6 * s;
+  const drawTail = (ox, oy, alpha) => {
+    ctx.globalAlpha = alpha;
+    if (feat.tailGleam) {   // Lv2+ 尾迹辉光：底层宽描
+      ctx.globalAlpha = alpha * 0.3 * glow;
+      ctx.strokeStyle = look.aura; ctx.lineWidth = Math.max(3, 6 * s);
+      ctx.beginPath();
+      ctx.moveTo(-10 * s + ox, 2 + oy);
+      ctx.quadraticCurveTo(-20 * s + ox, -2 + wag + oy, -26 * s + ox, -8 + wag * 1.4 + oy);
+      ctx.stroke();
+      ctx.strokeStyle = body; ctx.lineWidth = Math.max(2, 2.6 * s);
+      ctx.globalAlpha = alpha;
+    }
+    ctx.beginPath();
+    ctx.moveTo(-10 * s + ox, 2 + oy);
+    ctx.quadraticCurveTo(-20 * s + ox, -2 + wag + oy, -26 * s + ox, -8 + wag * 1.4 + oy);
+    ctx.stroke();
+    // Lv2+ 尾尖光点
+    if (feat.tailTip) {
+      const tipX = -26 * s + ox, tipY = -8 + wag * 1.4 + oy;
+      ctx.fillStyle = look.aura;
+      ctx.beginPath(); ctx.arc(tipX, tipY, 2.6 * s, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = body;
+    }
+    ctx.globalAlpha = 1;
+  };
+  drawTail(0, 0, 1);
+  if (feat.twinTail) drawTail(-3 * s, -8 * s, 0.65);
+  // 身体（椭圆）
+  ctx.beginPath(); ctx.ellipse(0, 2, 11 * s, 8.5 * s, 0, 0, Math.PI * 2); ctx.fill();
+  // 头（圆）+ 双耳（三角）；耳尖随级发光（椭圆底光替代 shadowBlur）
+  ctx.beginPath(); ctx.arc(9 * s, -4 * s, 6.5 * s, 0, Math.PI * 2); ctx.fill();
+  if (SAVE.pLv >= 4) {
+    ctx.globalAlpha = 0.32 * glow; ctx.fillStyle = look.aura;
+    ctx.beginPath(); ctx.ellipse(9 * s, -11 * s, 7.5 * s, 8 * s, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.fillStyle = body;
+  }
+  for (const exo of [-2.5, 2.5]) {
+    ctx.beginPath();
+    ctx.moveTo(9 * s + exo * s * 0.9 - 2 * s, -8 * s);
+    ctx.lineTo(9 * s + exo * s * 0.9 + 1.5 * s, -8 * s);
+    ctx.lineTo(9 * s + exo * s * 0.9 - 0.3 * s, -15.5 * s);
+    ctx.closePath(); ctx.fill();
+  }
+  // Lv15+ 头顶光环冠冕
+  if (feat.haloCrown) {
+    ctx.globalAlpha = 0.55 + 0.25 * Math.sin(pet.animT * 4);
+    ctx.strokeStyle = look.aura; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.ellipse(9 * s, -22 * s, 7 * s, 2.6 * s, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  // 眼睛：Lv3 前黑瞳，Lv3+ 品阶色发光瞳（双层圆替代 shadowBlur）
+  if (feat.eyeGlow) {
+    ctx.fillStyle = look.aura;
+    ctx.beginPath(); ctx.arc(11.5 * s, -5 * s, 2.2 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(11.5 * s, -5 * s, 0.9 * s, 0, Math.PI * 2); ctx.fill();
+  } else {
+    ctx.fillStyle = "#0b0d10";
+    ctx.beginPath(); ctx.arc(11.5 * s, -5 * s, 1.3 * s, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ---------- 敌人 ----------
+let enemies = [];
+const ENEMY_TYPES = {
+  grunt:  { name: "刀客", color: "#d9534f", speed: 170, hp: 30,  atk: 15, range: 70,  tele: 0.40, active: 0.14, recovery: 0.6, scale: 1.0, drops: { xt: [2, 4] } },
+  spear:  { name: "枪兵", color: "#d9a441", speed: 135, hp: 34,  atk: 18, range: 150, tele: 0.55, active: 0.16, recovery: 0.75, scale: 1.0, drops: { xt: [2, 4] } },
+  shield: { name: "盾卫", color: "#7a8ba0", speed: 85,  hp: 45,  atk: 12, range: 60,  tele: 0.50, active: 0.14, recovery: 0.7, scale: 1.05, shieldHp: 26, drops: { xt: [3, 5] } },
+};
+function spawnEnemy(typeKey, elite, x){
+  const t = ENEMY_TYPES[typeKey];
+  const n = game.trial;
+  const e = {
+    type: typeKey, elite: !!elite,
+    x: clamp(x, 40, WORLD_W - 40), y: GROUND, facing: x > player.x ? -1 : 1,
+    maxHp: t.hp * floorHp(n) * (elite ? 4 : 1) * (typeKey === "boss" ? 1 : 1),
+    atk: t.atk * floorAtk(n) * (elite ? 1.3 : 1),
+    state: "approach",   // approach/telegraph/attack/recover/stagger
+    t: 0, swingDone: false, perfectArmed: true,
+    staggerT: 0, hp: 0,
+    teleT: 0,
+    speed: t.speed * (elite ? 1.15 : 1),
+    _tele: t.tele, _active: t.active, _recovery: t.recovery, _range: t.range,
+    scale: t.scale * (elite ? 1.25 : 1),
+    color: elite ? "#ff2211" : t.color,
+    drops: t.drops, hitFlash: 0,
+  };
+  // 盾卫：盾牌有耐久（正面轻击磨盾，重击高效破盾；破盾后永久失去格挡）
+  if (typeKey === "shield") {
+    e.shieldMax = (t.shieldHp || 26) * floorHp(n) * (elite ? 1.8 : 1);
+    e.shieldHp = e.shieldMax;
+    e.shieldBroken = false;
+    e.shieldFlash = 0;
+  }
+  e.hp = e.maxHp;
+  enemies.push(e);
+  return e;
+}
+
+// ---------- BOSS（GDD §4.3：3 阶段守关员；关卡模式下每关关底换脸） ----------
+const BOSS_LOOKS = [
+  { name: "狱主·血屠", color: "#c9302c", scale: 1.9, tip: "巨刃横斩" },
+  { name: "刀魔·断岳", color: "#8a2be2", scale: 1.85, tip: "残影连斩" },
+  { name: "枪王·贯岳", color: "#c9a015", scale: 1.95, tip: "百步穿枪" },
+  { name: "弓煞·蚀月", color: "#1f9e6e", scale: 1.8, tip: "连珠箭雨" },
+  { name: "血神·吞天", color: "#e02020", scale: 2.05, tip: "嗜血狂潮" },
+];
+function bossLook(n){ return BOSS_LOOKS[(n - 1) % BOSS_LOOKS.length]; }
+function spawnBoss(){
+  const n = game.trial;
+  const look = bossLook(n);
+  const b = {
+    type: "boss", elite: false, isBoss: true,
+    x: level.bossGateX + 420, y: GROUND, facing: -1,
+    maxHp: 600 * floorHp(n), hp: 0, atk: 22 * floorAtk(n),
+    state: "idle", t: 0, moveT: 0, swingDone: false, perfectArmed: true,
+    phase: 1, enrage: 1, staggerImmune: true,
+    scale: look.scale, color: look.color, drops: { xt: [40, 60], jp: [20, 20], cy: [5, 5] },
+    hitFlash: 0, teleT: 0, _tele: 0, _active: 0, _recovery: 0, _range: 0, staggerT: 0,
+  };
+  b.hp = b.maxHp;
+  enemies.push(b);
+  return b;
+}
+
+// ---------- 关卡推进（v0.6：向前探索 → 关口拦路 → 斩敌开路） ----------
+const level = { len: 6200, seg: 820, gates: [], idx: -1, bossGateX: 6200, bossArmed: false, bossSpawned: false, cleared: 0 };
+const WAVE_COMPOSITIONS = [
+  ["grunt", "grunt", "grunt"],
+  ["grunt", "spear", "grunt"],
+  ["grunt", "spear", "shield", "grunt"],
+  ["spear", "shield", "grunt", "spear"],
+  ["grunt", "spear", "shield", "grunt", "grunt"],
+  ["spear", "spear", "shield", "shield", "grunt", "grunt"],
+];
+function buildLevel(){
+  level.len = 6200 + (game.trial - 1) * 350;
+  const firstGate = 520, lastGate = level.len - 700;
+  level.seg = (lastGate - firstGate) / Math.max(1, game.waveTotal - 1);
+  WORLD_W = level.len + 1100;
+  level.gates = [];
+  for (let i = 1; i <= game.waveTotal; i++) {
+    level.gates.push({ i, x: firstGate + (i - 1) * level.seg, spawned: false, cleared: false });
+  }
+  level.idx = -1; level.cleared = 0;
+  level.bossGateX = level.len;
+  level.bossArmed = false; level.bossSpawned = false;
+  game.limitX = WORLD_W - 30;
+  buildBackdrop();
+}
+
+// ---------- 波次管理（关卡模式：每关 6 道关口 + 关底 BOSS） ----------
+const game = {
+  state: "title",   // title/forge/play/waveBanner/death/victory
+  paused: false,    // v0.5：P/Esc 暂停（时间冻结，仅 UI 可交互）
+  trial: 1, wave: 0, waveTotal: 6,
+  limitX: 99999,    // v0.6：当前可前进的右边界（关口拦路时收窄）
+  transit: { active: false, t: 0, dur: 1.6, switched: false },   // v0.6：山门传送转场
+  bannerT: 0, bannerText: "",
+  roundXt: 0, roundJp: 0, roundCy: 0, roundXp: 0,
+  uiButtons: [],
+  forgeMsg: "", forgeMsgT: 0,
+};
+function startRun(){
+  game.state = "play"; game.trial = SAVE.trialLevel; game.wave = 0;
+  game.roundXt = 0; game.roundJp = 0; game.roundCy = 0; game.roundXp = 0;
+  if (!game.transit || !game.transit.active) game.transit = { active: false, t: 0, dur: 1.6, switched: false };
+  buildLevel();
+  enemies = []; particles.length = 0; dmgTexts.length = 0; orbs.length = 0; projectiles.length = 0;
+  blasts.length = 0;
+  portal = null;
+  resetPlayer(true);
+  resetPet();
+  camera.x = 0;
+  AudioSys.setKey(game.trial);   // 每关换调（听觉上的关卡推进）
+  AudioSys.setMood("explore");
+  nextWave();
+}
+function nextWave(){
+  game.wave++;
+  if (game.wave > game.waveTotal) { // 终点：关底 BOSS
+    level.bossArmed = true;
+    game.state = "waveBanner"; game.bannerT = 1.5;
+    game.bannerText = "第 " + game.trial + " 关 · " + bossLook(game.trial).name + " 在前方拦路";
+    return;
+  }
+  game.state = "waveBanner"; game.bannerT = 1.25;
+  game.bannerText = "第 " + game.trial + " 关 · 波次 " + game.wave + " / " + game.waveTotal + " · 向前推进（→ / D）";
+}
+// 关口：玩家推进到附近才刷怪（敌人从前方涌出，同时封住去路）
+function updateStageProgress(){
+  if (game.state !== "play") return;
+  if (level.bossArmed) {
+    if (!level.bossSpawned && player.x >= level.bossGateX - 420) {
+      level.bossSpawned = true;
+      const look = bossLook(game.trial);
+      game.state = "waveBanner"; game.bannerT = 1.6;
+      game.bannerText = "第 " + game.trial + " 关 · " + look.name + " 拦路";
+      spawnBoss();
+      S().bossIn();
+      shake = Math.max(shake, 8);
+    }
+    return;
+  }
+  const g = level.gates[game.wave - 1];
+  if (!g || g.spawned) return;
+  if (player.x >= g.x - 300) { g.spawned = true; level.idx = g.i - 1; spawnGateWave(g); }
+}
+function spawnGateWave(g){
+  const w = g.i, n = game.trial;
+  const comp = WAVE_COMPOSITIONS[clamp(w, 1, 6) - 1];
+  comp.forEach((k, i) => spawnEnemy(k, w >= 3 && i === comp.length - 1, g.x + 220 + i * 132));
+  if (w >= 4) spawnEnemy("spear", false, player.x - 460);           // 后方包抄（前后夹击压迫感）
+  for (let i = 0; i < Math.min(3, n - 1); i++) spawnEnemy("grunt", false, g.x + 400 + i * 120);
+  game.limitX = Math.max(player.x + 30, g.x - 10);                   // 封住去路，必须清场
+  shake = Math.max(shake, 5); hitstop = Math.max(hitstop, 0.045);
+  dmgText(g.x, GROUND - 215, "前方有人拦路", "#ffcc66", false);
+  S().gate();
+}
+function gateCleared(g){
+  g.cleared = true; level.cleared++;
+  game.limitX = WORLD_W - 30;                                        // 通路解开，继续向前
+  const jp = randi(1, 2); game.roundJp += jp;
+  dropOrb(g.x + 60, GROUND - 120, "jp", jp);
+  dmgText(g.x, GROUND - 205, "通路已开 · 继续向前推进", "#7fe89a", false);
+  ring(g.x, GROUND - 100, 160, "#7fe89a");
+  S().gateOpen();
+  nextWave();
+}
+
+// ---------- 山门（通关传送门）：BOSS 倒下后开启，踏入即传送到下一关 ----------
+let portal = null;
+function openPortal(x){
+  portal = { x, y: GROUND, t: 0 };
+  burst(x, GROUND - 130, "#ffe9a8", 26, 420);
+  burst(x, GROUND - 130, "#9fe8ff", 16, 300);
+  ring(x, GROUND - 130, 200, "#ffe9a8");
+  starRing(x, GROUND - 130, 240, "#ffe9a8");
+  shake = Math.max(shake, 7);
+  S().portalOpen();
+}
+function startTransit(){
+  if (game.transit.active) return;
+  game.transit = { active: true, t: 0, dur: 1.6, switched: false };
+  S().portalEnter();
+}
+function grantRoundMaterials(){
+  // 未拾取的素材球自动入账（结算兜底，P3：任何一局收获为正）；升级物品直接生效入档
+  for (const o of orbs) {
+    if (o.kind === "xt") game.roundXt += o.amount;
+    if (o.kind === "jp") game.roundJp += o.amount;
+    if (o.kind === "cy") game.roundCy += o.amount;
+    if (o.kind === "gem") applyGem(o.sub);
+  }
+  orbs.length = 0;
+  SAVE.xt += game.roundXt; SAVE.jp += game.roundJp; SAVE.cy += game.roundCy;
+  persist();   // xp/pLv 由 grantXp 即时入账，这里兜底保存余量进度
+}
+
+// ---------- UI 键盘/点按 ----------
+function handleUIKey(k){
+  // v0.5：P/Esc 暂停 · B 局中存档 · M 静音（S 防护 = 格挡键，见 §4.1）
+  const lower = k.length === 1 ? k.toLowerCase() : k;
+  if (lower === "p" || k === "Escape") togglePause();
+  else if (lower === "m") { const mu = AudioSys.toggleMute(); toast(mu ? "已静音（M 恢复）" : "声音开启"); }
+  else if (lower === "b") bankProgress();
+  else if (game.state === "victory" && (k === " " || k === "Enter" || lower === "k" || lower === "j")) startTransit();   // 踏入山门
+}
+function togglePause(){
+  if (game.state !== "play" && game.state !== "waveBanner") return;
+  game.paused = !game.paused;
+  if (game.paused) S().switch();   // 菜单点按音
+}
+function bankProgress(){
+  // B 键：局中即时存档——场上素材球/宝石兜底入账，素材入档，进度落盘（死亡也不丢）
+  if ((game.state !== "play" && game.state !== "waveBanner") || game.state === "title") return;
+  for (const o of orbs) {
+    if (o.kind === "xt") game.roundXt += o.amount;
+    if (o.kind === "jp") game.roundJp += o.amount;
+    if (o.kind === "cy") game.roundCy += o.amount;
+    if (o.kind === "gem") applyGem(o.sub);
+  }
+  orbs.length = 0;
+  const xt = game.roundXt, jp = game.roundJp, cy = game.roundCy;
+  SAVE.xt += xt; SAVE.jp += jp; SAVE.cy += cy;
+  game.roundXt = 0; game.roundJp = 0; game.roundCy = 0;
+  persist();
+  toast(xt + jp + cy > 0 ? ("进度已存档：玄铁 " + xt + " · 精魄 " + jp + " · 残页 " + cy) : "进度已存档（等级/经验/物品已永久有效）");
+  S().pickup();
+}
+function handleUIPoint(p){
+  // v0.5：战斗中也可点 HUD 右上角 ⏸ 图标；命中任何 UI 按钮即吞掉本次点击
+  for (const b of game.uiButtons) {
+    if (p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h) {
+      if (b.enabled !== false) b.cb(); else toast("素材不足");
+      return true;
+    }
+  }
+  if (game.state === "play" && !game.paused) return false;
+  return game.state !== "play" || game.paused;
+}
+function uiBtn(x, y, w, h, label, cb, enabled){
+  game.uiButtons.push({ x, y, w, h, label, cb, enabled: enabled !== false });
+}
+
+// ---------- 主更新 ----------
+function update(dtReal){
+  if (game.paused) return;   // v0.5：暂停时世界冻结（渲染继续）
+  nowSec += dtReal;
+  AudioSys.tick();
+  // v0.6：山门传送转场——半程切关，全程冻结世界
+  if (game.transit.active) {
+    const tr = game.transit;
+    tr.t += dtReal;
+    if (!tr.switched && tr.t >= tr.dur * 0.5) { tr.switched = true; startRun(); }
+    if (tr.t >= tr.dur) { tr.active = false; }
+    return;
+  }
+  // v0.8 丝滑改造：打击停顿只"钉住"敌人（近乎冻结），玩家/宠物/特效/镜头全速更新——
+  // 打击感保留（敌人定格、震屏照播），但放技能、按键永远即时响应，不再有"卡了一下"的感觉
+  const frozen = hitstop > 0;
+  if (frozen) hitstop = Math.max(0, hitstop - dtReal);
+  // 剑意时刻：敌人侧时缓
+  enemyTimeScale = lerp(enemyTimeScale, timeScale, 1 - Math.pow(0.0001, dtReal));
+  timeScale = lerp(timeScale, 1, 1 - Math.pow(0.02, dtReal));
+
+  shakeX = rand(-shake, shake) + shakeDir * shake * 0.55;   // 定向震屏
+  shakeY = rand(-shake, shake);
+  shake = Math.max(0, shake - dtReal * 34);
+  shakeDir = lerp(shakeDir, 0, 1 - Math.pow(0.001, dtReal));
+  zoom = Math.max(0, zoom - dtReal * 0.24);                  // 镜头推近回弹
+  flashT = Math.max(0, flashT - dtReal);
+
+  if (game.state === "play" || game.state === "waveBanner") updateCombat(dtReal, frozen);
+  updateFx(dtReal);
+  // 相机
+  const target = clamp(player.x - W * 0.42, 0, WORLD_W - W);
+  camera.x = lerp(camera.x, target, 1 - Math.pow(0.001, dtReal));
+  if (game.state === "waveBanner") { game.bannerT -= dtReal; if (game.bannerT <= 0) game.state = "play"; }
+  if (game.state === "forge") game.forgeMsgT -= dtReal;
+}
+
+function updateFx(dt){
+  updatePetals(dt);   // v0.6：花瓣飘落（纯视觉）
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]; p.t += dt;
+    if (p.ring) { if (p.t > p.life) particles.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 900 * dt;
+    if (p.t > p.life) particles.splice(i, 1);
+  }
+  for (let i = dmgTexts.length - 1; i >= 0; i--) {
+    const d = dmgTexts[i]; d.t += dt; d.y += d.vy * dt; d.vy *= 0.94;
+    if (d.t > d.life) dmgTexts.splice(i, 1);
+  }
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    const o = orbs[i]; o.t += dt;
+    if (o.t < 0.6) { o.x += o.vx * dt; o.y += o.vy * dt; o.vy += 1400 * dt; if (o.y > GROUND - 8) { o.y = GROUND - 8; o.vy = 0; o.vx *= 0.8; } }
+    else { // 飞向玩家
+      const dx = player.x - o.x, dy = (player.y - 50) - o.y, dist = Math.hypot(dx, dy) + 0.01;
+      const spd = Math.min(900, 300 + o.t * 800);
+      o.x += dx / dist * spd * dt; o.y += dy / dist * spd * dt;
+      if (dist < 30) {
+        if (o.kind === "xt") game.roundXt += o.amount;
+        if (o.kind === "jp") game.roundJp += o.amount;
+        if (o.kind === "cy") game.roundCy += o.amount;
+        if (o.kind === "gem") { applyGem(o.sub); orbs.splice(i, 1); continue; }
+        dmgText(o.x, o.y - 20, "+" + o.amount + (o.kind === "xt" ? " 玄铁" : o.kind === "jp" ? " 精魄" : " 残页"), "#9fd6ff", false);
+        orbs.splice(i, 1);
+      }
+    }
+  }
+}
+
+// ---------- 战斗更新 ----------
+function updateCombat(dtReal, frozen){
+  const pdt = dtReal; // 玩家在剑意时刻/打击停顿中都不减速（反杀窗口 + 丝滑操作，GDD §4.2 / §6E）
+  const edt = dtReal * enemyTimeScale * (frozen ? 0.05 : 1);   // 打击停顿 = 敌人侧急冻
+  updatePlayer(pdt);
+  updatePet(pdt);       // 灵狐随玩家全速行动（不受敌方时缓）
+  for (const e of enemies) updateEnemy(e, edt);
+  updateProjectiles(frozen ? dtReal * 0.3 : dtReal);   // 投射物在顿帧里慢放（视觉），不吃敌方时缓
+  updateBlasts(pdt);        // v0.7：冲击波/风爆结算（同样不吃时缓）
+  // v0.6：向前探索——推进到关口才刷怪 / BOSS 拦路判定
+  updateStageProgress();
+  // 玩家攻击 → 命中判定
+  if (player.state === "attack" && player.phase === "active") checkPlayerHits();
+  // 敌人攻击 → 命中/完美闪避判定
+  for (const e of enemies) if (e.state === "attack" && !e.swingDone) checkEnemyHit(e);
+  // 清理死亡
+  for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].dead) enemies.splice(i, 1);
+  // 关口清场：解开去路，继续向前
+  if (enemies.length === 0 && game.state === "play" && !level.bossArmed) {
+    const g = level.gates[game.wave - 1];
+    if (g && g.spawned && !g.cleared) gateCleared(g);
+  }
+  // BGM 情绪跟随战况（探索 / 交战 / BOSS）
+  AudioSys.setMood(level.bossSpawned && enemies.some(e => e.isBoss) ? "boss" : (enemies.length > 0 ? "battle" : "explore"));
+  if (player.hp <= 0) onPlayerDeath();
+  if (game.state === "waveBanner") player.animT += pdt;
+}
+
+function updatePlayer(dt){
+  player.animT += dt;
+  player.dodgeCDT = Math.max(0, player.dodgeCDT - dt);
+  player.invulnT = Math.max(0, player.invulnT - dt);
+  player.iframesT = Math.max(0, player.iframesT - dt);
+  player.comboT = Math.max(0, player.comboT - dt);
+  for (const w of WEAPON_ORDER) for (let si = 0; si < 3; si++) player.skillCDs[w][si] = Math.max(0, player.skillCDs[w][si] - dt);
+
+  const wantDodge = (dodgeBtn || pressedThisFrame.has("l") || pressedThisFrame.has("L"));
+  const wantJump = (jumpBtnPressed || pressedThisFrame.has(" ") || pressedThisFrame.has("ArrowUp") || pressedThisFrame.has("k") || pressedThisFrame.has("K"));
+  const wantSkill = [
+    (skillReq[0] || pressedThisFrame.has("u") || pressedThisFrame.has("U")),
+    (skillReq[1] || pressedThisFrame.has("i") || pressedThisFrame.has("I")),
+    (skillReq[2] || pressedThisFrame.has("o") || pressedThisFrame.has("O")),
+  ];
+  const wantBlock = (blockBtn || keys["s"] || keys["S"]);   // S = 防护（格挡）键
+  const wantSwitch = (switchReq || pressedThisFrame.has("q") || pressedThisFrame.has("Q") || pressedThisFrame.has("Tab"));
+  // v0.5：按下的瞬间记缓冲时间戳（0.2-0.25s 内有效）
+  if (wantJump) jumpBufAt = nowSec;
+  if (wantDodge) dodgeBufAt = nowSec;
+  if (wantSwitch) switchBufAt = nowSec;
+  // ---- v0.8 丝滑三件套 ----
+  // ① 技能输入缓冲：任何状态（攻击/格挡/其他技能中）按下 U/I/O 都记录，0.35s 内进入可施放状态即触发
+  for (let si = 0; si < 3; si++) if (wantSkill[si]) skillBufAt[si] = nowSec;
+  const skillReady = si => (wantSkill[si] || (skillBufAt[si] > 0 && nowSec - skillBufAt[si] <= 0.35)) && player.skillCDs[player.weapon][si] <= 0;
+  const castNow = si => { skillBufAt[si] = -1; player.buffered = false; castWeaponSkill(si); };
+  // ② 技能与移动键同时生效：frac = 该技能允许的移速比例，canTurn = 是否允许转向
+  const steer = (frac, canTurn) => {
+    const d = inputDir();
+    if (d !== 0) { player.x = clamp(player.x + d * BASE.speed * frac * dt, 30, maxX()); if (canTurn) player.facing = d; }
+  };
+  // ③ 持续型技能中可起跳（跳跃缓冲同自由态）
+  const skillJump = () => {
+    if ((wantJump || (jumpBufAt > 0 && nowSec - jumpBufAt <= 0.2)) && player.onGround) {
+      jumpBufAt = -1; player.vy = BASE.jumpV; player.onGround = false; S().jump();
+    }
+  };
+
+  // ---- 受击硬直 ----
+  if (player.state === "hurt") {
+    player.hurtT -= dt;
+    player.x += player.vx * dt; player.vx *= Math.pow(0.01, dt);
+    physicsFall(dt);
+    if (player.hurtT <= 0) player.state = "idle";
+    return;
+  }
+  // ---- 闪避 ----
+  if (player.state === "dodge") {
+    player.dodgeT -= dt;
+    player.x = clamp(player.x + player.dodgeDir * BASE.dodgeSpeed * dt, 30, maxX());
+    physicsFall(dt);
+    if (player.dodgeT <= 0) { player.state = "idle"; }
+    return;
+  }
+  // ---- 刀技1：剑气·裂空（U） ----
+  if (player.state === "skill1") {
+    player.skillT += dt;
+    if (!player.skillFired && player.skillT >= 0.10) { player.skillFired = true; spawnWave(); }
+    if (player.skillT < 0.16) player.x = clamp(player.x + player.facing * 240 * dt, 30, maxX());  // 踏步送力
+    steer(0.55, false);   // v0.8：技能中可走位
+    skillJump();
+    physicsFall(dt);
+    if (player.skillT >= 0.32) { player.state = "idle"; }
+    return;
+  }
+  // ---- 刀技2：疾风乱舞（I，周身 4 段 AOE + 全程 i-frames） ----
+  if (player.state === "skill2") {
+    player.skillT += dt;
+    player.iframesT = Math.max(player.iframesT, 0.1);   // 旋舞期间不可被截断
+    const pulses = [0.15, 0.40, 0.65, 0.90];
+    while (player.whirlHits < 4 && player.skillT >= pulses[player.whirlHits]) {
+      player.whirlHits++;
+      ring(player.x, player.y - 55, 175, "#c9a0ff");
+      shake = Math.max(shake, 3);
+      for (const e of enemies) {
+        if (e.dead) continue;
+        const d = e.x - player.x;
+        if (Math.abs(d) < 170 && Math.abs(e.y - player.y) < 130) {
+          hitEnemy(e, BASE.skillWhirl * dmgMult(), { heavy: false, knock: 150, stagger: 0.45 }, Math.sign(d) || player.facing);
+        }
+      }
+    }
+    physicsFall(dt);
+    steer(0.5, false);   // v0.8：旋舞中可走位（移动旋风）
+    skillJump();
+    if (player.skillT >= 1.0) { player.state = "idle"; player.whirlHits = 0; }
+    return;
+  }
+  // ---- 刀技3：居合·一闪（O，前冲穿阵 + i-frames） ----
+  if (player.state === "iai") {
+    player.iaiT += dt;
+    player.iframesT = Math.max(player.iframesT, 0.05);
+    player.x = clamp(player.x + player.facing * 1500 * dt, 30, maxX());
+    player.iaiHit = player.iaiHit || new Set();
+    for (const e of enemies) {
+      if (e.dead || player.iaiHit.has(e)) continue;
+      if (Math.abs(e.x - player.x) < 90 && Math.abs(e.y - player.y) < 120) {
+        player.iaiHit.add(e);
+        hitEnemy(e, 26 * dmgMult("sword"), { heavy: true, knock: 170, stagger: 0.6 }, player.facing);
+      }
+    }
+    if (player.iaiT >= 0.22) { player.state = "idle"; player.iaiT = 0; player.iaiHit = null; }
+    steer(0.3, false);   // v0.8：冲刺中可微调走位
+    physicsFall(dt);
+    return;
+  }
+  // ---- 弓技1：裂云·贯日（U，三连贯穿箭 · 逐支命中同一目标可叠加） ----
+  if (player.state === "stormshot") {
+    player.skillT += dt;
+    const shots = [0.07, 0.18, 0.29];
+    while (player.volleyN < 3 && player.skillT >= shots[player.volleyN]) {
+      const k = player.volleyN++;
+      spawnArrow(true, { skill: true, dy: (k - 1) * 11, dmg: BASE.bowPierce, spd: 1500,
+        st: { heavy: true, knock: 120, stagger: 0.45 } });
+      punch(player.facing, 5); zoom = Math.max(zoom, 0.026);
+      flash("rgba(255,232,150,0.13)", 0.05);
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+    // 后坐：放完三箭身体被推回 40px，视觉上"箭在推人"
+    player.x = clamp(player.x - player.facing * 150 * dt, 30, maxX());
+    steer(0.65, true);   // v0.8：三连射中可风筝走位、可转向（后续箭随转向射出）
+    skillJump();
+    physicsFall(dt);
+    if (player.skillT >= 0.5) { player.state = "idle"; player.volleyN = 0; }
+    return;
+  }
+  // ---- 弓技2：万箭·天罗（I，十四箭覆地 + 收尾三天箭） ----
+  if (player.state === "rain") {
+    player.skillT += dt;
+    while (player.rainN < 14 && player.skillT >= player.rainN * 0.055) {
+      player.rainN++;
+      const tx = player.x + player.facing * rand(70, 470);
+      projectiles.push({ kind: "arrow", rain: true, x: tx, y: 40, vx: 0, vy: 1420,
+        life: 1.2, dmg: BASE.bowRain * dmgMult("bow"), st: { heavy: false, knock: 70, stagger: 0.3 }, pierce: false, hitSet: null });
+      if (player.rainN % 3 === 0) { burst(tx, 52, "#9fe8ff", 3, 110); shake = Math.max(shake, 1.5); }
+    }
+    if (!player.rainHeavy && player.skillT >= 0.9) {
+      player.rainHeavy = true;
+      for (let i = -1; i <= 1; i++) {
+        const tx = player.x + player.facing * (200 + i * 130);
+        projectiles.push({ kind: "arrow", rain: true, heavyRain: true, x: tx, y: 20, vx: 0, vy: 1750,
+          life: 1.3, dmg: BASE.bowRainHeavy * dmgMult("bow"), st: { heavy: true, knock: 240, stagger: 0.65 }, pierce: false, hitSet: null });
+        burst(tx, 24, "#ffe9a0", 6, 200);
+      }
+      shake = Math.max(shake, 7); zoom = Math.max(zoom, 0.03);
+      flash("rgba(255,235,160,0.2)", 0.1);
+      if (navigator.vibrate) navigator.vibrate(30);
+      dmgText(player.x, player.y - 150, "天 罗", "#ffe9a0", true);
+    }
+    if (player.skillT >= 1.35) { player.state = "idle"; player.rainN = 0; player.rainHeavy = false; player.skillT = 0; }
+    steer(0.6, true);   // v0.8：箭雨中可走位可转向（落点随人移动）
+    skillJump();
+    physicsFall(dt);
+    return;
+  }
+  // ---- 弓技3：疾风·回锋（O，后撤 + 原地风爆 + 回身双箭） ----
+  if (player.state === "windStep") {
+    player.skillT += dt;
+    player.iframesT = Math.max(player.iframesT, 0.08);
+    player.x = clamp(player.x + player.windDir * 900 * dt, 30, maxX());
+    if (!player.windShot1 && player.skillT >= 0.08) {
+      player.windShot1 = true;
+      spawnArrow(true, { skill: true, dmg: 16, spd: 1400, st: { heavy: false, knock: 160, stagger: 0.4 } });
+    }
+    if (!player.windShot2 && player.skillT >= 0.2) {
+      player.windShot2 = true;
+      spawnArrow(true, { skill: true, dy: -10, dmg: 16, spd: 1400, st: { heavy: false, knock: 160, stagger: 0.4 } });
+    }
+    // 后撤残影
+    if (Math.random() < 0.6) pushParticle({ x: player.x, y: player.y - 60, vx: player.windDir * 120, vy: 0, life: 0.24, t: 0, color: "#8ff0ff", len: 16 });
+    steer(0.35, false);   // v0.8：后撤中仍可微调走位
+    physicsFall(dt);
+    if (player.skillT >= 0.3) { player.state = "idle"; player.skillT = 0; player.windShot1 = false; player.windShot2 = false; }
+    return;
+  }
+  // ---- 枪技1：游龙·破阵（U，三段龙形穿刺 + 收招枪气） ----
+  if (player.state === "lunge") {
+    player.skillT += dt;
+    player.iframesT = Math.max(player.iframesT, 0.06);
+    player.x = clamp(player.x + player.facing * 1350 * dt, 30, maxX());
+    // 每 0.11s 换一段：重置命中表 → 同一敌人最多吃 3 段
+    const tick = Math.min(2, Math.floor(player.skillT / 0.11));
+    if (tick !== player.lungeTick) { player.lungeTick = tick; player.iaiHit = new Set(); }
+    player.iaiHit = player.iaiHit || new Set();
+    for (const e of enemies) {
+      if (e.dead || player.iaiHit.has(e)) continue;
+      if (Math.abs(e.x - player.x) < 120 && Math.abs(e.y - player.y) < 120) {
+        player.iaiHit.add(e);
+        hitEnemy(e, BASE.spearLunge * dmgMult("spear"), { heavy: false, knock: 60, stagger: 0.3 }, player.facing);
+      }
+    }
+    if (player.skillT >= 0.33) {
+      // 收招：枪尖炸开一团枪气（补一段 AoE，让突进不是"穿过去就完事"）
+      addBlast({ x: player.x + player.facing * 60, y: player.y - 40, r: 165,
+        dmg: 30 * dmgMult("spear"), color: "#a0ffd0", kind: "shock", dir: player.facing });
+      player.state = "idle"; player.skillT = 0; player.iaiHit = null; player.lungeTick = -1;
+    }
+    steer(0.3, false);   // v0.8：龙突中可微调走位
+    physicsFall(dt);
+    return;
+  }
+  // ---- 枪技2：横扫·千军破（I，双段 360° 横扫 · 无视盾牌） ----
+  if (player.state === "sweep") {
+    player.skillT += dt;
+    const pulses = [0.13, 0.38];
+    while (player.sweepN < 2 && player.skillT >= pulses[player.sweepN]) {
+      player.sweepN++;
+      const back = player.sweepN === 1 ? 1 : -1;      // 第二段反向回扫
+      ring(player.x, player.y - 55, 250, "#a0ffd0");
+      starRing(player.x, player.y - 55, 190, "#c8ffe8");
+      burst(player.x, GROUND, "#a0ffd0", 12, 520);
+      shake = Math.max(shake, 8); zoom = Math.max(zoom, 0.045);
+      flash("rgba(160,255,208,0.11)", 0.06);
+      if (navigator.vibrate) navigator.vibrate(35);
+      for (const e of enemies) {
+        if (e.dead) continue;
+        if (Math.abs(e.x - player.x) < 250 && Math.abs(e.y - player.y) < 140) {
+          hitEnemy(e, BASE.spearSweep * dmgMult("spear"),
+            { heavy: true, knock: 420, stagger: 0.9, ignoreShield: true }, Math.sign(e.x - player.x) || back);
+        }
+      }
+    }
+    physicsFall(dt);
+    steer(0.4, false);   // v0.8：横扫中可走位（扫着推过去）
+    if (player.skillT >= 0.62) { player.state = "idle"; player.skillT = 0; player.sweepN = 0; }
+    return;
+  }
+  // ---- 枪技3：坠天·裂地（O，腾空 → 落地三叠冲击波） ----
+  if (player.state === "drop") {
+    steer(0.45, false);   // v0.8：腾空下坠中可空中漂移
+    if (!player.onGround) { physicsFall(dt); return; }
+    if (!player.skillFired) {
+      player.skillFired = true; player.skillT = 0;
+      hitstop = 0.12; punch(player.facing, 11); zoom = Math.max(zoom, 0.07);
+      flash("rgba(200,255,225,0.32)", 0.14);
+      shake = Math.max(shake, 13);
+      if (navigator.vibrate) navigator.vibrate(60);
+      dmgText(player.x, player.y - 150, "裂 地", "#a0ffd0", true);
+      // 主冲击 + 两段延迟扩散（逐段衰减：46 → 22 → 17.6）
+      addBlast({ x: player.x, y: GROUND, r: 190, dmg: BASE.spearDrop * dmgMult("spear"), color: "#ccffe6", kind: "slam" });
+      addBlast({ x: player.x, y: GROUND, fuse: 0.15, dur: 0.5, r: 280,
+        dmg: BASE.spearWave * dmgMult("spear"), st: { heavy: true, knock: 460, stagger: 0.8 }, color: "#a0ffd0" });
+      addBlast({ x: player.x, y: GROUND, fuse: 0.3, dur: 0.55, r: 370,
+        dmg: BASE.spearWave * 0.8 * dmgMult("spear"), st: { heavy: false, knock: 300, stagger: 0.5 }, color: "#7fe8c0" });
+      // 地面碎石
+      for (let i = 0; i < 10; i++) {
+        pushParticle({ x: player.x + rand(-90, 90), y: GROUND, vx: rand(-320, 320), vy: rand(-620, -260),
+          life: rand(0.3, 0.7), t: 0, color: i % 2 ? "#6f7b6a" : "#a0ffd0", len: rand(6, 14) });
+      }
+    }
+    player.skillT += dt;
+    steer(0.3, false);   // v0.8：落定收招中仍可走位
+    if (player.skillT >= 0.4) { player.state = "idle"; player.skillT = 0; player.skillFired = false; }
+    return;
+  }
+  // ---- 格挡（S）：正面减伤 80%；起手 0.18s 内受击 = 完美格挡 ----
+  if (player.state === "block") {
+    player.blockT += dt;
+    // v0.8：格挡中按技能 = 收盾直接施放（防与攻无缝衔接）
+    for (let si = 0; si < 3; si++) if (skillReady(si)) { castNow(si); return; }
+    const d = inputDir();
+    player.x = clamp(player.x + d * 110 * dt, 30, maxX());   // 格挡中缓移
+    if (d !== 0) player.facing = d;
+    physicsFall(dt);
+    if (!wantBlock) { player.state = "idle"; }
+    return;
+  }
+  // ---- 弓射击 ----
+  if (player.state === "shoot") {
+    player.phaseT += dt;
+    // v0.8：收箭瞬间（recovery）可直接转技能——射击循环无缝接爆发
+    if (player.phase === "recovery") {
+      for (let si = 0; si < 3; si++) if (skillReady(si)) { castNow(si); return; }
+    }
+    if (player.phase === "windup" && player.phaseT >= SHOOT.windup) {
+      player.phase = "active"; player.phaseT = 0;
+      spawnArrow(player.shootCharged);
+      player.stats.attacks++;
+    }
+    else if (player.phase === "active" && player.phaseT >= SHOOT.active) { player.phase = "recovery"; player.phaseT = 0; }
+    else if (player.phase === "recovery" && player.phaseT >= SHOOT.recovery / atkSpeedMult()) {
+      player.state = "idle"; player.shootCharged = false;
+      // 松开泄漏消费（防再触发）
+      atkBtnReleased = false;
+    }
+    const d = inputDir();
+    player.x = clamp(player.x + d * 70 * dt, 30, maxX());
+    physicsFall(dt);
+    return;
+  }
+  // ---- 攻击中（含蓄力） ----
+  if (player.state === "charge") {
+    player.chargeT += dt;
+    const wasFull = player.charged;
+    player.charged = player.chargeT >= 0.35;
+    if (player.charged && !wasFull) S().bowFull();
+    const d = inputDir();
+    player.x = clamp(player.x + d * 60 * dt, 30, maxX());
+    physicsFall(dt);
+    if (atkBtnReleased) {
+      atkBtnReleased = false;
+      if (player.weapon === "bow") { startShoot(player.charged); }   // 弓：蓄力→强箭
+      else if (player.charged) startAttack(-1); // 重击
+      else startAttack(1);
+    }
+    return;
+  }
+  if (player.state === "attack") {
+    const st = stageStats();
+    player.phaseT += dt;
+    // 空中下劈：判定帧内加速坠落
+    if (player.stage === 4 && !player.onGround && player.phase !== "recovery") player.vy += 4200 * dt;
+    if (player.phase === "windup" && player.phaseT >= st.windup / atkSpeedMult()) { player.phase = "active"; player.phaseT = 0; player.hitSet = new Set(); player.swingId++; }
+    else if (player.phase === "active" && player.phaseT >= st.active) { player.phase = "recovery"; player.phaseT = 0; }
+    else if (player.phase === "recovery" && player.phaseT >= st.recovery / atkSpeedMult()) {
+      player.state = "idle"; player.stage = 0; player.phase = "windup";
+      // 连段缓冲
+      if (player.buffered) {
+        player.buffered = false;
+        const ns = player.nextStage === -1 ? -1 : (player.nextStage || 1);   // 防 NaN：未定义回退第 1 段
+        startAttack(ns === -1 ? -1 : Math.min(ns, 3));
+      }
+    }
+    // 攻击期间松开攻击键：长按≥0.35s → 缓冲重击；快速点按 → 只消费事件（防泄漏到空闲态再触发轻击）
+    if (atkBtnReleased) {
+      atkBtnReleased = false;
+      if (atkBtnDownAt >= 0 && nowSec - atkBtnDownAt >= 0.35) { player.buffered = true; player.nextStage = -1; }
+    }
+    // 攻击期间可缓冲输入
+    if (atkPressBufferedAt > 0 && nowSec - atkPressBufferedAt < 0.3) { player.buffered = true; player.nextStage = (player.stage === -1 ? 1 : player.stage + 1); }
+    // v0.5：收招期（recovery）可直接换武器——无延迟切枪
+    if (player.phase === "recovery" && (wantSwitch || (switchBufAt > 0 && nowSec - switchBufAt <= 0.25))) {
+      switchBufAt = -1;
+      doWeaponSwitch();
+      player.state = "idle"; player.phase = "windup"; player.phaseT = 0;
+      return;
+    }
+    // v0.8：收招期（recovery）可直接取消转技能——普攻连段无缝接技能
+    if (player.phase === "recovery") {
+      for (let si = 0; si < 3; si++) if (skillReady(si)) { castNow(si); return; }
+    }
+    // 攻击中小幅位移；长枪判定帧带突刺冲刺步（送力感）
+    const d = inputDir();
+    let moveSpd = 90;
+    if (player.weapon === "spear" && (player.phase === "active" || (player.phase === "recovery" && player.phaseT < 0.06))) {
+      player.x = clamp(player.x + player.facing * 300 * dt, 30, maxX());
+      moveSpd = 0;
+    }
+    player.x = clamp(player.x + d * moveSpd * dt, 30, maxX());
+    physicsFall(dt);
+    return;
+  }
+  // ---- 自由态：响应输入 ----
+  // 换武器（Q / Tab）：刀→长弓→长枪 三段轮换；支持 0.25s 缓冲（收招瞬间按也生效）
+  if (wantSwitch || (switchBufAt > 0 && nowSec - switchBufAt <= 0.25)) {
+    switchBufAt = -1;
+    doWeaponSwitch();
+    return;
+  }
+  // ---- 武器技能（U/I/O）：每武器三技能，独立 CD；v0.8 起含 0.35s 输入缓冲（任何状态按下都算数） ----
+  {
+    for (let si = 0; si < 3; si++) {
+      if (skillReady(si)) { castNow(si); return; }
+    }
+  }
+  // 格挡（S）：按住举武器，正面减伤 80%；起手 0.18s 内 = 完美格挡判定窗口
+  if (wantBlock && player.onGround) {
+    player.state = "block"; player.blockT = 0;
+    return;
+  }
+  // 长按转蓄力（0.12s 起蓄势，0.35s 蓄满）
+  if (atkBtnDown && nowSec - atkBtnDownAt > 0.12) {
+    player.state = "charge";
+    player.chargeT = nowSec - atkBtnDownAt;   // 蓄力计时含按住阶段：总长按 0.35s 蓄满（GDD §4.1）
+    player.charged = false;
+    atkBtnDown = false; atkPressBufferedAt = -1;
+    return;
+  }
+  // 弓：按下不射，松手射（快 tap = 普通箭；长按走上方蓄力 → 强箭）
+  if (player.weapon === "bow") {
+    if (atkBtnReleased) {
+      atkBtnReleased = false;
+      startShoot(false);
+      return;
+    }
+  }
+  else if (pressedThisFrame.has("j") || pressedThisFrame.has("J") || (atkPressBufferedAt > 0 && nowSec - atkPressBufferedAt < 0.25)) {
+    atkBtnReleased = false; atkPressBufferedAt = -1;
+    if (!player.onGround) startAttack(4);                                        // 空中下劈（pogo）
+    else startAttack(player.comboT > 0 ? clamp(player.stage + 1, 1, 3) : 1);     // 重击(-1)被打断后残留值钳回合法区间
+    return;
+  }
+  // 闪避（v0.5：支持 0.25s 预输入缓冲；CD 0.5→0.3，总间隔 0.65s）
+  if ((wantDodge || (dodgeBufAt > 0 && nowSec - dodgeBufAt <= 0.25)) && player.dodgeCDT <= 0) {
+    dodgeBufAt = -1;
+    player.state = "dodge";
+    player.dodgeT = BASE.dodgeDur;
+    player.iframesT = BASE.iFrames;
+    const d = inputDir();
+    player.dodgeDir = d !== 0 ? d : -player.facing; // 无输入则后撤（GDD §4.1）
+    player.dodgeCDT = BASE.dodgeCD + BASE.dodgeDur;
+    burst(player.x, player.y - 40, "#cccccc", 6, 200);
+    S().dodge();
+    return;
+  }
+  // 跳跃（v0.5：0.2s 预输入缓冲——攻击收招中按跳，落地/收招瞬间自动起跳）
+  if ((wantJump || (jumpBufAt > 0 && nowSec - jumpBufAt <= 0.2)) && player.onGround) {
+    jumpBufAt = -1;
+    player.vy = BASE.jumpV; player.onGround = false;
+    burst(player.x, GROUND, "#888888", 5, 150);
+    S().jump();
+  }
+  // 移动
+  const d = inputDir();
+  if (d !== 0) { player.facing = d; player.state = "run"; player.x = clamp(player.x + d * BASE.speed * dt, 30, maxX()); player.runX += Math.abs(d) * BASE.speed * dt; }
+  else player.state = "idle";
+  physicsFall(dt);
+}
+function physicsFall(dt){
+  if (!player.onGround) {
+    player.vy += BASE.gravity * dt;
+    player.y += player.vy * dt;
+    if (player.y >= GROUND) {
+      player.y = GROUND; player.vy = 0; player.onGround = true;
+      burst(player.x, GROUND, "#777777", 4, 120);
+      // 空中下劈落地：冲击波结算（判定提前结束，落地即震）
+      if (player.state === "attack" && player.stage === 4) {
+        player.phase = "recovery"; player.phaseT = 0;
+        ring(player.x, GROUND, 120, "#ffcc88");
+        burst(player.x, GROUND, "#ccaa77", 12, 340);
+        shake = Math.max(shake, 7);
+        punch(player.facing, 6);
+        for (const e of enemies) {
+          if (e.dead) continue;
+          const d = e.x - player.x;
+          if (Math.abs(d) < 110 && Math.abs(e.y - GROUND) < 60) hitEnemy(e, BASE.skillWhirl * dmgMult(), { heavy: false, knock: 120, stagger: 0.4 }, Math.sign(d) || player.facing);
+        }
+      }
+    }
+  }
+}
+// 换武器执行（v0.5 抽出为独立函数：自由态与收招期共用）
+function doWeaponSwitch(){
+  const idx = WEAPON_ORDER.indexOf(player.weapon);
+  player.weapon = WEAPON_ORDER[(idx + 1) % WEAPON_ORDER.length];
+  player.comboT = 0; player.stage = 0; player.buffered = false;
+  burst(player.x, player.y - 60, "#ffee88", 10, 260);
+  ring(player.x, player.y - 55, 70, "#ffee88");
+  S().switch();
+  dmgText(player.x, player.y - 120, player.weapon === "sword" ? "拔刀" : player.weapon === "bow" ? "取弓" : "持枪", "#ffee88", true);
+}
+function startAttack(stage){
+  player.state = "attack"; player.stage = stage; player.phase = "windup"; player.phaseT = 0;
+  player.hitSet = new Set(); player.swingId++;
+  player.stats.attacks++;
+  S().swing(stage === -1 || stage === 3 || stage === 4);
+  player.comboT = BASE.comboWindow;
+  // 攻击瞬间锁定朝向
+  const d = inputDir();
+  if (d !== 0) player.facing = d;
+  if (player.weapon === "spear") {
+    // 突刺轨迹：水平刺线（非斩击弧）
+    const far = stage === -1 ? 200 : stage === 4 ? 120 : 140;
+    for (let i = 0; i < 3; i++) {
+      particles.push({ x: player.x + player.facing * (30 + i * 34), y: player.y - 58, vx: player.facing * 420, vy: 0,
+        life: 0.11, t: 0, color: stage === -1 ? "#a0ffd0" : "#d8f5e4", stab: true, len: 46 });
+    }
+  } else {
+    slashFx(player.x + player.facing * 60, player.y - 55, player.facing, stage === -1 || stage === 4);
+  }
+}
+function startShoot(power){
+  player.state = "shoot"; player.phase = "windup"; player.phaseT = 0;
+  player.shootCharged = !!power;
+  const d = inputDir();
+  if (d !== 0) player.facing = d;
+}
+// 武器技能施放（U/I/O 三槽，按当前武器分流）
+function castWeaponSkill(si){
+  const w = player.weapon;
+  player.skillCDs[w][si] = SKILLS[w][si].cd;
+  const d = inputDir(); if (d !== 0) player.facing = d;
+  if (w === "sword") {
+    if (si === 0) {   // 剑气·裂空
+      player.state = "skill1"; player.skillT = 0; player.skillFired = false;
+      burst(player.x + player.facing * 30, player.y - 60, "#8fd6ff", 8, 260);
+    } else if (si === 1) {   // 疾风乱舞
+      player.state = "skill2"; player.skillT = 0; player.whirlHits = 0;
+      flash("rgba(200,160,255,0.18)", 0.1);
+    } else {   // 居合·一闪
+      player.state = "iai"; player.iaiT = 0; player.iaiHit = new Set();
+      player.iframesT = 0.3;
+      flash("rgba(255,255,255,0.16)", 0.08); zoom = Math.max(zoom, 0.03);
+      dmgText(player.x, player.y - 120, "居合·一闪", "#ffffff", true);
+    }
+  } else if (w === "bow") {
+    if (si === 0) {   // 裂云·贯日：三连贯穿箭
+      player.state = "stormshot"; player.skillT = 0; player.volleyN = 0;
+      flash("rgba(255,232,150,0.16)", 0.08); zoom = Math.max(zoom, 0.022);
+      burst(player.x + player.facing * 34, player.y - 62, "#ffe9a0", 10, 300);
+      dmgText(player.x, player.y - 122, "裂云·贯日", "#ffe9a0", true);
+    } else if (si === 1) {   // 万箭·天罗
+      player.state = "rain"; player.skillT = 0; player.rainN = 0; player.rainHeavy = false;
+      flash("rgba(159,232,255,0.18)", 0.1); zoom = Math.max(zoom, 0.02);
+      dmgText(player.x, player.y - 122, "万箭·天罗", "#9fe8ff", true);
+    } else {   // 疾风·回锋：后撤 + 原地风爆 + 回身双箭
+      player.state = "windStep"; player.skillT = 0;
+      player.windDir = -player.facing;
+      player.iframesT = 0.45; player.dodgeCDT = 0;
+      player.windShot1 = player.windShot2 = false;
+      addBlast({ x: player.x, y: player.y - 40, fuse: 0.26, r: 175,
+        dmg: BASE.bowWind * dmgMult("bow"), color: "#8ff0ff", kind: "wind",
+        st: { heavy: true, knock: 340, stagger: 0.8 }, dir: player.facing });
+      burst(player.x, player.y - 55, "#8ff0ff", 12, 340);
+      dmgText(player.x, player.y - 118, "疾风·回锋", "#8ff0ff", true);
+    }
+  } else {   // spear
+    if (si === 0) {   // 游龙·破阵
+      player.state = "lunge"; player.skillT = 0; player.iaiHit = new Set(); player.lungeTick = -1;
+      player.iframesT = 0.4;
+      flash("rgba(160,255,208,0.16)", 0.08); zoom = Math.max(zoom, 0.025);
+      burst(player.x, player.y - 60, "#a0ffd0", 12, 340);
+      dmgText(player.x, player.y - 122, "游龙·破阵", "#a0ffd0", true);
+    } else if (si === 1) {   // 横扫·千军破
+      player.state = "sweep"; player.skillT = 0; player.sweepN = 0;
+      flash("rgba(160,255,208,0.12)", 0.08);
+      dmgText(player.x, player.y - 122, "横扫·千军破", "#c8ffe8", true);
+    } else {   // 坠天·裂地
+      player.state = "drop"; player.skillFired = false; player.skillT = 0;
+      player.vy = -900; player.onGround = false;
+      burst(player.x, GROUND, "#a0ffd0", 10, 300);
+      dmgText(player.x, player.y - 130, "坠天·裂地", "#a0ffd0", true);
+    }
+  }
+}
+
+function checkPlayerHits(){
+  const st = stageStats();
+  const x0 = player.x + player.facing * 30, x1 = player.x + player.facing * (30 + st.range);
+  const hx0 = Math.min(x0, x1), hx1 = Math.max(x0, x1);
+  for (const e of enemies) {
+    if (player.hitSet.has(e) || e.dead) continue;
+    const ex = e.x, eh = 90 * e.scale, ey = e.y;
+    const ew = 34 * e.scale;
+    if (ex + ew > hx0 && ex - ew < hx1 && Math.abs(ey - player.y) < st.h + 80) {
+      player.hitSet.add(e);
+      hitEnemy(e, playerAttackDamage(), st, player.facing);
+      // 空中下劈命中 → pogo 弹跳（GDD §4.4：跳跃参与战斗的理由）
+      if (player.stage === 4 && !player.onGround) {
+        player.vy = -560;
+        burst(player.x, player.y - 20, "#ffeecc", 6, 200);
+      }
+    }
+  }
+}
+function hitEnemy(e, dmg, st, dir, srcX){
+  // 暴击判定（剑意必暴 + 秘纹会心）
+  let crit = player.nextCrit || Math.random() < critChance();
+  player.nextCrit = false;
+  let final = dmg * (crit ? BASE.critMul : 1);
+  // 盾卫盾牌：正面攻击先打盾（GDD §4.3）——盾有耐久，打破后永久失去格挡
+  if (st.ignoreShield && e.type === "shield" && !e.shieldBroken && !e.isBoss) {
+    // v0.7 破甲技（横扫·千军破）：直接越过盾面打本体，盾同时被震碎
+    e.shieldHp = Math.max(0, e.shieldHp - final * 3);
+    e.shieldFlash = 0.24;
+    S().shieldBreak();
+    starRing(e.x + e.facing * 30, e.y - 55 * e.scale, 130, "#d8ffe8");
+    burst(e.x + e.facing * 30, e.y - 55 * e.scale, "#dfe9ff", 18, 560);
+    hitstop = Math.max(hitstop, 0.09); punch(dir, 10);
+    if (e.shieldHp <= 0) {
+      e.shieldBroken = true;
+      dmgText(e.x, e.y - 126, "破 盾!", "#ffe066", true);
+      if (!e.elite) { e.state = "stagger"; e.staggerT = 1.0; e.t = 0; }
+    }
+  }
+  if (e.type === "shield" && !e.shieldBroken && !e.isBoss && !st.ignoreShield) {
+    // 攻击来自敌人面朝方向 = 正面
+    const fromFront = Math.sign((srcX === undefined ? player.x : srcX) - e.x) === e.facing;
+    if (fromFront) {
+      const sx = e.x + e.facing * 30, sy = e.y - 55 * e.scale;
+      // 重击（蓄力/空中下劈/重招）破盾效率 2.5 倍，并震入少量真伤；轻击全吃在盾上
+      e.shieldHp = Math.max(0, e.shieldHp - final * (st.heavy ? 2.5 : 1));
+      e.shieldFlash = 0.22;
+      S().hitLight();
+      // 金属火花：白蓝短线四溅 + 橙黄火星 + 盾面冲击环
+      burst(sx, sy, "#dfe9ff", 12, 430);
+      burst(sx, sy, "#ffcf8a", 6, 320);
+      ring(sx, sy, 52, "#cfe4ff");
+      hitstop = Math.max(hitstop, 0.07); punch(dir, 7); zoom = Math.max(zoom, 0.022);
+      flash("rgba(210,235,255,0.18)", 0.06);
+      if (navigator.vibrate) navigator.vibrate(12);
+      if (e.shieldHp <= 0) {
+        // ---- 破盾：盾面炸裂 → 长踉跄 + 穿透伤害 ----
+        e.shieldBroken = true;
+        S().shieldBreak();
+        e.hp -= final * 0.6;
+        hitstop = 0.15; punch(dir, 14); zoom = Math.max(zoom, 0.07);
+        shake = Math.max(shake, 12);
+        flash("rgba(255,255,255,0.5)", 0.14);
+        starRing(sx, sy, 135, "#fff2c4");
+        ring(sx, sy, 110, "#ffffff");
+        burst(sx, sy, "#dfe9ff", 28, 640);     // 盾片飞散
+        burst(sx, sy, "#ffffff", 16, 430);
+        dmgText(e.x, e.y - 122, "破 盾!", "#ffe066", true);
+        if (navigator.vibrate) navigator.vibrate(45);
+        if (!e.elite) { e.state = "stagger"; e.staggerT = 1.0; e.t = 0; }
+        else e.x = clamp(e.x + dir * 40, 30, WORLD_W - 30);
+        if (e.hp <= 0) { killEnemy(e, dir); return; }
+        return;
+      }
+      if (st.heavy) {
+        // 盾未破但被重击：震入 35% 真伤
+        e.hp -= final * 0.35;
+        dmgText(e.x, e.y - 102, Math.round(final * 0.35), "#ffaa66", false);
+        if (e.hp <= 0) { killEnemy(e, dir); return; }
+      } else {
+        dmgText(e.x, e.y - 102, "盾 " + Math.ceil(e.shieldHp), "#9fd6ff", false);
+      }
+      return;
+    }
+  }
+  e.hp -= final;
+  e.hitFlash = 0.18;
+  const heavyHit = st.heavy || player.stage === 3;
+  if (crit) S().crit(); else if (heavyHit) S().hitHeavy(); else S().hitLight();
+  const hx = e.x - dir * 20, hy = e.y - 55 * e.scale;
+  // ---- 反馈通道全开（GDD §7）：hitstop / 定向震屏 / 冲击环 / 星芒 / 推镜 / 闪屏 ----
+  hitstop = heavyHit ? 0.10 : 0.055;
+  punch(dir, heavyHit ? 12 : 7);
+  zoom = Math.max(zoom, crit ? 0.062 : (heavyHit ? 0.048 : 0.022));
+  flash(crit ? "rgba(255,255,255,0.45)" : (heavyHit ? "rgba(255,225,185,0.3)" : "rgba(255,255,255,0.18)"), crit ? 0.12 : 0.09);
+  ring(hx, hy, heavyHit || crit ? 92 : 58, crit ? "#ff6644" : (heavyHit ? "#ffbb77" : "#ffeecc"));
+  ring(hx, hy, heavyHit || crit ? 58 : 38, "#ffffff");
+  if (heavyHit || crit) starRing(hx, hy, crit ? 120 : 96, crit ? "#ffd0b0" : "#fff2c4");
+  burst(hx, hy, crit ? "#ff8855" : (heavyHit ? "#ff8855" : "#ffeebb"), heavyHit || crit ? 18 : 10, 460);
+  burst(hx, hy, "#ffffff", heavyHit || crit ? 8 : 4, 620);   // 高速白色火花
+  if (navigator.vibrate) navigator.vibrate(heavyHit || crit ? 30 : 14);
+  dmgText(e.x, e.y - 100, Math.round(final), crit ? "#ff3333" : "#ffcc66", crit || heavyHit);
+  // 击退与踉跄（精英霸体除外）
+  if (!e.elite && !e.isBoss) {
+    e.x = clamp(e.x + dir * st.knock, 30, WORLD_W - 30);
+    e.state = "stagger"; e.staggerT = st.stagger; e.t = 0;
+  } else if (!e.isBoss) {
+    e.x = clamp(e.x + dir * st.knock * 0.15, 30, WORLD_W - 30);
+  }
+  // 嗜血剑意
+  if (SAVE.relics.vampire) { player.hp = Math.min(playerMaxHp(), player.hp + final * 0.08); }
+  if (e.hp <= 0) killEnemy(e, dir);
+}
+function killEnemy(e, dir){
+  e.dead = true;
+  player.stats.kills++;
+  S().kill();
+  // ---- 经验（GDD §5 升阶：击杀成长闭环）----
+  const XP_TABLE = { grunt: 12, spear: 16, shield: 20 };
+  const xpGain = Math.round((e.isBoss ? 150 : (XP_TABLE[e.type] || 12) * (e.elite ? 3 : 1)));
+  game.roundXp += xpGain;
+  grantXp(xpGain);
+  // ---- 击杀演出：长停顿 + 推镜 + 微慢动作 + 躯体碎裂 ----
+  hitstop = 0.16;
+  punch(dir || 1, 14);
+  zoom = Math.max(zoom, 0.068);
+  timeScale = 0.28;
+  flash("rgba(255,255,255,0.34)", 0.14);
+  ring(e.x, e.y - 50, 130, "#ffffff");
+  starRing(e.x, e.y - 50, 120, "#fff2c4");
+  burst(e.x, e.y - 50, e.color, 34, 560);      // 躯体散成线条（GDD §7）
+  burst(e.x, e.y - 50, "#ffffff", 16, 380);
+  if (navigator.vibrate) navigator.vibrate(35);
+  // ---- 击杀回血（GDD §3.1：贪刀闭环的正向反馈）----
+  const heal = e.isBoss ? 30 : (e.elite ? 8 : 3);   // [PLACEHOLDER] 杂兵 3% / 精英 8% / BOSS 30% 上限，playtest 校准
+  if (player.hp < playerMaxHp()) {
+    player.hp = Math.min(playerMaxHp(), player.hp + heal);
+    dmgText(player.x, player.y - 125, "+" + heal, "#4cd964", false);
+    burst(player.x, player.y - 55, "#4cd964", 6, 170);
+  }
+  // 掉落（GDD §5.2）
+  const d = e.drops || {};
+  if (d.xt) { const amt = randi(d.xt[0], d.xt[1]) * (e.elite ? 3 : 1); dropOrb(e.x, e.y - 60, "xt", amt); }
+  if (e.isBoss) {
+    if (d.jp) dropOrb(e.x, e.y - 60, "jp", d.jp[0]);
+    if (d.cy) dropOrb(e.x + 40, e.y - 60, "cy", d.cy[0]);
+    dropGem(e.x - 50, e.y - 80); dropGem(e.x + 70, e.y - 80);   // BOSS 双宝
+    game.roundCy += 1; // 层结算保底 1 页
+    openPortal(e.x);   // v0.6：BOSS 倒下 → 山门开启（传送下一关）
+    onVictory();
+  } else if (e.elite) {
+    dropOrb(e.x, e.y - 60, "jp", randi(3, 5));
+    dropGem(e.x + 40, e.y - 60);   // 精英必掉一个永久升级物品
+  }
+}
+
+function checkEnemyHit(e){
+  // 敌方攻击判定盒
+  let rx = e._range * (e.scale || 1), ax0, ax1;
+  if (e.isBoss) { rx = e.bossRange || 140; }
+  ax0 = Math.min(e.x + e.facing * 30, e.x + e.facing * (30 + rx));
+  ax1 = Math.max(e.x + e.facing * 30, e.x + e.facing * (30 + rx));
+  const pw = 26, px0 = player.x - pw, px1 = player.x + pw;
+  const overlapX = px1 > ax0 && px0 < ax1 && Math.abs(player.y - e.y) < 110;
+  if (!overlapX) return;
+  // 威胁计数：每次挥刀只计一次（GDD §9 B 信号的分母）
+  if (!e.swingCounted) { e.swingCounted = true; player.stats.threats++; }
+  if (player.invulnT > 0) return;          // 受击保护
+  if (player.iframesT > 0) {               // 完美闪避（GDD §4.2：i-frames 中穿过刀锋）
+    if (e.perfectArmed) {
+      e.perfectArmed = false;
+      player.stats.perfect++;
+      triggerSwordFocus();
+    }
+    return;
+  }
+  if (e.swingDone) return;                 // 本次挥刀已命中过
+  // ---- 格挡（S）：只防正面；起手 0.18s 内 = 完美格挡 ----
+  if (player.state === "block") {
+    const toEnemy = Math.sign(e.x - player.x) || player.facing;
+    if (toEnemy === player.facing) {
+      e.swingDone = true;
+      if (player.blockT <= 0.18) {
+        // 完美格挡（parry）：无伤 + 敌方大踉跄 + 反击必暴
+        player.stats.parries++;
+        player.nextCrit = true;
+        if (!e.isBoss && !e.elite) { e.state = "stagger"; e.staggerT = 1.1; e.t = 0; }
+        else e.x = clamp(e.x + toEnemy * 60, 30, WORLD_W - 30);
+        hitstop = 0.11; punch(toEnemy, 7); zoom = Math.max(zoom, 0.04);
+        flash("rgba(255,255,255,0.35)", 0.12);
+        S().parry();
+        ring(player.x + player.facing * 42, player.y - 55, 95, "#ffffff");
+        burst(player.x + player.facing * 42, player.y - 55, "#ffffff", 12, 340);
+        dmgText(player.x, player.y - 112, "完美格挡!", "#ffffff", true);
+        if (navigator.vibrate) navigator.vibrate(30);
+        return;
+      }
+      // 普通格挡：削 80% 伤害，小幅后坐
+      player.stats.blocked++;
+      const chip = Math.max(1, Math.round(e.atk * 0.2));
+      player.hp -= chip;
+      player.vx = -e.facing * 150;
+      hitstop = 0.06; punch(toEnemy, 5);
+      S().block();
+      burst(player.x + player.facing * 42, player.y - 55, "#ffffff", 8, 260);
+      ring(player.x + player.facing * 42, player.y - 55, 55, "#ffffff");
+      dmgText(player.x, player.y - 112, "格挡 -" + chip, "#cccccc", false);
+      if (navigator.vibrate) navigator.vibrate(12);
+      return;
+    }
+    // 背后受击：格挡无效，走正常伤害
+  }
+  // 命中玩家
+  e.swingDone = true;
+  if (player.state === "attack" || player.state === "charge") player.stats.deathWhileAttacking++;
+  player.stats.hitsTaken++;
+  player.hp -= e.atk;
+  S().hurt();
+  player.state = "hurt"; player.hurtT = 0.5; player.invulnT = 0.8;   // GDD §3.1
+  player.buffered = false;                                          // 受击打断：连段缓冲一并清除
+  player.vx = -e.facing * 260;
+  // ---- 受击反馈：屏红闪 + 定向后坐震屏 ----
+  hitstop = 0.06;
+  punch(-e.facing, 9);
+  zoom = Math.max(zoom, 0.02);
+  flash("rgba(255,60,60,0.32)", 0.13);
+  ring(player.x, player.y - 55, 60, "#ff5544");
+  burst(player.x, player.y - 55, "#ff4444", 12, 320);
+  dmgText(player.x, player.y - 100, Math.round(e.atk), "#ff4444", true);
+  if (navigator.vibrate) navigator.vibrate(40);
+}
+function triggerSwordFocus(){
+  timeScale = 0.3; enemyTimeScale = 0.3;
+  S().parry();
+  player.nextCrit = true;
+  dmgText(player.x, player.y - 130, "剑意!", "#ffee55", true);
+  ring(player.x, player.y - 50, 80, "#ffee55");
+  burst(player.x, player.y - 50, "#ffee55", 14, 340);
+  flash("rgba(255,238,120,0.18)", 0.1);
+  if (navigator.vibrate) navigator.vibrate(15);
+}
+
+// ---------- 敌人 AI ----------
+function updateEnemy(e, dt){
+  e.hitFlash = Math.max(0, e.hitFlash - dt);
+  if (e.shieldFlash) e.shieldFlash = Math.max(0, e.shieldFlash - dt);
+  if (e.dead) return;
+  if (e.isBoss) { updateBoss(e, dt); return; }
+  if (e.state === "stagger") { e.staggerT -= dt; if (e.staggerT <= 0) e.state = "approach"; return; }
+  const dx = player.x - e.x;
+  const dist = Math.abs(dx);
+  e.t += dt;
+
+  if (e.state === "approach") {
+    if (dist > e._range * 0.85) { e.facing = Math.sign(dx) || 1; e.x = clamp(e.x + e.facing * e.speed * dt, 30, WORLD_W - 30); }
+    else { e.state = "telegraph"; e.t = 0; e.perfectArmed = true; e.swingDone = false; e.swingCounted = false; }
+  } else if (e.state === "telegraph") {
+    e.facing = Math.sign(player.x - e.x) || e.facing;
+    if (e.t >= e._tele) { e.state = "attack"; e.t = 0; }
+  } else if (e.state === "attack") {
+    // 攻击时小幅前冲
+    e.x = clamp(e.x + e.facing * 220 * dt * (e.type === "grunt" ? 1.6 : 1), 30, WORLD_W - 30);
+    if (e.t >= e._active) { e.state = "recover"; e.t = 0; }
+  } else if (e.state === "recover") {
+    if (e.t >= e._recovery) { e.state = "approach"; e.t = 0; }
+  }
+}
+function updateBoss(b, dt){
+  b.t += dt;
+  b.phase = b.hp > b.maxHp * 0.6 ? 1 : (b.hp > b.maxHp * 0.3 ? 2 : 3);
+  b.enrage = b.phase === 3 ? 1.35 : 1;
+  const dx = player.x - b.x, dist = Math.abs(dx);
+  if (b.state === "idle") {
+    b.facing = Math.sign(dx) || 1;
+    if (dist > 180) b.x = clamp(b.x + b.facing * 200 * b.enrage * dt, 30, WORLD_W - 30);
+    if (b.t > 0.9 / b.enrage) { pickBossMove(b, dist); }
+  } else if (b.state === "telegraph") {
+    if (b.t >= b._tele) { b.state = "attack"; b.t = 0; b.swingDone = false; b.perfectArmed = true; b.swingCounted = false; }
+  } else if (b.state === "attack") {
+    if (b.move === "dash") b.x = clamp(b.x + b.facing * 700 * b.enrage * dt, 30, WORLD_W - 30);
+    if (b.move === "slam") { if (b.t > 0.25 && !b.slamJumped) { b.slamJumped = true; } b.x = clamp(b.x + b.facing * 320 * dt, 30, WORLD_W - 30); }
+    if (b.t >= b._active) {
+      if (b.move === "slam" && !b.shockDone) {
+        b.shockDone = true;
+        punch(b.facing, 13); zoom = Math.max(zoom, 0.035); flash("rgba(255,170,80,0.3)", 0.1);
+        ring(b.x, GROUND - 30, 120, "#ffaa33");
+        burst(b.x, GROUND, "#ffaa33", 20, 420);
+        // 地波：贴地判定一次（简化为近距离伤害）
+        if (Math.abs(player.x - b.x) < 260 && player.iframesT <= 0 && player.invulnT <= 0) {
+          player.hp -= b.atk * 0.8; player.stats.hitsTaken++;
+          player.state = "hurt"; player.hurtT = 0.5; player.invulnT = 0.8; player.vx = -b.facing * 300;
+          dmgText(player.x, player.y - 100, Math.round(b.atk * 0.8), "#ff4444", true);
+        }
+      }
+      b.state = "recover"; b.t = 0;
+    }
+  } else if (b.state === "recover") {
+    if (b.t >= b._recovery / b.enrage) { b.state = "idle"; b.t = 0; b.slamJumped = false; b.shockDone = false; }
+  }
+  // 连击（P2 阶段三连突刺）
+  if (b.state === "idle" && b.phase >= 2 && Math.random() < 0.3) { b.combo = 3; }
+  if (b.state === "recover" && b.combo > 0) { b.combo--; pickBossMove(b, dist); }
+}
+function pickBossMove(b, dist){
+  b.state = "telegraph"; b.t = 0;
+  if (b.phase === 1 || Math.random() < 0.6) {
+    if (dist > 350) { b.move = "dash"; b._tele = 0.6; b._active = 0.30; b._recovery = 0.8; b.bossRange = 130; }
+    else { b.move = "thrust"; b._tele = 0.5; b._active = 0.18; b._recovery = 0.7; b.bossRange = 170; }
+  } else {
+    b.move = "slam"; b._tele = 0.7; b._active = 0.45; b._recovery = 1.0; b.bossRange = 0;
+  }
+}
+
+// ---------- 死亡 / 胜利（GDD §3.2 / §9） ----------
+function onPlayerDeath(){
+  if (game.state === "death") return;
+  S().death();
+  grantRoundMaterials();   // P3：死亡素材全额保留
+  game.state = "death";
+  burst(player.x, player.y - 50, "#ffffff", 24, 420);
+  shake = 8;
+}
+function onVictory(){
+  if (game.state === "victory") return;
+  S().victory();
+  grantRoundMaterials();
+  SAVE.bestTrial = Math.max(SAVE.bestTrial, SAVE.trialLevel);
+  SAVE.trialLevel = SAVE.trialLevel + 1;   // 解锁下一关
+  persist();   // v0.4：每通一关即时存档（等级/经验/素材/升级物品全部落盘）
+  game.state = "victory";
+  game.saveFlash = 2;   // 胜利界面"已存档"提示计时
+  dmgText(player.x, player.y - 160, "进度已存档", "#7fe89a", true);
+  shake = 6;
+}
+
+// ---------- 渲染 ----------
+function render(){
+  ctx.save();
+  ctx.scale(cv.width / W, cv.height / H);
+  ctx.fillStyle = "#0b0d10"; ctx.fillRect(0, 0, W, H);
+  if (game.state === "title") { drawTitle(); ctx.restore(); return; }
+  if (game.state === "forge") { drawForge(); ctx.restore(); return; }
+
+  drawBackground();
+  ctx.save();
+  // 重击/暴击/击杀：镜头瞬间推近（zoom punch）
+  const z = 1 + zoom;
+  if (z > 1.001) { ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2); }
+  ctx.translate(-camera.x + shakeX, shakeY);
+
+  // 地面
+  ctx.strokeStyle = "#2a2f36"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, GROUND + 2); ctx.lineTo(WORLD_W, GROUND + 2); ctx.stroke();
+  // 地纹（单路径批量 + 只画可视区：合并 stroke 调用降卡顿）
+  ctx.strokeStyle = "#1a1e24"; ctx.lineWidth = 1;
+  ctx.beginPath();
+  const gx0 = Math.max(0, Math.floor((camera.x - 120) / 90) * 90), gx1 = Math.min(WORLD_W, camera.x + W + 120);
+  for (let x = gx0; x <= gx1; x += 90) { ctx.moveTo(x, GROUND + 2); ctx.lineTo(x - 30, GROUND + 34); }
+  ctx.stroke();
+
+  // 剑意时刻氛围
+  if (enemyTimeScale < 0.7) { ctx.fillStyle = "rgba(180,200,255,0.08)"; ctx.fillRect(camera.x, 0, W, H); }
+
+  drawGates();
+  for (const o of orbs) drawOrb(o);
+  for (const e of enemies) if (!e.dead) drawEnemy(e);   // 尸体不再渲染（碎裂粒子已接管）
+  for (const pr of projectiles) drawProjectile(pr);
+  drawBlasts();
+  if (portal) drawPortal();
+  drawPet();
+  if (game.state !== "death") drawPlayer();
+  for (const p of particles) drawParticle(p);
+  for (const d of dmgTexts) drawDmgText(d);
+
+  ctx.restore();
+  drawPetals();
+  drawHUD();
+  // 命中/受击/剑意 闪屏层（反馈通道，GDD §7）
+  if (flashT > 0) { ctx.globalAlpha = Math.min(1, flashT * 7); ctx.fillStyle = flashColor; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  if (game.state === "waveBanner") drawBanner();
+  if (game.state === "death") drawDeath();
+  if (game.state === "victory") drawVictory();
+  if (game.state === "play" && isTouchDevice()) drawTouchControls();
+  if (game.paused) drawPause();   // v0.5：暂停覆盖层（最后画，压住一切）
+  if (game.transit.active) drawTransit();   // v0.6：山门传送转场（最上层）
+  ctx.restore();
+}
+
+// ---------- 江湖背景（v0.6：多层视差 · 竹林客栈 · 关口牌坊 · 飘落花瓣） ----------
+let bgSeed = 1;
+function bgRand(){ bgSeed = (bgSeed * 1664525 + 1013904223) >>> 0; return bgSeed / 4294967296; }
+const bg = { pines: [], roofs: [], lanterns: [], petals: [] };
+function buildBackdrop(){
+  bgSeed = 9871 + game.trial * 613;
+  bg.pines = []; bg.roofs = []; bg.lanterns = []; bg.petals = [];
+  const spanP = WORLD_W * 0.55 + W + 600;
+  for (let i = 0; i < 90; i++) bg.pines.push({
+    x: bgRand() * spanP, h: 110 + bgRand() * 170,
+    s: 0.75 + bgRand() * 0.55, bamboo: bgRand() < 0.6, lean: (bgRand() - 0.5) * 0.18,
+  });
+  const spanR = WORLD_W * 0.78 + W + 600;
+  for (let i = 0; i < 16; i++) bg.roofs.push({
+    x: bgRand() * spanR, w: 150 + bgRand() * 170, h: 54 + bgRand() * 46, lamp: bgRand() < 0.7,
+  });
+  for (let i = 0; i < 34; i++) bg.lanterns.push({ x: bgRand() * spanR, y: GROUND - 150 - bgRand() * 110, r: 3.2 + bgRand() * 3.4, ph: bgRand() * 6.3 });
+  for (let i = 0; i < 46; i++) bg.petals.push({
+    x: bgRand() * W, y: bgRand() * H, vy: 10 + bgRand() * 30, vx: -14 - bgRand() * 30,
+    r: 1.8 + bgRand() * 2.4, a: bgRand() * 6.28, spin: (bgRand() - 0.5) * 2.4,
+  });
+}
+buildBackdrop();   // 标题界面也先铺一层江湖夜
+function updatePetals(dt){  for (const p of bg.petals) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.a += p.spin * dt;
+    if (p.y > H + 10 || p.x < -20) { p.y = -10; p.x = Math.random() * W * 1.15; }
+  }
+}
+function drawHillLayer(p, baseY, amp, color, phase, rim){
+  const ox = camera.x * p;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(-90, H);
+  ctx.lineTo(-90, baseY);
+  for (let x = -90; x <= W + 110; x += 64) {
+    const wx = x + ox;
+    const y = baseY - amp * (0.55 + 0.45 * Math.sin(wx * 0.0034 + phase)) - amp * 0.22 * Math.sin(wx * 0.0112 + phase * 2.1);
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W + 110, baseY);
+  ctx.lineTo(W + 110, H);
+  ctx.closePath(); ctx.fill();
+  // 月光山脊（极淡的一线亮边，撑出水墨层次）
+  if (rim) {
+    ctx.strokeStyle = rim; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (let x = -90; x <= W + 110; x += 64) {
+      const wx = x + ox;
+      const y = baseY - amp * (0.55 + 0.45 * Math.sin(wx * 0.0034 + phase)) - amp * 0.22 * Math.sin(wx * 0.0112 + phase * 2.1);
+      if (x === -90) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+}
+function drawPagoda(sx, baseY, h, color){
+  if (sx < -140 || sx > W + 140) return;
+  ctx.fillStyle = color;
+  const tiers = 4, tw = h * 0.42;
+  for (let i = 0; i < tiers; i++) {
+    const ty = baseY - h + i * (h / tiers);
+    const w = tw * (0.55 + i * 0.15);
+    ctx.beginPath();
+    ctx.moveTo(sx - w, ty + h / tiers * 0.62);
+    ctx.lineTo(sx - w * 0.62, ty);
+    ctx.lineTo(sx + w * 0.62, ty);
+    ctx.lineTo(sx + w, ty + h / tiers * 0.62);
+    ctx.closePath(); ctx.fill();
+    ctx.fillRect(sx - w * 0.16, ty + h / tiers * 0.62, w * 0.32, h / tiers * 0.3);
+  }
+  ctx.fillRect(sx - 1.5, baseY - h - 12, 3, 14);
+}
+function drawBackground(){
+  // 天幕：夜墨渐层
+  const sky = ctx.createLinearGradient(0, 0, 0, GROUND + 40);
+  sky.addColorStop(0, "#05070e");
+  sky.addColorStop(0.42, "#0a1220");
+  sky.addColorStop(1, "#16202e");
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+  // 星子（视差 0.02，缓慢漂移）
+  const sox = camera.x * 0.02;
+  ctx.fillStyle = "#dfe8f5";
+  for (let i = 0; i < 60; i++) {
+    const sx = ((i * 197 - sox) % (W + 80) + W + 80) % (W + 80) - 40;
+    const sy = 26 + ((i * 89) % 240);
+    ctx.globalAlpha = 0.18 + ((i * 37) % 10) / 26 + 0.12 * Math.sin(nowSec * 1.4 + i);
+    ctx.fillRect(sx, sy, 1.7, 1.7);
+  }
+  ctx.globalAlpha = 1;
+  // 月
+  const mx = 980 - camera.x * 0.05;
+  ctx.fillStyle = "#e8e4d8"; ctx.beginPath(); ctx.arc(mx, 128, 54, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#0a0f18"; ctx.beginPath(); ctx.arc(mx + 21, 116, 47, 0, Math.PI * 2); ctx.fill();
+  // 云带（三条，缓慢横移）
+  for (let i = 0; i < 3; i++) {
+    const cy = 110 + i * 54;
+    const cx = ((mx * 0.6 + i * 420 - camera.x * (0.03 + i * 0.012)) % (W + 460) + W + 460) % (W + 460) - 230;
+    ctx.globalAlpha = 0.1 - i * 0.02;
+    ctx.fillStyle = "#9fb2c8";
+    ctx.beginPath(); ctx.ellipse(cx, cy, 230 + i * 40, 16 + i * 3, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // 远山三层（水墨剪影，越远越淡；带一线月光山脊）
+  drawHillLayer(0.08, GROUND - 60, 150, "#101b28", 0.6, "rgba(150,180,215,0.10)");
+  drawHillLayer(0.16, GROUND - 30, 112, "#16222f", 2.1, "rgba(150,180,215,0.09)");
+  drawHillLayer(0.26, GROUND + 6, 78, "#1c2a38", 4.4, "rgba(150,180,215,0.08)");
+  // 塔影（寺院远影）
+  drawPagoda(520 - camera.x * 0.34, GROUND - 40, 210, "#0f1a26");
+  drawPagoda(1420 - camera.x * 0.34, GROUND - 30, 150, "#0f1a26");
+  drawPagoda(2350 - camera.x * 0.34, GROUND - 36, 178, "#0e1824");
+  drawPagoda(3400 - camera.x * 0.34, GROUND - 26, 132, "#0e1824");
+  drawPagoda(4900 - camera.x * 0.34, GROUND - 34, 190, "#0e1824");
+  // 雾带
+  ctx.fillStyle = "rgba(140,168,196,0.05)";
+  ctx.fillRect(0, GROUND - 150, W, 46);
+  ctx.fillStyle = "rgba(140,168,196,0.04)";
+  ctx.fillRect(0, GROUND - 96, W, 34);
+  // 竹林 / 松林（视差 0.55）
+  const pox = camera.x * 0.55;
+  for (const t of bg.pines) {
+    const sx = t.x - pox;
+    if (sx < -160 || sx > W + 160) continue;
+    const by = GROUND - 2;
+    if (t.bamboo) {
+      ctx.strokeStyle = "#24483b"; ctx.lineWidth = 3.4 * t.s; ctx.lineCap = "round";
+      const tipX = sx + t.lean * t.h, tipY = by - t.h;
+      ctx.beginPath(); ctx.moveTo(sx, by); ctx.quadraticCurveTo(sx + t.lean * t.h * 0.35, by - t.h * 0.6, tipX, tipY); ctx.stroke();
+      // 竹节
+      ctx.strokeStyle = "#2f5a49"; ctx.lineWidth = 2.2 * t.s;
+      for (let k = 1; k < 6; k++) {
+        const q = k / 6, nx = sx + (tipX - sx) * q, ny = by + (tipY - by) * q;
+        ctx.beginPath(); ctx.moveTo(nx - 4 * t.s, ny); ctx.lineTo(nx + 4 * t.s, ny); ctx.stroke();
+      }
+      // 竹叶（3~4 簇，交错方向）
+      ctx.strokeStyle = "#2b5346"; ctx.lineWidth = 1.7 * t.s;
+      for (let k = 2; k < 6; k++) {
+        const q = k / 6, lx = sx + (tipX - sx) * q, ly = by + (tipY - by) * q;
+        const dir = k % 2 ? 1 : -1;
+        for (let f = 0; f < 3; f++) {
+          ctx.beginPath();
+          ctx.moveTo(lx, ly);
+          ctx.quadraticCurveTo(lx + dir * (14 + f * 7) * t.s, ly - (8 + f * 3) * t.s, lx + dir * (24 + f * 11) * t.s, ly - (2 - f * 5) * t.s);
+          ctx.stroke();
+        }
+      }
+    } else {
+      ctx.fillStyle = "#16281f";
+      for (let k = 0; k < 3; k++) {
+        const w = (46 - k * 11) * t.s, hh = t.h * (0.34 + k * 0.2);
+        ctx.beginPath();
+        ctx.moveTo(sx - w, by - hh * 0.62);
+        ctx.lineTo(sx, by - hh - 14 * t.s);
+        ctx.lineTo(sx + w, by - hh * 0.62);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.strokeStyle = "#1a2a20"; ctx.lineWidth = 3 * t.s;
+      ctx.beginPath(); ctx.moveTo(sx, by); ctx.lineTo(sx, by - t.h * 0.5); ctx.stroke();
+    }
+  }
+  // 客栈屋檐 + 灯笼（视差 0.78）
+  const rox = camera.x * 0.78;
+  for (const r of bg.roofs) {
+    const sx = r.x - rox;
+    if (sx < -260 || sx > W + 260) continue;
+    const by = GROUND - 4;
+    ctx.fillStyle = "#101a24";
+    // 檐身
+    ctx.beginPath();
+    ctx.moveTo(sx - r.w / 2, by);
+    ctx.lineTo(sx - r.w / 2, by - r.h * 0.5);
+    ctx.lineTo(sx - r.w * 0.58, by - r.h * 0.55);
+    ctx.lineTo(sx - r.w * 0.3, by - r.h);
+    ctx.lineTo(sx + r.w * 0.3, by - r.h);
+    ctx.lineTo(sx + r.w * 0.58, by - r.h * 0.55);
+    ctx.lineTo(sx + r.w / 2, by - r.h * 0.5);
+    ctx.lineTo(sx + r.w / 2, by);
+    ctx.closePath(); ctx.fill();
+    // 屋脊微光
+    ctx.strokeStyle = "#1c2a38"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(sx - r.w * 0.3, by - r.h); ctx.lineTo(sx + r.w * 0.3, by - r.h); ctx.stroke();
+    if (r.lamp) {
+      const lx = sx + r.w * 0.42, ly = by - r.h * 0.42;
+      ctx.fillStyle = "rgba(255,140,70,0.10)";
+      ctx.beginPath(); ctx.arc(lx, ly, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#c0392b";
+      ctx.beginPath(); ctx.arc(lx, ly, 3.6, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  // 悬空灯笼（暖点，带吊绳与穗子）
+  for (const l of bg.lanterns) {
+    const sx = l.x - rox;
+    if (sx < -40 || sx > W + 40) continue;
+    const fl = 0.72 + 0.28 * Math.sin(nowSec * 2.2 + l.ph);
+    ctx.strokeStyle = "rgba(120,140,160,0.20)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(sx, l.y - l.r * 8); ctx.lineTo(sx, l.y - l.r); ctx.stroke();
+    ctx.fillStyle = "rgba(255,150,80," + (0.10 * fl) + ")";
+    ctx.beginPath(); ctx.arc(sx, l.y, l.r * 4.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(214,84,52," + (0.55 + 0.35 * fl) + ")";
+    ctx.beginPath(); ctx.arc(sx, l.y, l.r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(240,180,110,0.35)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(sx, l.y + l.r); ctx.lineTo(sx, l.y + l.r * 2.6); ctx.stroke();
+  }
+  // 前景芦草（近景框，遮住画面最下沿，增加纵深）
+  const fgox = camera.x;
+  ctx.strokeStyle = "#0b1119"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < 90; i++) {
+    const ph = (i * 173) % 1000;
+    const sx = ((i * 149 - fgox) % (W + 160) + W + 160) % (W + 160) - 80;
+    const h = 22 + (ph % 37);
+    const sway = Math.sin(nowSec * 1.6 + i) * 3;
+    ctx.moveTo(sx, H);
+    ctx.quadraticCurveTo(sx + sway, H - h * 0.6, sx + sway * 2.2, H - h);
+  }
+  ctx.stroke();
+  ctx.fillStyle = "#0a0f16";
+  ctx.fillRect(0, H - 16, W, 16);
+}
+// 飘落花瓣（屏幕空间，雨后桃花）
+function drawPetals(){
+  for (const p of bg.petals) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.a);
+    ctx.fillStyle = "rgba(226,150,170,0.55)";
+    ctx.beginPath(); ctx.ellipse(0, 0, p.r * 1.5, p.r * 0.72, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ---------- 关口牌坊（世界层，拦路 / 已通） ----------
+function drawGate(g){
+  const sx = g.x;   // 世界坐标系（渲染时已整体 translate(-camera.x)）
+  if (sx < camera.x - 220 || sx > camera.x + W + 220) return;
+  const by = GROUND;
+  const blocked = g.spawned && !g.cleared;
+  const done = g.cleared;
+  const col = blocked ? "#c0563c" : done ? "#3d8a64" : "#6a4a42";
+  const glow = blocked ? (0.45 + 0.35 * Math.sin(nowSec * 8)) : done ? 0.5 : 0;
+  ctx.save();
+  if (glow > 0) { ctx.globalAlpha = glow * 0.5; ctx.strokeStyle = blocked ? "#ff6644" : "#5fe8a0"; ctx.lineWidth = 12; }
+  else { ctx.strokeStyle = col; ctx.lineWidth = 7; }
+  ctx.lineCap = "butt";
+  ctx.beginPath(); ctx.moveTo(sx - 56, by); ctx.lineTo(sx - 56, by - 166); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sx + 56, by); ctx.lineTo(sx + 56, by - 166); ctx.stroke();
+  ctx.globalAlpha = 1;
+  // 横梁（两端上翘）
+  ctx.strokeStyle = col; ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.moveTo(sx - 96, by - 166); ctx.lineTo(sx - 56, by - 184);
+  ctx.lineTo(sx + 56, by - 184); ctx.lineTo(sx + 96, by - 166);
+  ctx.stroke();
+  // 匾额
+  ctx.fillStyle = "rgba(8,12,18,0.88)"; ctx.fillRect(sx - 27, by - 178, 54, 27);
+  ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.strokeRect(sx - 27, by - 178, 54, 27);
+  ctx.fillStyle = blocked ? "#ff9b7a" : done ? "#8ee8b0" : "#9fb2c8";
+  ctx.font = "bold 16px serif"; ctx.textAlign = "center";
+  ctx.fillText(blocked ? "阻" : done ? "通" : "关", sx, by - 158);
+  // 幡旗（拦路时飘动更急）
+  const sway = Math.sin(nowSec * (blocked ? 6 : 2.6) + g.i) * (blocked ? 7 : 3);
+  for (const dir of [-1, 1]) {
+    ctx.strokeStyle = col; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(sx + dir * 56, by - 150);
+    ctx.quadraticCurveTo(sx + dir * 44 + sway, by - 128, sx + dir * 40 + sway * 1.4, by - 104);
+    ctx.stroke();
+    ctx.fillStyle = blocked ? "rgba(168,69,47,0.55)" : "rgba(47,106,78,0.4)";
+    ctx.beginPath();
+    ctx.moveTo(sx + dir * 56, by - 148);
+    ctx.lineTo(sx + dir * 34, by - 142);
+    ctx.lineTo(sx + dir * 34 + sway, by - 108);
+    ctx.lineTo(sx + dir * 56 + sway, by - 112);
+    ctx.closePath(); ctx.fill();
+  }
+  // 关口标记：第 N 道
+  ctx.fillStyle = "rgba(159,178,200,0.55)"; ctx.font = "12px sans-serif";
+  ctx.fillText("第 " + g.i + " 道", sx, by + 24);
+  ctx.restore();
+}
+function drawGates(){
+  for (const g of level.gates) drawGate(g);
+  // 终点山门（BOSS 场地）
+  const bx = level.bossGateX;
+  if (bx > camera.x - 260 && bx < camera.x + W + 260) {
+    const by = GROUND;
+    ctx.save();
+    if (level.bossSpawned) {
+      ctx.globalAlpha = 0.4 + 0.25 * Math.sin(nowSec * 5);
+      ctx.strokeStyle = "#e04040"; ctx.lineWidth = 16;
+    } else { ctx.strokeStyle = "#5b6672"; ctx.lineWidth = 10; }
+    ctx.beginPath(); ctx.moveTo(bx - 84, by); ctx.lineTo(bx - 84, by - 230); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bx + 84, by); ctx.lineTo(bx + 84, by - 230); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = level.bossSpawned ? "#a83c3c" : "#5b6672"; ctx.lineWidth = 11;
+    ctx.beginPath();
+    ctx.moveTo(bx - 132, by - 230); ctx.lineTo(bx - 84, by - 252);
+    ctx.lineTo(bx + 84, by - 252); ctx.lineTo(bx + 132, by - 230);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(8,12,18,0.9)"; ctx.fillRect(bx - 40, by - 246, 80, 34);
+    ctx.strokeStyle = level.bossSpawned ? "#a83c3c" : "#55606e"; ctx.lineWidth = 2; ctx.strokeRect(bx - 40, by - 246, 80, 34);
+    ctx.fillStyle = level.bossSpawned ? "#ff8a6a" : "#9fb2c8"; ctx.font = "bold 20px serif"; ctx.textAlign = "center";
+    ctx.fillText("山 门", bx, by - 222);
+    // 双灯笼（山门是要"进去"的地方，得有暖光）
+    for (const dir of [-1, 1]) {
+      const lx = bx + dir * 112, ly = by - 196;
+      const fl = 0.7 + 0.3 * Math.sin(nowSec * 2.4 + dir);
+      ctx.fillStyle = "rgba(255,150,80," + (0.12 * fl) + ")";
+      ctx.beginPath(); ctx.arc(lx, ly, 22, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(206,72,44," + (0.6 + 0.3 * fl) + ")";
+      ctx.beginPath(); ctx.arc(lx, ly, 7, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+// ---------- 山门传送门（BOSS 倒下后开启） ----------
+function drawPortal(){
+  const px = portal.x, py = GROUND;   // 世界坐标
+  if (px < camera.x - 280 || px > camera.x + W + 280) return;
+  const pulse = 0.75 + 0.25 * Math.sin(nowSec * 4);
+  ctx.save();
+  // 光柱
+  const g = ctx.createLinearGradient(0, py - 320, 0, py);
+  g.addColorStop(0, "rgba(255,233,168,0)");
+  g.addColorStop(1, "rgba(255,233,168,0.20)");
+  ctx.fillStyle = g; ctx.fillRect(px - 76, py - 320, 152, 320);
+  // 门框
+  ctx.strokeStyle = "#7a8a9a"; ctx.lineWidth = 9; ctx.lineCap = "butt";
+  ctx.beginPath(); ctx.moveTo(px - 64, py); ctx.lineTo(px - 64, py - 190); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px + 64, py); ctx.lineTo(px + 64, py - 190); ctx.stroke();
+  ctx.lineWidth = 10;
+  ctx.beginPath(); ctx.moveTo(px - 84, py - 190); ctx.lineTo(px + 84, py - 190); ctx.stroke();
+  // 门内能量膜
+  for (let i = 0; i < 3; i++) {
+    const rr = 60 - i * 13;
+    ctx.globalAlpha = (0.16 + i * 0.16) * pulse;
+    ctx.fillStyle = i === 2 ? "#fff6d8" : "#9fe8ff";
+    ctx.beginPath(); ctx.ellipse(px, py - 96, rr * 0.6, rr * 1.55, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // 旋转符文环
+  ctx.strokeStyle = "rgba(255,233,168," + (0.55 * pulse) + ")"; ctx.lineWidth = 2;
+  for (let i = 0; i < 3; i++) {
+    const rot = nowSec * (0.8 + i * 0.4) + i * 2.1;
+    ctx.beginPath(); ctx.ellipse(px, py - 96, 40 + i * 12, 62 + i * 16, 0, rot, rot + 2.0); ctx.stroke();
+  }
+  // 地面光环
+  ctx.globalAlpha = 0.35 * pulse;
+  ctx.strokeStyle = "#ffe9a8"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(px, py, 96, 22, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+// ---------- 山门传送转场（墨染 + 关门） ----------
+function drawTransit(){
+  const tr = game.transit;
+  const p = clamp(tr.t / tr.dur, 0, 1);
+  const cover = p < 0.5 ? p * 2 : (1 - p) * 2;      // 0→1→0
+  ctx.save();
+  ctx.fillStyle = "rgba(4,6,10," + Math.min(1, cover) + ")";
+  ctx.fillRect(0, 0, W, H);
+  if (cover > 0.55) {
+    const a = (cover - 0.55) / 0.45;
+    ctx.globalAlpha = a;
+    // 墨染横带（三条扫过）
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = i % 2 ? "rgba(16,24,34,0.95)" : "rgba(8,12,20,0.95)";
+      ctx.fillRect(0, H * (0.12 + i * 0.3) - 34, W, 68);
+    }
+    // 山门（外框 + 门内光 + 基座）
+    const px = W / 2, py = H * 0.64;
+    const grd2 = ctx.createLinearGradient(0, py - 200, 0, py);
+    grd2.addColorStop(0, "rgba(255,233,168,0.05)");
+    grd2.addColorStop(1, "rgba(255,233,168,0.40)");
+    ctx.fillStyle = grd2; ctx.fillRect(px - 78, py - 200, 156, 200);
+    ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(px - 172, py, 344, 16);
+    ctx.strokeStyle = "#ffe9a8"; ctx.lineWidth = 8; ctx.lineCap = "butt";
+    ctx.beginPath(); ctx.moveTo(px - 92, py); ctx.lineTo(px - 92, py - 196); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px + 92, py); ctx.lineTo(px + 92, py - 196); ctx.stroke();
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.moveTo(px - 132, py - 196); ctx.lineTo(px - 92, py - 214);
+    ctx.lineTo(px + 92, py - 214); ctx.lineTo(px + 132, py - 196);
+    ctx.stroke();
+    // 匾
+    ctx.fillStyle = "rgba(6,10,16,0.85)"; ctx.fillRect(px - 46, py - 210, 92, 30);
+    ctx.strokeStyle = "#ffe9a8"; ctx.lineWidth = 2; ctx.strokeRect(px - 46, py - 210, 92, 30);
+    ctx.fillStyle = "#ffe9a8"; ctx.font = "bold 18px serif"; ctx.textAlign = "center";
+    ctx.fillText("山 门", px, py - 189);
+    // 门内旋转符环
+    for (let i = 0; i < 3; i++) {
+      const rot = nowSec * (1 + i * 0.5) + i * 2;
+      ctx.strokeStyle = "rgba(255,233,168,0.45)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(px, py - 100, 46 + i * 12, 74 + i * 14, 0, rot, rot + 2.0); ctx.stroke();
+    }
+    // 文字板
+    ctx.fillStyle = "rgba(4,6,10,0.78)"; ctx.fillRect(0, py + 34, W, 108);
+    ctx.fillStyle = "#ffe9a8"; ctx.font = "bold 40px serif"; ctx.textAlign = "center";
+    ctx.fillText("传 送 中", px, py + 86);
+    ctx.fillStyle = "#cfe4ff"; ctx.font = "18px serif";
+    ctx.fillText("前往 第 " + SAVE.trialLevel + " 关 · 前方路远，且行且斩", px, py + 122);
+    // 光柱粒子
+    for (let i = 0; i < 18; i++) {
+      const yy = py - ((nowSec * 220 + i * 60) % 210);
+      ctx.globalAlpha = a * (0.15 + (i % 5) * 0.1);
+      ctx.fillStyle = "#ffe9a8";
+      ctx.fillRect(px - 84 + (i * 37) % 168, yy, 2, 22);
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+// ---- 火柴人渲染（程序化骨骼 v2，GDD §1） ----
+// 姿态格式：armF/armB = [上臂角, 小臂角]（0=前方，正=向下，两段臂带肘关节）
+//           wrist = 刀刃相对小臂的偏角 → 刀刃角 = 小臂角 + wrist，刀随手转
+//           legs  = [[脚x偏移, 抬脚], ...] 两段腿，膝盖前凸
+const easeOut = q => 1 - (1 - q) * (1 - q);
+const easeOutQuart = q => 1 - Math.pow(1 - q, 4);
+function drawStick(x, groundY, facing, color, scale, pose, flash, extra){
+  const s = 90 * scale;             // 身高
+  const hipY = groundY - s * 0.45;
+  const shY = groundY - s * 0.82;   // 肩
+  const headR = s * 0.11;
+  const headY = groundY - s * 0.95;
+  const P = pose;
+  const leanX = (P.lean || 0) * s * 0.05;
+  ctx.save();
+  ctx.translate(x, 0);
+  ctx.scale(facing, 1);
+  ctx.strokeStyle = flash > 0 ? "#ffffff" : color;
+  ctx.fillStyle = flash > 0 ? "#ffffff" : color;
+  ctx.lineWidth = Math.max(3, 5 * scale);
+  ctx.lineCap = "round";
+  const L = (x1, y1, x2, y2) => { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
+  // 躯干 + 头
+  L(leanX, shY, leanX * 0.6, hipY);
+  ctx.beginPath(); ctx.arc(leanX * 1.1, headY, headR, 0, Math.PI * 2); ctx.stroke();
+  // 两段腿（膝盖朝前凸 → 自然站姿/跑姿）
+  const legs = P.legs || [[-0.13, 0.02], [0.17, 0]];
+  const hipX = leanX * 0.6;
+  for (const lg of legs) {
+    const fx = hipX + lg[0] * s * 0.34;
+    const fy = groundY - (lg[1] || 0) * s * 0.3;
+    const kx = (hipX + fx) / 2 + s * 0.09;
+    const ky = (hipY + fy) / 2 - (lg[1] || 0) * s * 0.1;
+    L(hipX, hipY, kx, ky); L(kx, ky, fx, fy);
+  }
+  // 双手重兵器：玩家重剑 / BOSS 巨斧后臂同握
+  const twoHanded = P.weapon === "heavy" || P.weapon === "eaxe";
+  const armF = P.armF || [0.8, 1.1];
+  const armB = twoHanded ? [armF[0] - 0.3, armF[1] - 0.14] : (P.armB || [0.95, 1.25]);
+  const handB = limb(armB);   // 后手坐标（弓弦终点跟后手走）
+  const hand = limb(armF);
+  if (P.weapon) {
+    // 刀刃/枪杆由小臂角驱动；弓垂直持握（内部自绘，不用腕角）
+    const wang = P.weapon === "bow" ? armF[1] + 1.45 : armF[1] + (P.wrist === undefined ? -0.15 : P.wrist);
+    drawWeapon(hand.x, hand.y, wang, P.weapon, scale, extra && extra.charged, extra && extra.nocked, handB, extra);
+  }
+  ctx.restore();
+
+  function limb(angs){
+    const a1 = angs[0], a2 = angs[1];
+    const ex = leanX + Math.cos(a1) * s * 0.28, ey = shY + Math.sin(a1) * s * 0.28;
+    const hx = ex + Math.cos(a2) * s * 0.27, hy = ey + Math.sin(a2) * s * 0.27;
+    L(leanX, shY, ex, ey); L(ex, ey, hx, hy);
+    return { x: hx, y: hy };
+  }
+}
+// 武器沿小臂方向（刀刃角）绘制：刀真的"握在手里并随手转"；弓为竖直持握（不受腕角旋转）
+// 外观随锻造等级进化（颜值系统）：0 凡铁 → 1 青锋 → 2 赤金 → 3 寒光 → 4 紫电 → 5 神兵
+function drawWeapon(hx, hy, ang, type, scale, charged, nocked, handB, extra){
+  const wkey = type === "heavy" ? "sword" : type;
+  const tier = clamp(SAVE.wLv[wkey] || 0, 0, 5);
+  const isMax = tier >= 5;
+  const glow = tier >= 3;                      // 寒光起自带辉光
+  const glowCol = TIER_COLOR[tier];
+  ctx.save();
+  ctx.translate(hx, hy);
+  if (type !== "bow") ctx.rotate(ang);
+  if (type === "sword" || type === "heavy"){
+    const heavy = type === "heavy";
+    const len = (heavy ? 100 : 80) * scale * (1 + tier * 0.09);     // 锻造加长刀身
+    const wd = Math.max(3, (heavy ? 6.5 : 4.5) * scale) * (1 + tier * 0.06);
+    // 高阶辉光：刀身外圈品阶色光晕
+    if (glow) {
+      ctx.save();
+      ctx.globalAlpha = 0.30 + 0.14 * Math.sin(nowSec * 10);
+      ctx.strokeStyle = glowCol; ctx.lineWidth = 7;
+      ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(len, 0); ctx.stroke();
+      ctx.restore();
+    }
+    // 刀柄 + 护手（高阶：缠绳纹 + 兽首护手）
+    ctx.strokeStyle = tier >= 2 ? "#5a4028" : "#8a6f4d"; ctx.lineWidth = Math.max(3, 4 * scale);
+    ctx.beginPath(); ctx.moveTo(-15 * scale, 0); ctx.lineTo(0, 0); ctx.stroke();
+    if (tier >= 1) {   // 柄绳
+      ctx.strokeStyle = tier >= 4 ? "#8a6fb0" : "#a08868"; ctx.lineWidth = 1.4;
+      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(-13 * scale + i * 3.2, -2.4); ctx.lineTo(-10.5 * scale + i * 3.2, 2.4); ctx.stroke(); }
+    }
+    ctx.strokeStyle = tier >= 3 ? glowCol : "#c9b08a"; ctx.lineWidth = Math.max(2.5, 3 * scale) * (tier >= 2 ? 1.25 : 1);
+    if (tier >= 4) {   // 神兵/紫电：菱形大护手
+      ctx.beginPath(); ctx.moveTo(0, -15 * scale); ctx.lineTo(5 * scale, 0); ctx.lineTo(0, 15 * scale); ctx.lineTo(-5 * scale, 0); ctx.closePath(); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(0, -11 * scale); ctx.lineTo(0, 11 * scale); ctx.stroke();
+    }
+    // 刃：梯形刀身 + 品阶脊线；蓄力 / 神兵炽亮
+    const bodyCol = charged ? "rgba(255,238,85,0.92)" : (tier === 0 ? "rgba(230,236,246,0.9)" : "rgba(" + hex2rgb(TIER_COLOR[tier]) + ",0.88)");
+    ctx.beginPath();
+    ctx.moveTo(2 * scale, -wd * 0.75);
+    ctx.lineTo(len * 0.55, -wd * 0.95);
+    ctx.lineTo(len, 0);
+    ctx.lineTo(len * 0.55, wd * 0.95);
+    ctx.lineTo(2 * scale, wd * 0.75);
+    ctx.closePath();
+    ctx.fillStyle = bodyCol;
+    ctx.fill();
+    ctx.strokeStyle = charged ? "#ffee55" : (tier === 0 ? "#e8edf5" : TIER_COLOR[tier]); ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = tier >= 2 ? glowCol : "#ffffff"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(6 * scale, -1); ctx.lineTo(len * 0.88, -2.5); ctx.stroke();
+    if (tier >= 3) {   // 寒光以上：刃口流光
+      ctx.save();
+      ctx.globalAlpha = 0.6 + 0.35 * Math.sin(nowSec * 14);
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(len * 0.3, -wd * 0.7); ctx.lineTo(len * 0.92, 0); ctx.stroke();
+      ctx.restore();
+    }
+    if (isMax) {       // 神兵：刃尖星芒
+      ctx.save();
+      ctx.globalAlpha = 0.5 + 0.4 * Math.sin(nowSec * 8);
+      ctx.strokeStyle = "#ffe66e"; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.moveTo(len, 0); ctx.lineTo(len + 14, 0); ctx.stroke();
+      ctx.beginPath(); ctx.arc(len, 0, 5, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+  } else if (type === "spear"){
+    const t = tier;
+    const shaftLen = 108 * scale * (1 + t * 0.06);
+    const skillOn = player.state === "lunge" || player.state === "sweep" || player.state === "drop";
+    // 高阶辉光
+    if (t >= 3 || skillOn) {
+      ctx.save();
+      ctx.globalAlpha = (skillOn ? 0.42 : 0.28) + 0.12 * Math.sin(nowSec * 10);
+      ctx.strokeStyle = skillOn ? "#a0ffd0" : glowCol; ctx.lineWidth = skillOn ? 9 : 6; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(20 * scale, 0); ctx.lineTo(shaftLen + 18 * scale, 0); ctx.stroke();
+      ctx.restore();
+    }
+    // 杆：暗描边 + 亮芯（双线，比单线厚一档）
+    ctx.strokeStyle = "#3a3038"; ctx.lineWidth = Math.max(5, 5.6 * scale); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-34 * scale, 0); ctx.lineTo(shaftLen, 0); ctx.stroke();
+    ctx.strokeStyle = t >= 1 ? (t >= 4 ? "#8a76b0" : "#a8875e") : "#b89a70"; ctx.lineWidth = Math.max(3, 3.4 * scale);
+    ctx.beginPath(); ctx.moveTo(-34 * scale, 0); ctx.lineTo(shaftLen, 0); ctx.stroke();
+    ctx.save();   // 杆身高光
+    ctx.globalAlpha = 0.5; ctx.strokeStyle = t >= 3 ? "#ffffff" : "#f4e6cc"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, -1.5 * scale); ctx.lineTo(shaftLen - 6, -1.5 * scale); ctx.stroke();
+    ctx.restore();
+    // 枪鐏（杆尾铁锥）
+    ctx.fillStyle = "#8a9099";
+    ctx.beginPath(); ctx.moveTo(-34 * scale, 0); ctx.lineTo(-46 * scale, -3 * scale); ctx.lineTo(-46 * scale, 3 * scale); ctx.closePath(); ctx.fill();
+    if (t >= 2) {   // 赤金以上：枪杆缠纹
+      ctx.strokeStyle = glowCol; ctx.lineWidth = 1.2;
+      for (let i = 0; i < 5; i++) { const px = (30 + i * 14) * scale; ctx.beginPath(); ctx.moveTo(px, -3); ctx.lineTo(px + 8, 3); ctx.stroke(); }
+    }
+    // 红缨：青锋起有，神兵变金缨；技能中加长飘动
+    if (t >= 1 || skillOn) {
+      const flow = skillOn ? 1.8 : 1;
+      ctx.strokeStyle = t >= 5 ? "#ffe66e" : "#d64141"; ctx.lineWidth = 2.2;
+      for (let i = 0; i < 5; i++) {
+        ctx.globalAlpha = 0.55 + i * 0.09;
+        ctx.beginPath(); ctx.moveTo(shaftLen - 6, 0);
+        ctx.quadraticCurveTo(shaftLen + 4 + i * 4, (-7 - i * 3) * flow, shaftLen + 10 + i * 8, (5 + i * 6) * flow);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    // 枪尖：菱形双翼 + 高阶流光
+    const tipCol = t === 0 ? "#dfe4ea" : TIER_COLOR[t];
+    ctx.fillStyle = tipCol;
+    ctx.beginPath(); ctx.moveTo(shaftLen, 0); ctx.lineTo(shaftLen + 19 * scale, -3.5 * scale); ctx.lineTo(shaftLen + 19 * scale, 3.5 * scale); ctx.closePath(); ctx.fill();
+    if (t >= 2 || skillOn) {   // 双翼倒钩
+      ctx.fillStyle = ctx.strokeStyle = t >= 4 ? glowCol : "#c8d4e0";
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.moveTo(shaftLen + 4, 0); ctx.lineTo(shaftLen + 14 * scale, -9 * scale); ctx.lineTo(shaftLen + 17 * scale, -2 * scale); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(shaftLen + 4, 0); ctx.lineTo(shaftLen + 14 * scale, 9 * scale); ctx.lineTo(shaftLen + 17 * scale, 2 * scale); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    // 枪锋白线 + 尖端点光
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = t >= 3 ? 1.6 : 1;
+    ctx.globalAlpha = 0.7 + 0.3 * Math.sin(nowSec * 14);
+    ctx.beginPath(); ctx.moveTo(shaftLen + 2, 0); ctx.lineTo(shaftLen + 19 * scale, 0); ctx.stroke();
+    ctx.globalAlpha = 1;
+    if (t >= 3 || skillOn) {
+      ctx.fillStyle = "#ffffff";
+      ctx.globalAlpha = 0.5 + 0.4 * Math.sin(nowSec * 16);
+      ctx.beginPath(); ctx.arc(shaftLen + 20 * scale, 0, 2.4, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  } else if (type === "shield"){
+    const sh = extra || {};
+    const crack = clamp(sh.shieldDmg || 0, 0, 1);   // 0 完好 → 1 濒碎
+    if (sh.shieldBroken) {
+      // 破盾后：只剩半片锯齿残骸（暗色、断口），随手臂晃动
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = "#262c34"; ctx.strokeStyle = "#4a525c"; ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(12 * scale, -26 * scale);
+      ctx.lineTo(21 * scale, -14 * scale);
+      ctx.lineTo(15 * scale, -5 * scale);
+      ctx.lineTo(22 * scale, 5 * scale);
+      ctx.lineTo(13 * scale, 12 * scale);
+      ctx.lineTo(16 * scale, 1 * scale);
+      ctx.lineTo(10 * scale, -9 * scale);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    } else {
+      // 盾面被击时的白闪 + 损伤加深配色
+      const hot = (sh.shieldFlash || 0) > 0;
+      const base = hot ? "#c8d6ea" : (crack > 0.6 ? "#2e343c" : "#39424e");
+      ctx.fillStyle = base; ctx.strokeStyle = hot ? "#ffffff" : (crack > 0.6 ? "#55606c" : "#66707c"); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(16 * scale, 0, 10 * scale, 34 * scale, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      // 盾心铆钉
+      ctx.fillStyle = hot ? "#ffffff" : "#8892a0"; ctx.beginPath(); ctx.arc(16 * scale, 0, 3.5 * scale, 0, Math.PI * 2); ctx.fill();
+      // 裂纹：随耐久下降逐条出现（3 条）
+      if (crack > 0.25) {
+        ctx.strokeStyle = "#0f1318"; ctx.lineWidth = 1.6; ctx.lineCap = "round";
+        const cracks = [
+          [[14, -24], [19, -14], [12, -6]],
+          [[18, 6], [11, 14], [17, 24]],
+          [[15, -12], [21, -8], [16, 0]],
+        ];
+        const nCrack = crack > 0.75 ? 3 : (crack > 0.5 ? 2 : 1);
+        for (let i = 0; i < nCrack; i++) {
+          ctx.beginPath();
+          cracks[i].forEach((pt, j) => { const X = pt[0] * scale, Y = pt[1] * scale; j ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); });
+          ctx.stroke();
+        }
+      }
+      // 高伤时盾面发抖（濒碎提示）
+      if (crack > 0.7) {
+        ctx.globalAlpha = 0.25 + 0.2 * Math.sin(nowSec * 22);
+        ctx.strokeStyle = "#ff6644"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(16 * scale, 0, 12 * scale, 36 * scale, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+  } else if (type === "eblade"){
+    // 敌·刀客朴刀：宽刃弯背、圆盘护手、铁灰带锈——与玩家武士刀形制区分（v0.5）
+    ctx.strokeStyle = "#6b5a44"; ctx.lineWidth = Math.max(3.5, 4.5 * scale);
+    ctx.beginPath(); ctx.moveTo(-14 * scale, 0); ctx.lineTo(0, 0); ctx.stroke();
+    ctx.fillStyle = "#8a8074";
+    ctx.beginPath(); ctx.arc(2 * scale, 0, 4.5 * scale, 0, Math.PI * 2); ctx.fill();
+    const len = 66 * scale, wd = 11 * scale;
+    ctx.beginPath();
+    ctx.moveTo(3 * scale, -wd * 0.55);
+    ctx.quadraticCurveTo(len * 0.45, -wd * 1.5, len, -wd * 0.35);
+    ctx.lineTo(len * 0.96, wd * 0.5);
+    ctx.quadraticCurveTo(len * 0.4, wd * 1.1, 3 * scale, wd * 0.55);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(196,188,172,0.85)"; ctx.fill();
+    ctx.strokeStyle = "#b8ac96"; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.strokeStyle = "#5a5044"; ctx.lineWidth = 1.2;   // 血槽
+    ctx.beginPath(); ctx.moveTo(8 * scale, -2); ctx.lineTo(len * 0.8, -wd * 0.35); ctx.stroke();
+  } else if (type === "efork"){
+    // 敌·枪兵猎叉：双尖叉 + 红缨——与玩家长枪形制区分（v0.5）
+    ctx.strokeStyle = "#7a5f42"; ctx.lineWidth = Math.max(3.5, 4 * scale);
+    const L0 = 120 * scale;
+    ctx.beginPath(); ctx.moveTo(-30 * scale, 0); ctx.lineTo(L0, 0); ctx.stroke();
+    ctx.strokeStyle = "#a83226"; ctx.lineWidth = 2;   // 缨
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath(); ctx.moveTo(L0 - 6, 0);
+      ctx.quadraticCurveTo(L0 + 2 + i * 3, -5 - i * 4, L0 + 8 + i * 6, 3 + i * 4);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = "#c2b8a4"; ctx.lineWidth = Math.max(2.5, 3 * scale); ctx.lineCap = "round";
+    const tipLen = 22 * scale, spread = 13 * scale;
+    ctx.beginPath(); ctx.moveTo(L0, 0); ctx.lineTo(L0 + tipLen, 0); ctx.stroke();                    // 中尖
+    ctx.beginPath(); ctx.moveTo(L0, -spread * 0.2); ctx.lineTo(L0 + 4 * scale, -spread); ctx.lineTo(L0 + tipLen * 0.92, -spread); ctx.stroke();   // 上叉
+    ctx.beginPath(); ctx.moveTo(L0, spread * 0.2); ctx.lineTo(L0 + 4 * scale, spread); ctx.lineTo(L0 + tipLen * 0.92, spread); ctx.stroke();       // 下叉
+  } else if (type === "eaxe"){
+    // 敌·BOSS 巨斧：月牙斧刃 + 斧面血符——与玩家重剑形制区分（v0.5；v0.6 缩到人形合比例）
+    ctx.strokeStyle = "#5f5040"; ctx.lineWidth = Math.max(4.5, 5 * scale);
+    const L0 = 92 * scale;
+    ctx.beginPath(); ctx.moveTo(-34 * scale, 0); ctx.lineTo(L0, 0); ctx.stroke();
+    ctx.fillStyle = "#9aa2ad"; ctx.strokeStyle = "#c8d2dc"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(L0 - 5, -4 * scale);
+    ctx.quadraticCurveTo(L0 + 30 * scale, -26 * scale, L0 + 33 * scale, 0);
+    ctx.quadraticCurveTo(L0 + 30 * scale, 26 * scale, L0 - 5, 4 * scale);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(178,40,36,0.85)";   // 斧面血符
+    ctx.beginPath(); ctx.arc(L0 + 12 * scale, 0, 4.5 * scale, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f0e0c8"; ctx.fillRect(L0 + 10 * scale, -2.5 * scale, 4 * scale, 5 * scale);
+  } else if (type === "bow"){
+    // 竖直长弓：弓梢上下、弓身弧向前凸；弦端点连到后手实际位置 → 拉弦动作由骨骼驱动
+    // 锻造进化：0 木弓 → 1 角弓（青纹）→ 2 赤铜弓 → 3 铁脊弓（辉光）→ 4 紫檀弓 → 5 神臂弓
+    const t = tier;
+    const R = 42 * scale * (1 + t * 0.05);
+    const cx = 4 * scale;
+    const tipY = R * 0.91;
+    const limbCol = t === 0 ? "#a8825a" : (charged ? "#9fe8ff" : TIER_COLOR[t]);
+    if (t >= 3) {   // 铁脊以上：弓身辉光
+      ctx.save();
+      ctx.globalAlpha = 0.30 + 0.14 * Math.sin(nowSec * 10);
+      ctx.strokeStyle = glowCol; ctx.lineWidth = 8; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.arc(cx - R * 0.42, 0, R, -1.15, 1.15); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.strokeStyle = limbCol; ctx.lineWidth = Math.max(3, 4 * scale) * (1 + t * 0.08); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(cx - R * 0.42, 0, R, -1.15, 1.15); ctx.stroke();
+    // v0.7：弓臂高光（内圈细亮线）——双线描边让木弓也有金属质感
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = t >= 3 ? "#ffffff" : "#f0e2c4"; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(cx - R * 0.42, 0, R - 3.2 * scale, -1.05, 1.05); ctx.stroke();
+    ctx.restore();
+    // 弓把缠绳：中央一小段加粗深色 + 三道缠纹
+    ctx.strokeStyle = t >= 2 ? "#4a3a2a" : "#6b503a"; ctx.lineWidth = Math.max(4, 6 * scale);
+    ctx.beginPath(); ctx.arc(cx - R * 0.42, 0, R, -0.17, 0.17); ctx.stroke();
+    ctx.strokeStyle = t >= 4 ? glowCol : "#d8c9a0"; ctx.lineWidth = 1.1;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.arc(cx - R * 0.42, 0, R + 1.5, i * 0.085 - 0.03, i * 0.085 + 0.03);
+      ctx.stroke();
+    }
+    if (t >= 1) {   // 角弓以上：反曲弓梢 + 缠筋纹
+      ctx.strokeStyle = t >= 2 ? glowCol : "#e8dcc0"; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(cx, -tipY); ctx.lineTo(cx + 9 * scale, -tipY - 8 * scale); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, tipY); ctx.lineTo(cx + 9 * scale, tipY + 8 * scale); ctx.stroke();
+      for (let i = 0; i < 3; i++) {
+        const ay = (i + 1) * R * 0.28;
+        ctx.beginPath(); ctx.moveTo(cx - 6 * scale, -ay); ctx.lineTo(cx - 12 * scale, -ay - 6); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx - 6 * scale, ay); ctx.lineTo(cx - 12 * scale, ay + 6); ctx.stroke();
+      }
+    }
+    if (t >= 5) {   // 神臂弓：弓心星辉
+      ctx.save();
+      ctx.globalAlpha = 0.5 + 0.4 * Math.sin(nowSec * 8);
+      ctx.strokeStyle = "#ffe66e"; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.arc(cx, 0, 7, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    // 弦：上弓梢 → 弦扣（后手）→ 下弓梢；未拉弦时竖直
+    let nockX = cx, nockY = 0;
+    if (handB) {
+      const bx = handB.x - hx, by = handB.y - hy;
+      if (bx < cx) { nockX = Math.max(bx, cx - 26 * scale); nockY = clamp(by, -9 * scale, 9 * scale); }
+    }
+    ctx.strokeStyle = t >= 3 ? "#dfe8ff" : "#e8e0cc"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(cx, -tipY); ctx.lineTo(nockX, nockY); ctx.lineTo(cx, tipY); ctx.stroke();
+    // 搭弦之箭：从弦扣沿水平向前（高阶箭矢染色）
+    if (nocked) {
+      const acol = t >= 2 ? TIER_COLOR[t] : "#d8c9a0";
+      ctx.strokeStyle = charged ? "#ffee88" : acol; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(nockX, nockY); ctx.lineTo(cx + 46 * scale, 0); ctx.stroke();
+      ctx.fillStyle = charged ? "#ffee88" : (t >= 2 ? TIER_COLOR[t] : "#eef2f7");
+      ctx.beginPath(); ctx.moveTo(cx + 46 * scale, 0); ctx.lineTo(cx + 58 * scale, -4 * scale); ctx.lineTo(cx + 58 * scale, 4 * scale); ctx.closePath(); ctx.fill();
+    }
+    // 蓄力满：弓身青辉
+    if (charged) {
+      ctx.globalAlpha = 0.45 + 0.25 * Math.sin(nowSec * 18);
+      ctx.strokeStyle = "#9fe8ff"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx - R * 0.42, 0, R + 8, -1.0, 1.0); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+  ctx.restore();
+}
+function hex2rgb(h){
+  return parseInt(h.slice(1, 3), 16) + "," + parseInt(h.slice(3, 5), 16) + "," + parseInt(h.slice(5, 7), 16);
+}
+
+// ---- 挥刀弧线表：小臂角从 startA（举刀）扫到 endA（劈落），刀刃跟随 ----
+const SWINGS = {
+  1:     { startA: -2.10, endA: 0.55, lean0: -0.40, lean1: 1.50, wrist: -0.10 },
+  2:     { startA: -2.35, endA: 0.45, lean0: -0.50, lean1: 1.60, wrist: -0.10 },
+  3:     { startA: -2.60, endA: 0.75, lean0: -0.70, lean1: 2.00, wrist: -0.10 },
+  4:     { startA: -2.70, endA: 0.85, lean0: -0.90, lean1: 2.05, wrist: -0.10 },   // 空中下劈：举刀过顶直坠
+  heavy: { startA: -2.85, endA: 1.05, lean0: -1.00, lean1: 2.20, wrist: -0.15 },
+};
+
+// ---- 玩家姿态 ----
+function drawPlayer(){
+  const p = player;
+  let pose;
+  const t = p.animT;
+  const s = 90;
+  const isBow = p.weapon === "bow";
+  if (p.state === "dodge") {
+    // 翻滚：团身旋转
+    ctx.save();
+    ctx.translate(p.x, p.y - 38);
+    ctx.rotate((0.35 - p.dodgeT) / 0.35 * Math.PI * 2 * p.dodgeDir);
+    ctx.strokeStyle = p.iframesT > 0 ? "#ffee55" : "#e8e8e8";
+    ctx.lineWidth = 5; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 1.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-14, -8); ctx.lineTo(20, 4); ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  // ---- 技能2：疾风乱舞（整体高速旋转） ----
+  if (p.state === "skill2") {
+    ctx.save();
+    ctx.translate(p.x, p.y - 48);
+    ctx.rotate(p.skillT * 17 * p.facing);
+    drawStick(0, 48, 1, "#e8e8e8", 1.0, { lean: 0, armF: [0.1, -0.3], armB: [-0.12, 0.28], wrist: 0,
+      legs: [[-0.12, 0.35], [0.12, 0.35]], weapon: isBow ? "bow" : "sword" });
+    ctx.restore();
+    // 旋风气流线
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = "#c9a0ff"; ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const a = p.skillT * 17 + i * 2.09;
+      ctx.beginPath(); ctx.arc(p.x, p.y - 50, 58 + i * 22, a, a + 1.4); ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+  if (p.state === "hurt") {
+    // 受击后仰，手臂本能后甩护身
+    pose = { lean: -1.8, armF: [-1.15, -0.75], armB: [-1.35, -0.95], wrist: -0.3, legs: [[-0.30, 0], [0.22, 0]], weapon: isBow ? "bow" : "sword" };
+  }
+  else if (p.state === "iai") {
+    // 居合：前倾疾冲、刀收身侧（出鞘前），拖影残像
+    pose = { lean: 1.5, armF: [0.35, -1.85], armB: [0.1, -0.5], wrist: -0.3,
+             legs: [[-0.62, 0.1], [0.72, 0.08]], weapon: "sword" };
+    ctx.save();
+    ctx.globalAlpha = 0.25; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.moveTo(p.x - p.facing * 120, p.y - 55); ctx.lineTo(p.x, p.y - 55); ctx.stroke();
+    ctx.restore();
+  }
+  else if (p.state === "lunge") {
+    // 游龙·破阵：骑马步疾突、双手送枪 + 龙形枪气
+    pose = { lean: 1.4, armF: [0.08, 0.03], armB: [-0.18, -0.28], wrist: -0.02,
+             legs: [[-0.52, 0.06], [0.68, 0.05]], weapon: "spear" };
+    ctx.save();
+    ctx.translate(p.x, p.y - 58); ctx.scale(p.facing, 1);
+    // 三层后向残影
+    for (let i = 1; i <= 3; i++) {
+      ctx.globalAlpha = 0.2 - i * 0.045;
+      ctx.strokeStyle = "#a0ffd0"; ctx.lineWidth = 8 - i * 1.6; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-i * 26, 0); ctx.lineTo(-i * 26 - 34, 0); ctx.stroke();
+    }
+    // 龙形枪气：节节收窄的龙身（外层厚淡 + 内层亮芯）+ 龙首
+    const lph = p.skillT * 26;
+    for (let i = 0; i < 10; i++) {
+      const xx = -46 + i * 20;
+      const yy = Math.sin(lph + i * 0.62) * (i / 10) * 18;
+      const k = 1 - i / 11;
+      ctx.strokeStyle = "#a0ffd0"; ctx.lineWidth = 24 * k + 2; ctx.lineCap = "round";
+      ctx.globalAlpha = 0.10 + 0.30 * k;
+      ctx.beginPath(); ctx.moveTo(xx, yy); ctx.lineTo(xx + 21, yy); ctx.stroke();
+      ctx.strokeStyle = "#eafff5"; ctx.lineWidth = 4 * k + 1;
+      ctx.globalAlpha = 0.35 + 0.5 * k;
+      ctx.beginPath(); ctx.moveTo(xx, yy); ctx.lineTo(xx + 21, yy); ctx.stroke();
+    }
+    // 龙首：带描边的三角头 + 眼点 + 双须（贴在枪尖位置，枪到哪龙头到哪）
+    const hx0 = 166, hy0 = Math.sin(lph + 9 * 0.62) * 18;
+    ctx.globalAlpha = 0.95;
+    ctx.beginPath();
+    ctx.moveTo(hx0 - 4, hy0 - 13); ctx.lineTo(hx0 + 42, hy0 - 17); ctx.lineTo(hx0 + 30, hy0);
+    ctx.lineTo(hx0 + 42, hy0 + 17); ctx.lineTo(hx0 - 4, hy0 + 13);
+    ctx.closePath();
+    ctx.fillStyle = "#d8fff0"; ctx.fill();
+    ctx.strokeStyle = "#5fe8b8"; ctx.lineWidth = 2.4; ctx.stroke();
+    ctx.fillStyle = "#134a3c";
+    ctx.beginPath(); ctx.arc(hx0 + 16, hy0 - 7, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(hx0 + 16, hy0 + 7, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#a0ffd0"; ctx.lineWidth = 2;
+    for (let s = -1; s <= 1; s += 2) {
+      ctx.beginPath();
+      ctx.moveTo(hx0 + 28, hy0 + s * 8);
+      ctx.quadraticCurveTo(hx0 + 60, hy0 + s * 26, hx0 + 44, hy0 + s * 38);
+      ctx.stroke();
+    }
+    // 枪尖爆点
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.047 + lph * 0.15;
+      ctx.beginPath(); ctx.moveTo(hx0 + 20 + Math.cos(a) * 8, hy0 + Math.sin(a) * 8);
+      ctx.lineTo(hx0 + 20 + Math.cos(a) * 26, hy0 + Math.sin(a) * 26); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  else if (p.state === "sweep") {
+    // 横扫·千军破：拧腰平扫（两段反向）
+    const sw = p.skillT < 0.13 ? lerp(0.3, 1.5, p.skillT / 0.13)
+             : p.skillT < 0.38 ? lerp(1.5, 0.4, (p.skillT - 0.13) / 0.25)
+             : lerp(-0.6, 1.25, (p.skillT - 0.38) / 0.24);
+    pose = { lean: 0.7, armF: [sw, sw - 0.45], armB: [sw - 0.4, sw - 0.7], wrist: -0.02,
+             legs: [[-0.42, 0.05], [0.5, 0.05]], weapon: "spear" };
+    // 双段 360° 弧光：第一段顺扫、第二段回扫（正反圆环 + 地面尘环）
+    ctx.save();
+    ctx.translate(p.x, p.y - 55);
+    const a1 = clamp((p.skillT - 0.13) / 0.24, 0, 1);
+    const a2 = clamp((p.skillT - 0.38) / 0.24, 0, 1);
+    ctx.lineCap = "round";
+    if (p.skillT >= 0.13 && a1 < 1) {
+      const e1 = easeOut(a1), a0 = -2.6, aEnd = a0 + 6.283 * e1;
+      ctx.globalAlpha = (1 - a1) * 0.8;
+      ctx.strokeStyle = "#a0ffd0"; ctx.lineWidth = 14 * (1 - a1) + 3;
+      ctx.beginPath(); ctx.ellipse(0, 8, 232, 78, 0, a0, aEnd); ctx.stroke();
+      ctx.globalAlpha = (1 - a1) * 0.65;
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.ellipse(0, 8, 200, 62, 0, a0, aEnd); ctx.stroke();
+      // 扫击前缘：一段高亮拖刃（读得出"枪尖正在这一侧"）
+      ctx.globalAlpha = (1 - a1) * 0.95;
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.ellipse(0, 8, 232, 78, 0, aEnd - 0.45, aEnd); ctx.stroke();
+    }
+    if (p.skillT >= 0.38 && a2 < 1) {
+      const e2 = easeOut(a2), b0 = 2.9, bEnd = b0 - 6.283 * e2;
+      ctx.globalAlpha = (1 - a2) * 0.7;
+      ctx.strokeStyle = "#c8ffe8"; ctx.lineWidth = 12 * (1 - a2) + 2.5;
+      ctx.beginPath(); ctx.ellipse(0, 8, 250, 90, 0, b0, bEnd, true); ctx.stroke();
+      ctx.globalAlpha = (1 - a2) * 0.45;
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.ellipse(0, 8, 214, 70, 0, b0, bEnd, true); ctx.stroke();
+      ctx.globalAlpha = (1 - a2) * 0.9;
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.ellipse(0, 8, 250, 90, 0, bEnd, bEnd + 0.45, true); ctx.stroke();
+    }
+    ctx.restore();
+    // 地面横扫尘环
+    if (p.skillT >= 0.13 && p.skillT <= 0.75) {
+      const q = clamp((p.skillT - 0.13) / 0.5, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = (1 - q) * 0.45;
+      ctx.strokeStyle = "#8fe8c0"; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.ellipse(p.x, GROUND + 4, 60 + q * 200, 10 + q * 26, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+  }
+  else if (p.state === "drop") {
+    // 坠天·裂地：空中倒持枪下坠 / 落地压枪收势
+    if (!p.onGround) {
+      pose = { lean: 0.2, armF: [0.15, 0.85], armB: [0.3, 1.0], wrist: 0, legs: [[-0.3, 0.45], [0.3, 0.4]], weapon: "spear" };
+      // 下坠光束：三道竖直流光 + 枪尖聚能
+      ctx.save();
+      ctx.translate(p.x, p.y - 50);
+      ctx.lineCap = "round";
+      for (let i = 0; i < 3; i++) {
+        ctx.globalAlpha = 0.16 + i * 0.14;
+        ctx.strokeStyle = i === 1 ? "#ffffff" : "#a0ffd0"; ctx.lineWidth = i === 1 ? 2 : 6;
+        const off = (i - 1) * 12;
+        ctx.beginPath(); ctx.moveTo(off, -34); ctx.lineTo(off, -150 - i * 24); ctx.stroke();
+      }
+      ctx.globalAlpha = 0.6 + 0.3 * Math.sin(nowSec * 22);
+      ctx.fillStyle = "#ccffe6";
+      ctx.beginPath(); ctx.arc(0, 62, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } else {
+      pose = { lean: 1.2, armF: [0.5, 0.9], armB: [0.2, 0.6], wrist: 0, legs: [[-0.55, 0.05], [0.6, 0.1]], weapon: "spear" };
+      // 落地：五道上冲光柱 + 地面裂线
+      const q = clamp(p.skillT / 0.4, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = (1 - q) * 0.7;
+      ctx.lineCap = "round";
+      for (let i = 0; i < 5; i++) {
+        const xx = p.x + (i - 2) * 30;
+        const hh = (86 + (i % 2) * 60) * (1 - q * 0.35);
+        ctx.strokeStyle = i % 2 ? "#a0ffd0" : "#ffffff"; ctx.lineWidth = i % 2 ? 5 : 2.5;
+        ctx.beginPath(); ctx.moveTo(xx, GROUND); ctx.lineTo(xx + (i - 2) * 4, GROUND - hh); ctx.stroke();
+      }
+      ctx.globalAlpha = (1 - q) * 0.5;
+      ctx.strokeStyle = "#7fe8c0"; ctx.lineWidth = 2;
+      for (let i = 0; i < 6; i++) {
+        const a = i * 1.047, rr = 40 + q * 190;
+        ctx.beginPath();
+        ctx.moveTo(p.x + Math.cos(a) * rr * 0.5, GROUND);
+        ctx.lineTo(p.x + Math.cos(a) * rr, GROUND + Math.sin(a) * 8);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+  else if (p.state === "rain") {
+    // 万箭·天罗：仰身朝天拉弓放箭
+    pose = { lean: -0.3, armF: [-0.55, -0.95], armB: [-0.25, -0.85], wrist: 0,
+             legs: [[-0.3, 0], [0.35, 0]], weapon: "bow" };
+    // 覆盖范围预告：五条循环落箭轨迹（让玩家看清"这片区域要下雨"）
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.strokeStyle = "#9fe8ff"; ctx.lineWidth = 2; ctx.lineCap = "round";
+    for (let i = 0; i < 7; i++) {
+      const xx = p.x + p.facing * (80 + i * 62);
+      const yy = ((nowSec * 900 + i * 137) % 400) + 30;
+      ctx.beginPath(); ctx.moveTo(xx, yy); ctx.lineTo(xx, yy + 76); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(xx - 5, yy + 68); ctx.lineTo(xx, yy + 78); ctx.lineTo(xx + 5, yy + 68); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  else if (p.state === "stormshot") {
+    // 裂云·贯日：架弓连射，弦震三叠向前推
+    pose = { lean: 0.5, armF: [0.1, 0.02], armB: [-0.18, -0.9], wrist: 0,
+             legs: [[-0.36, 0], [0.42, 0.02]], weapon: "bow" };
+    const q = clamp(p.skillT / 0.5, 0, 1);
+    ctx.save();
+    ctx.translate(p.x + p.facing * 46, p.y - 62); ctx.scale(p.facing, 1);
+    for (let i = 0; i < 2; i++) {
+      const k = clamp(q * 1.7 - i * 0.3, 0, 1);
+      if (k <= 0 || k >= 1) continue;
+      ctx.globalAlpha = (1 - k) * (i ? 0.7 : 0.45);
+      ctx.strokeStyle = i === 1 ? "#ffffff" : "#ffe9a0"; ctx.lineWidth = 3 - i;
+      ctx.beginPath(); ctx.arc(-26, 0, 30 + k * 46, -0.55, 0.55); ctx.stroke();
+    }
+    // 出弦方向的速度线（比弧线更能读出"箭往哪飞"）
+    const kk = clamp(q * 2.2, 0, 1);
+    ctx.globalAlpha = (1 - kk) * 0.75;
+    ctx.strokeStyle = "#fff6cc"; ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath(); ctx.moveTo(20, (i - 1) * 9); ctx.lineTo(20 + 70 * (1 - kk), (i - 1) * 9); ctx.stroke();
+    }
+    // 弦口聚能星芒
+    ctx.globalAlpha = 0.55 + 0.35 * Math.sin(nowSec * 26);
+    ctx.strokeStyle = "#fff6cc"; ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const a = i * 1.571 + nowSec * 7;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * 8, Math.sin(a) * 8);
+      ctx.lineTo(Math.cos(a) * 20, Math.sin(a) * 20); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  else if (p.state === "windStep") {
+    // 疾风·回锋：后撤仰身，三层风影拖后
+    pose = { lean: -0.45, armF: [0.16, 0.06], armB: [0.5, 0.9], wrist: 0,
+             legs: [[0.35, 0.28], [0.1, 0.46]], weapon: "bow" };
+    ctx.save();
+    ctx.translate(p.x, p.y - 55);
+    for (let i = 1; i <= 3; i++) {
+      ctx.globalAlpha = 0.22 - i * 0.055;
+      ctx.strokeStyle = "#8ff0ff"; ctx.lineWidth = 6 - i;
+      ctx.beginPath(); ctx.arc(-p.windDir * i * 22, 0, 24 + i * 4, 0.35, 2.7); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  else if (p.state === "block") {
+    // 格挡：举兵器护身（刀竖挡 / 弓前竖 / 枪斜架）
+    if (isBow) {
+      pose = { lean: -0.15, armF: [0.35, 0.15], armB: [-0.4, -0.9], wrist: 0, legs: [[-0.3, 0], [0.32, 0]], weapon: "bow" };
+    } else if (p.weapon === "spear") {
+      pose = { lean: -0.1, armF: [0.3, -0.55], armB: [-0.25, -0.75], wrist: 0, legs: [[-0.3, 0], [0.32, 0]], weapon: "spear" };
+    } else {
+      pose = { lean: -0.1, armF: [0.25, -1.15], armB: [-0.5, -1.0], wrist: -0.1, legs: [[-0.3, 0], [0.32, 0]], weapon: "sword" };
+    }
+    // 起手 0.18s：完美格挡窗口提示（白辉）
+    if (p.blockT <= 0.18) {
+      ctx.save();
+      ctx.globalAlpha = 0.5 - p.blockT * 2.2;
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(p.x + p.facing * 42, p.y - 55, 40 + p.blockT * 60, -0.8, 0.8); ctx.stroke();
+      ctx.restore();
+    }
+  }
+  else if (p.state === "skill1") {
+    // 剑气·裂空：收臂蓄势 → 全力前刺送出剑气
+    const q = clamp(p.skillT / 0.32, 0, 1);
+    const ext = q < 0.3 ? easeOut(q / 0.3) : 1 - (q - 0.3) / 0.7 * 0.35;
+    pose = { lean: -0.15 + 0.75 * ext, armF: [0.5 - 0.5 * ext, 0.55 - 0.53 * ext], armB: [-0.4, -0.75], wrist: 0.05,
+             legs: [[-0.5 - 0.15 * ext, 0], [0.55 + 0.2 * ext, 0.05]], weapon: "sword" };
+  }
+  else if (p.state === "shoot") {
+    // 弓射：前臂持弓平伸，后手从弦上收到颊侧再回弹（弦端点跟随后手骨骼）
+    if (p.phase === "windup") {
+      const q = clamp(p.phaseT / SHOOT.windup, 0, 1);
+      pose = { lean: 0.35, armF: [0.08, 0.02], armB: [lerp(0.1, -0.32, q), lerp(-0.5, -1.18, q)], wrist: 0,
+               legs: [[-0.32, 0], [0.38, 0.02]], weapon: "bow" };
+    } else {
+      // 放箭后：后手回弹、上身后送
+      pose = { lean: 0.42, armF: [0.1, 0.02], armB: [-0.06, -0.38], wrist: 0,
+               legs: [[-0.32, 0], [0.38, 0.02]], weapon: "bow" };
+    }
+  }
+  else if (p.state === "charge") {
+    // 蓄力：弓=开弓拉弦贴颊 / 枪=撤枪后蓄 / 刀=双手举剑过顶后坐蓄势
+    const c = Math.min(1, p.chargeT / 0.35);
+    const tremble = Math.sin(t * 32) * 0.06 * c;
+    if (isBow) {
+      pose = { lean: 0.35, armF: [0.08, 0.02], armB: [lerp(0.1, -0.32, c), lerp(-0.5, -1.2, c) + tremble], wrist: 0,
+               legs: [[-0.34, 0], [0.4, 0.02]], weapon: "bow" };
+    } else if (p.weapon === "spear") {
+      // 撤枪：双手后收、枪尖后引，前腿弓步
+      pose = { lean: -0.3 - 0.2 * c, armF: [-0.25 + tremble, -0.75 + tremble], armB: [-0.5, -1.0], wrist: -0.05,
+               legs: [[-0.42 - 0.08 * c, 0], [0.34 + 0.1 * c, 0.02]], weapon: "spear" };
+    } else {
+      pose = { lean: -0.55 - 0.25 * c, armF: [-1.55 + tremble, -2.45 + tremble], armB: [0.55, 0.85], wrist: -0.15,
+               legs: [[-0.38 - 0.1 * c, 0], [0.30 + 0.12 * c, 0.04]], weapon: "heavy" };
+    }
+    if (p.charged) {
+      // 蓄力光效：弓青辉 / 枪翠辉 / 刀金辉（GDD §4.1）
+      ctx.save();
+      ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 18);
+      ctx.strokeStyle = isBow ? "#9fe8ff" : p.weapon === "spear" ? "#a0ffd0" : "#ffee55"; ctx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) { const a = t * 3 + i * 1.256; ctx.beginPath(); ctx.arc(p.x + p.facing * 20, p.y - 60, 28 + i * 7, a, a + 1.1); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+  else if (p.state === "attack") {
+    const st = stageStats();
+    if (p.weapon === "spear") {
+      // 突刺：撤枪→猛送→收枪（枪杆沿手臂水平，判定帧由 update 冲刺步送力）
+      let a2, lean;
+      if (p.phase === "windup") {
+        const q = clamp(p.phaseT / (st.windup / atkSpeedMult() + 0.001), 0, 1);
+        a2 = lerp(0.3, -0.62, easeOut(q)); lean = lerp(0.4, 0.15, q);
+      } else if (p.phase === "active") {
+        const q = clamp(p.phaseT / (st.active + 0.001), 0, 1);
+        const e = easeOutQuart(q);                       // 起手即全速 → 突刺爆发感
+        a2 = lerp(-0.62, 0.14, e); lean = lerp(0.15, 0.95, e);
+      } else {
+        const q = clamp(p.phaseT / (st.recovery / atkSpeedMult() + 0.001), 0, 1);
+        a2 = lerp(0.14, 0.38, q); lean = lerp(0.95, 0.5, q);
+      }
+      pose = { lean, armF: [a2 - 0.32, a2], armB: [a2 - 0.52, a2 - 0.34], wrist: -0.02,
+               legs: p.onGround ? [[-0.45, 0.03], [0.5, 0.06]] : [[-0.2, 0.55], [0.25, 0.5]], weapon: "spear" };
+      // 突刺拖尾：判定帧水平速度线
+      if (p.phase === "active") {
+        ctx.save();
+        ctx.translate(p.x, 0); ctx.scale(p.facing, 1);
+        const cyy = p.y - 58, far = Math.min(st.range * 0.8, 170);
+        ctx.globalAlpha = 0.5; ctx.strokeStyle = p.stage === -1 ? "#a0ffd0" : "#d8f5e4"; ctx.lineWidth = 4; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(14, cyy); ctx.lineTo(far, cyy); ctx.stroke();
+        ctx.globalAlpha = 0.25; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(8, cyy + 9); ctx.lineTo(far * 0.7, cyy + 9); ctx.stroke();
+        ctx.restore();
+      }
+    }
+    else {
+    const sw = p.stage === -1 ? SWINGS.heavy : (SWINGS[p.stage] || SWINGS[clamp(p.stage, 1, 3)]);
+    const prevEnd = (p.stage === 1 || p.stage === -1 || p.stage === 4) ? 1.05 : (SWINGS[clamp(p.stage, 1, 3) - 1] || SWINGS[1]).endA;  // 连段从上一刀收势接起
+    let a2, lean, strikeP = 0;
+    if (p.phase === "windup") {
+      const q = clamp(p.phaseT / (st.windup / atkSpeedMult() + 0.001), 0, 1);
+      a2 = lerp(prevEnd, sw.startA, easeOut(q)); lean = lerp(0.3, sw.lean0, q);
+    } else if (p.phase === "active") {
+      strikeP = clamp(p.phaseT / (st.active + 0.001), 0, 1);
+      const e = easeOutQuart(strikeP);                       // 起手即全速 → 打击感
+      a2 = lerp(sw.startA, sw.endA, e); lean = lerp(sw.lean0, sw.lean1, e);
+    } else {
+      const q = clamp(p.phaseT / (st.recovery / atkSpeedMult() + 0.001), 0, 1);
+      a2 = lerp(sw.endA, sw.endA + 0.18, q); lean = lerp(sw.lean1, 0.6, q); strikeP = 1;   // 顺势收刀
+    }
+    // 上臂滞后于小臂（肘关节拖拽）→ 挥刀像甩鞭
+    const a1 = a2 - lerp(0.95, 0.22, p.phase === "windup" ? 0 : strikeP);
+    const airborne = !p.onGround;
+    pose = { lean, armF: [a1, a2], armB: [0.5, 0.8], wrist: sw.wrist,
+             legs: airborne ? [[-0.2, 0.55], [0.25, 0.5]] : [[-0.50, 0.03], [0.55, 0.06]],
+             weapon: p.stage === -1 ? "heavy" : "sword" };
+    // ---- 刀光拖尾：挥击弧线（扇形轨迹） ----
+    if (p.phase === "active" || (p.phase === "recovery" && p.phaseT < 0.08)) {
+      ctx.save();
+      ctx.translate(p.x, 0); ctx.scale(p.facing, 1);
+      const cx = leanXof(pose), cy = p.y - s * 0.82;
+      for (let i = 0; i < 3; i++) {
+        ctx.globalAlpha = (0.30 - i * 0.08) * (p.phase === "active" ? 1 : 0.55);
+        ctx.strokeStyle = (p.stage === -1 || p.stage === 4) ? "#ff8844" : "#ffeecc";
+        ctx.lineWidth = 8 - i * 2.4;
+        ctx.beginPath(); ctx.arc(cx, cy, s * (1.02 + i * 0.10), Math.min(sw.startA, a2), Math.max(sw.startA, a2)); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    }   // 刀分支
+  }
+  else if (p.state === "run") {
+    // 跑动：手臂与腿反向摆动；弓前手持弓 / 枪斜端 / 刀握身侧
+    const ph = (p.runX / 95) * Math.PI * 2 % (Math.PI * 2);
+    const swing = Math.sin(ph);
+    if (isBow) {
+      pose = { lean: 1.0, armF: [0.25, 0.15], armB: [0.55 + swing * 0.5, 0.95 + swing * 0.55], wrist: 0,
+               legs: [[swing * 0.42, 0.32 * Math.max(0, swing)], [-swing * 0.42, 0.32 * Math.max(0, -swing)]], weapon: "bow" };
+    } else if (p.weapon === "spear") {
+      pose = { lean: 1.0, armF: [0.3 - swing * 0.12, 0.08 - swing * 0.1], armB: [0.5 + swing * 0.35, 0.45 + swing * 0.3], wrist: -0.05,
+               legs: [[swing * 0.42, 0.32 * Math.max(0, swing)], [-swing * 0.42, 0.32 * Math.max(0, -swing)]], weapon: "spear" };
+    } else {
+      pose = { lean: 1.0, armF: [0.55 - swing * 0.5, 0.95 - swing * 0.55], armB: [0.55 + swing * 0.5, 0.95 + swing * 0.55], wrist: -0.35,
+               legs: [[swing * 0.42, 0.32 * Math.max(0, swing)], [-swing * 0.42, 0.32 * Math.max(0, -swing)]], weapon: "sword" };
+    }
+  }
+  else if (!p.onGround) {
+    // 跃起：弓=持弓待射 / 枪=斜举 / 刀=上举蓄势，双腿收拢
+    if (isBow) {
+      pose = { lean: 0.5, armF: [0.1, 0.02], armB: [0.4, 0.1], wrist: 0, legs: [[-0.35, 0.45], [0.28, 0.12]], weapon: "bow" };
+    } else if (p.weapon === "spear") {
+      pose = { lean: 0.5, armF: [0.15, -0.35], armB: [0.5, 0.2], wrist: -0.05, legs: [[-0.35, 0.45], [0.28, 0.12]], weapon: "spear" };
+    } else {
+      pose = { lean: 0.6, armF: [-0.95, -1.65], armB: [0.85, 1.15], wrist: -0.2, legs: [[-0.35, 0.45], [0.28, 0.12]], weapon: "sword" };
+    }
+  }
+  else { // idle 呼吸：垂刀而立 / 持弓而立 / 拄枪而立
+    if (isBow) {
+      pose = { lean: 0.12 + 0.03 * Math.sin(t * 2), armF: [0.5 + 0.04 * Math.sin(t * 2), 0.2], armB: [0.85, 1.1], wrist: 0,
+               legs: [[-0.13, 0.02], [0.17, 0]], weapon: "bow" };
+    } else if (p.weapon === "spear") {
+      // 拄枪：枪尾拄地、枪尖斜指天
+      pose = { lean: 0.1 + 0.03 * Math.sin(t * 2), armF: [-0.4, -1.35 + 0.05 * Math.sin(t * 2)], armB: [0.3, 0.75], wrist: 0.1,
+               legs: [[-0.13, 0.02], [0.17, 0]], weapon: "spear" };
+    } else {
+      pose = { lean: 0.12 + 0.03 * Math.sin(t * 2), armF: [0.72 + 0.04 * Math.sin(t * 2), 1.05], armB: [0.95, 1.3], wrist: -0.45,
+               legs: [[-0.13, 0.02], [0.17, 0]], weapon: "sword" };
+    }
+  }
+  // 剑意时刻玩家高亮（GDD §7）
+  if (enemyTimeScale < 0.7) {
+    ctx.save(); ctx.globalAlpha = 0.35; ctx.strokeStyle = "#ffee55"; ctx.lineWidth = 14;
+    ctx.beginPath(); ctx.moveTo(player.x, player.y - 100); ctx.lineTo(player.x, player.y); ctx.stroke(); ctx.restore();
+  }
+  // 受击无敌闪烁
+  if (p.invulnT > 0 && Math.floor(nowSec * 14) % 2 === 0) return;
+  const nocked = isBow && (p.state === "charge" || (p.state === "shoot" && p.phase === "windup"));
+  drawStick(p.x, p.y, p.facing, "#e8e8e8", 1.0, pose, 0, { charged: p.state === "charge" && p.charged, nocked });
+}
+function leanXof(pose){ return (pose.lean || 0) * 90 * 0.05; }
+
+// ---- 敌人姿态 ----
+function drawEnemy(e){
+  const P = enemyPose(e);
+  const shY = e.y - 90 * e.scale * 0.82;
+  // 前摇红光 → 升级为攻击范围预告（扇形/箭头，威胁可读才敢贴身贪刀）
+  if (e.state === "telegraph") {
+    ctx.save();
+    ctx.translate(e.x, 0); ctx.scale(e.facing, 1);
+    ctx.globalAlpha = 0.20 + 0.13 * Math.sin(nowSec * 16);
+    if (e.type === "spear") {
+      const rx = 40 + e._range * e.scale;
+      ctx.strokeStyle = "#ff4433"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(24, shY); ctx.lineTo(rx, shY); ctx.stroke();
+      ctx.fillStyle = "#ff4433";
+      ctx.beginPath(); ctx.moveTo(rx, shY - 9); ctx.lineTo(rx + 14, shY); ctx.lineTo(rx, shY + 9); ctx.closePath(); ctx.fill();
+    } else {
+      ctx.strokeStyle = e.isBoss ? "#ff5522" : "#ff3333";
+      ctx.lineWidth = 10 * e.scale;
+      ctx.beginPath(); ctx.arc(0, shY, 95 * e.scale, -0.5, 0.75); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // 挥击刀光（敌人也有弧线拖尾）
+  if (e.state === "attack" && e.t < 0.25) {
+    ctx.save();
+    ctx.translate(e.x, 0); ctx.scale(e.facing, 1);
+    ctx.globalAlpha = 0.30 * (1 - e.t / 0.25);
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 5 * e.scale;
+    ctx.beginPath(); ctx.arc(0, shY, 92 * e.scale, -2.0, 0.45); ctx.stroke();
+    ctx.restore();
+  }
+  drawStick(e.x, e.y, e.facing, e.color, e.scale, P, e.hitFlash > 0 ? 1 : 0,
+    { shieldBroken: e.shieldBroken, shieldDmg: e.shieldMax ? 1 - e.shieldHp / e.shieldMax : 0, shieldFlash: e.shieldFlash });
+  // 血条（加厚 + 描边 + 内高光）
+  if (!e.dead) {
+    const bw = 56 * e.scale, bh = 9;
+    const y = e.y - 112 * e.scale;
+    ctx.fillStyle = "#1a1e24"; ctx.fillRect(e.x - bw / 2 - 1, y - 1, bw + 2, bh + 2);
+    ctx.fillStyle = "#333a44"; ctx.fillRect(e.x - bw / 2, y, bw, bh);
+    const r = clamp(e.hp / e.maxHp, 0, 1);
+    ctx.fillStyle = e.elite ? "#ff7a00" : (e.isBoss ? "#e8402a" : "#d64141");
+    ctx.fillRect(e.x - bw / 2, y, bw * r, bh);
+    ctx.fillStyle = "rgba(255,255,255,0.28)"; ctx.fillRect(e.x - bw / 2, y + 1, bw * r, 2.5);
+    if (e.hp < e.maxHp && !e.isBoss) { ctx.fillStyle = "#666f7a"; ctx.font = "11px sans-serif"; ctx.textAlign = "center"; ctx.fillText(Math.ceil(e.hp), e.x, y - 4); }
+    if (e.elite) { ctx.fillStyle = "#ff8844"; ctx.font = "12px sans-serif"; ctx.textAlign = "center"; ctx.fillText("精英", e.x, y - 20); }
+    if (e.isBoss) { ctx.fillStyle = "#ff5533"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center"; ctx.fillText(bossLook(game.trial).name + " · 阶段 " + e.phase, e.x, y - 20); }
+    // 盾牌耐久条（盾卫专属）：轻击磨盾 / 重击破盾，破盾后显示"盾碎"
+    if (e.type === "shield") {
+      const sy2 = y + bh + 3;
+      if (!e.shieldBroken) {
+        const sr = clamp(e.shieldHp / e.shieldMax, 0, 1);
+        ctx.fillStyle = "#141a20"; ctx.fillRect(e.x - bw / 2, sy2, bw, 4);
+        ctx.fillStyle = sr > 0.5 ? "#6fb9e8" : (sr > 0.25 ? "#e8c25a" : "#e86a4a");
+        ctx.fillRect(e.x - bw / 2, sy2, bw * sr, 4);
+      } else {
+        ctx.fillStyle = "#6b7480"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+        ctx.fillText("盾碎", e.x, sy2 + 6);
+      }
+    }
+  }
+}
+function enemyPose(e){
+  // v0.5：敌方武器与玩家完全不同形制——刀客=朴刀 / 枪兵=猎叉 / BOSS=巨斧（盾卫=圆盾）
+  const wp = e.type === "spear" ? "efork" : e.type === "shield" ? "shield" : e.isBoss ? "eaxe" : "eblade";
+  const wrist = e.type === "spear" ? 0 : (wp === "shield" ? 0 : -0.1);
+  if (e.state === "telegraph") {
+    // 举兵器后拉蓄势
+    if (e.type === "spear") return { lean: -0.7, armF: [0.25, -0.55], armB: [0.85, 1.15], wrist, legs: [[-0.38, 0], [0.32, 0]], weapon: wp };
+    if (e.type === "shield") return { lean: -0.5, armF: [-0.35, -0.15], armB: [0.9, 1.2], wrist, legs: [[-0.35, 0], [0.3, 0]], weapon: wp };
+    return { lean: -0.7, armF: [-0.55, -2.25], armB: [0.9, 1.2], wrist, legs: [[-0.38, 0], [0.32, 0]], weapon: wp };
+  }
+  if (e.state === "attack") {
+    // 兵器挥出/突刺/撞盾
+    if (e.type === "spear") return { lean: 1.5, armF: [-0.05, 0.10], armB: [0.6, 0.9], wrist, legs: [[-0.5, 0], [0.55, 0.05]], weapon: wp };
+    if (e.type === "shield") return { lean: 1.3, armF: [0.05, 0.30], armB: [0.55, 0.85], wrist, legs: [[-0.45, 0], [0.5, 0.03]], weapon: wp };
+    return { lean: 1.6, armF: [-0.28, 0.35], armB: [0.5, 0.8], wrist, legs: [[-0.55, 0], [0.6, 0.05]], weapon: wp };
+  }
+  if (e.state === "stagger") return { lean: -1.6, armF: [-1.2, -0.85], armB: [-1.35, -1.0], wrist, legs: [[-0.25, 0], [0.2, 0]], weapon: wp };
+  if (e.state === "recover") return { lean: 0.5, armF: [0.45, 0.75], armB: [0.7, 1.0], wrist, legs: [[-0.28, 0], [0.3, 0]], weapon: wp };
+  // approach 走路：手臂随腿摆动
+  const ph = (e.x / 75) * Math.PI * 2 % (Math.PI * 2);
+  const sw = Math.sin(ph);
+  return { lean: 0.55, armF: [0.5 - sw * 0.4, 0.9 - sw * 0.45], armB: [0.5 + sw * 0.4, 0.9 + sw * 0.45], wrist,
+           legs: [[sw * 0.36, 0.28 * Math.max(0, sw)], [-sw * 0.36, 0.28 * Math.max(0, -sw)]], weapon: wp };
+}
+
+function drawParticle(p){
+  const a = 1 - p.t / p.life;
+  ctx.save();
+  if (p.ring) {
+    // 冲击波纹（命中环）
+    const prog = p.t / p.life;
+    ctx.globalAlpha = clamp((1 - prog) * 0.75, 0, 1);
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = 3.5 * (1 - prog) + 1;
+    ctx.beginPath(); ctx.arc(p.x, p.y, lerp(p.r0, p.r1, 1 - Math.pow(1 - prog, 2)), 0, Math.PI * 2); ctx.stroke();
+    ctx.restore(); return;
+  }
+  if (p.star) {
+    // 星芒冲击：八向放射线，长短交错 + 轻微旋转
+    const prog = p.t / p.life;
+    const rr = lerp(p.r0, p.r1, 1 - Math.pow(1 - prog, 2));
+    ctx.globalAlpha = clamp((1 - prog) * 0.95, 0, 1);
+    ctx.strokeStyle = p.color; ctx.lineCap = "round";
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4 + prog * 0.7;
+      const rIn = rr * (i % 2 ? 0.5 : 0.3), rOut = rr * (i % 2 ? 0.85 : 1);
+      ctx.lineWidth = (i % 2 ? 2 : 4) * (1 - prog) + 0.8;
+      ctx.beginPath();
+      ctx.moveTo(p.x + Math.cos(a) * rIn, p.y + Math.sin(a) * rIn);
+      ctx.lineTo(p.x + Math.cos(a) * rOut, p.y + Math.sin(a) * rOut);
+      ctx.stroke();
+    }
+    ctx.restore(); return;
+  }
+  ctx.globalAlpha = clamp(a, 0, 1);
+  ctx.strokeStyle = p.color; ctx.lineWidth = 2; ctx.lineCap = "round";
+  if (p.slash) {
+    // 双层弧光
+    ctx.globalAlpha = clamp(a * 1.2, 0, 0.9); ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(p.x - p.vx * 0.2, p.y, p.len * 0.5, -1.2, 1.2); ctx.stroke();
+    ctx.globalAlpha = clamp(a * 0.8, 0, 0.6); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(p.x - p.vx * 0.2, p.y, p.len * 0.64, -1.0, 1.0); ctx.stroke();
+  } else if (p.stab) {
+    // 突刺轨迹线（水平渐隐）
+    ctx.globalAlpha = clamp(a * 1.3, 0, 0.9); ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - Math.sign(p.vx) * p.len, p.y); ctx.stroke();
+    ctx.globalAlpha = clamp(a * 0.7, 0, 0.5); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y + 5); ctx.lineTo(p.x - Math.sign(p.vx) * p.len * 0.7, p.y + 5); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 0.05, p.y - p.vy * 0.05); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawDmgText(d){
+  const a = 1 - d.t / d.life;
+  // 弹跳入场：数字砸出来再回落
+  const pop = 1 + 0.55 * Math.max(0, 1 - d.t * 7);
+  ctx.save(); ctx.globalAlpha = clamp(a, 0, 1);
+  ctx.font = "bold " + Math.round((d.big ? 30 : 20) * pop) + "px sans-serif";
+  ctx.textAlign = "center";
+  ctx.strokeStyle = "#00000088"; ctx.lineWidth = 4; ctx.strokeText(d.txt, d.x, d.y);
+  ctx.fillStyle = d.color; ctx.fillText(d.txt, d.x, d.y);
+  ctx.restore();
+}
+function drawOrb(o){
+  const colors = { xt: "#9fd6ff", jp: "#c9a0ff", cy: "#ffd700" };
+  ctx.save();
+  ctx.translate(o.x, o.y);
+  ctx.rotate(Math.sin(o.t * 6) * 0.2);
+  if (o.kind === "gem") {
+    // 永久升级物品：大颗宝石 + 呼吸光晕 + 内高光（双层放大菱形替代 shadowBlur）
+    const def = GEM_DEFS[o.sub] || GEM_DEFS.hp;
+    const pul = 0.7 + 0.3 * Math.sin(o.t * 8);
+    ctx.fillStyle = def.color;
+    for (const gs of [1.6, 1.25]) {
+      ctx.globalAlpha = 0.16 * pul;
+      ctx.beginPath();
+      ctx.moveTo(0, -12 * gs); ctx.lineTo(9 * gs, -3 * gs); ctx.lineTo(6 * gs, 10 * gs); ctx.lineTo(0, 13 * gs); ctx.lineTo(-6 * gs, 10 * gs); ctx.lineTo(-9 * gs, -3 * gs);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#ffffffaa"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -12); ctx.lineTo(9, -3); ctx.lineTo(6, 10); ctx.lineTo(0, 13); ctx.lineTo(-6, 10); ctx.lineTo(-9, -3);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#ffffffcc";
+    ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(4, -3); ctx.lineTo(0, 2); ctx.lineTo(-4, -3); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    return;
+  }
+  ctx.fillStyle = colors[o.kind];
+  ctx.strokeStyle = "#ffffff55";
+  ctx.beginPath();
+  if (o.kind === "xt") ctx.rect(-7, -7, 14, 14);
+  else if (o.kind === "jp") { ctx.moveTo(0, -9); ctx.lineTo(7, 0); ctx.lineTo(0, 9); ctx.lineTo(-7, 0); ctx.closePath(); }
+  else { ctx.moveTo(0, -9); ctx.lineTo(8, -4); ctx.lineTo(8, 5); ctx.lineTo(0, 10); ctx.lineTo(-8, 5); ctx.lineTo(-8, -4); ctx.closePath(); }
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+// ---- HUD ----
+function drawHUD(){
+  game.uiButtons.length = 0;   // v0.5：HUD 层重建按钮（暂停图标）
+  if ((game.state === "play" || game.state === "waveBanner") && !game.paused) {
+    game.uiButtons.push({ x: W - 74, y: 14, w: 44, h: 44, label: "⏸", cb: () => togglePause(), enabled: true });
+  }
+  // 血条（加厚：渐变 + 内高光 + 低血量脉冲）
+  const hpw = 300, hph = 28, hpx = 30, hpy = 24;
+  const ratio = clamp(player.hp / playerMaxHp(), 0, 1);
+  const low = ratio <= 0.3;
+  ctx.fillStyle = "#222831"; ctx.fillRect(hpx, hpy, hpw, hph);
+  const grd = ctx.createLinearGradient(0, hpy, 0, hpy + hph);
+  if (low && Math.sin(nowSec * 9) > 0) { grd.addColorStop(0, "#ff7755"); grd.addColorStop(1, "#b31212"); }
+  else { grd.addColorStop(0, "#e86a6a"); grd.addColorStop(1, "#a02c2c"); }
+  ctx.fillStyle = grd; ctx.fillRect(hpx, hpy, hpw * ratio, hph);
+  if (ratio > 0) { ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.fillRect(hpx, hpy + 2, hpw * ratio, 6); }
+  ctx.strokeStyle = "#5a5f68"; ctx.lineWidth = 2; ctx.strokeRect(hpx, hpy, hpw, hph);
+  ctx.fillStyle = "#fff"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("气 " + Math.max(0, Math.ceil(player.hp)) + " / " + playerMaxHp(), hpx + 10, hpy + 19);
+  // 经验条（升阶进度）+ 等级徽记
+  const xpw = hpw, xpy = hpy + hph + 5, xph = 7;
+  const xr = clamp(SAVE.xp / xpNeed(SAVE.pLv), 0, 1);
+  ctx.fillStyle = "#222831"; ctx.fillRect(hpx, xpy, xpw, xph);
+  ctx.fillStyle = "#c9a015"; ctx.fillRect(hpx, xpy, xpw * xr, xph);
+  if (xr > 0) { ctx.fillStyle = "rgba(255,255,220,0.5)"; ctx.fillRect(hpx, xpy, xpw * xr, 2); }
+  ctx.strokeStyle = "#4a4f58"; ctx.lineWidth = 1; ctx.strokeRect(hpx, xpy, xpw, xph);
+  ctx.fillStyle = "#ffe66e"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("Lv." + SAVE.pLv + "  经验 " + SAVE.xp + " / " + xpNeed(SAVE.pLv), hpx, xpy + 22);
+  ctx.fillStyle = "#ddd"; ctx.font = "13px sans-serif";
+  ctx.fillText("第 " + game.trial + " 关 · 关口 " + Math.min(game.wave, game.waveTotal) + "/" + game.waveTotal + " · 击杀 " + player.stats.kills, hpx + 170, xpy + 22);
+  // v0.6：前进度条（向前探索的进度 + 关口刻度）
+  const pgw = 320, pgx = W / 2 - pgw / 2, pgy = 26, pgh = 9;
+  const prog = clamp(player.x / Math.max(1, level.bossGateX), 0, 1);
+  ctx.fillStyle = "rgba(10,16,24,0.72)"; ctx.fillRect(pgx - 2, pgy - 2, pgw + 4, pgh + 4);
+  ctx.fillStyle = "#3f6f6a"; ctx.fillRect(pgx, pgy, pgw * prog, pgh);
+  if (prog > 0) { ctx.fillStyle = "rgba(160,255,235,0.5)"; ctx.fillRect(pgx, pgy, pgw * prog, 2); }
+  for (const g of level.gates) {
+    const tx = pgx + pgw * clamp(g.x / level.bossGateX, 0, 1);
+    ctx.fillStyle = g.cleared ? "#5fe8a0" : (g.spawned ? "#ff6644" : "#5a6472");
+    ctx.fillRect(tx - 1.5, pgy - 3, 3, pgh + 6);
+  }
+  ctx.fillStyle = "#ffcf6a"; ctx.fillRect(pgx + pgw - 2, pgy - 5, 3, pgh + 10);   // 山门刻度
+  ctx.fillStyle = "#8fa0b2"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("前行 " + Math.round(prog * 100) + "%" + (level.bossArmed ? " · 山门在前" : ""), W / 2, pgy + pgh + 15);
+  // 武器指示（Q 三段轮换 + 锻造品阶）
+  const wn = player.weapon === "sword" ? "刀" : player.weapon === "bow" ? "长弓" : "长枪";
+  const wlv = SAVE.wLv[player.weapon] || 0;
+  ctx.fillStyle = player.weapon === "bow" ? "#9fe8ff" : player.weapon === "spear" ? "#a0ffd0" : "#f0e6d2";
+  ctx.font = "bold 15px sans-serif";
+  ctx.fillText("◈ " + wn + " · " + TIER_NAMES[tierOf(player.weapon)] + (wlv > 5 ? "+" + wlv : "") + " · Q 轮换", hpx + 440, xpy + 22);
+  // 素材（GDD §5）
+  ctx.textAlign = "right"; ctx.font = "bold 16px sans-serif";
+  ctx.fillStyle = "#9fd6ff"; ctx.fillText("玄铁 " + (SAVE.xt + game.roundXt), W - 40, 40);
+  ctx.fillStyle = "#c9a0ff"; ctx.fillText("精魄 " + (SAVE.jp + game.roundJp), W - 40, 64);
+  ctx.fillStyle = "#ffd700"; ctx.fillText("残页 " + (SAVE.cy + game.roundCy), W - 40, 88);
+  // 灵狐状态（随人物等级成长）
+  ctx.fillStyle = petLook().color; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "right";
+  ctx.fillText("灵狐 " + petName(), W - 40, 112);
+  // 闪避 CD 指示
+  if (player.dodgeCDT > 0) {
+    ctx.fillStyle = "#556"; ctx.fillRect(30, 82, 80, 6);
+    ctx.fillStyle = "#8ab"; ctx.fillRect(30, 82, 80 * (1 - player.dodgeCDT / (BASE.dodgeCD + BASE.dodgeDur)), 6);
+  }
+  // 武器技能 CD（U/I/O 三槽，随当前武器切换显示；就绪时高亮脉冲）
+  const ws = SKILLS[player.weapon];
+  const wcol = player.weapon === "bow" ? "#7fd4ff" : player.weapon === "spear" ? "#a0ffd0" : "#7fd4ff";
+  const keyNames = ["U", "I", "O"];
+  for (let i = 0; i < 3; i++) {
+    const sk = { label: keyNames[i] + " " + ws[i].name, cdt: player.skillCDs[player.weapon][i], cd: ws[i].cd, color: i === 1 ? "#c9a0ff" : wcol };
+    const x = 30 + i * 128, y = 94, cw = 120, ch = 40;
+    ctx.fillStyle = "#222831"; ctx.fillRect(x, y, cw, ch);
+    const ready = sk.cdt <= 0;
+    if (!ready) { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(x, y, cw * clamp(sk.cdt / sk.cd, 0, 1), ch); }
+    ctx.strokeStyle = ready ? sk.color : "#3a3f47"; ctx.lineWidth = 1.5;
+    if (ready) ctx.globalAlpha = 0.6 + 0.4 * Math.sin(nowSec * 6 + i);
+    ctx.strokeRect(x, y, cw, ch);
+    ctx.globalAlpha = 1;
+    // 技能名（v0.7：槽位加宽到 120，五字技能名不再与冷却数字打架）
+    ctx.fillStyle = ready ? sk.color : "#666f7a"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(sk.label, x + 7, y + 17);
+    // 底部冷却条 + 秒数（数字下沉一行，与技能名分层）
+    ctx.fillStyle = "rgba(255,255,255,0.10)"; ctx.fillRect(x + 7, y + ch - 8, cw - 14, 3);
+    if (!ready) {
+      ctx.fillStyle = sk.color; ctx.globalAlpha = 0.8;
+      ctx.fillRect(x + 7, y + ch - 8, (cw - 14) * (1 - clamp(sk.cdt / sk.cd, 0, 1)), 3);
+      ctx.globalAlpha = 1;
+      ctx.textAlign = "right"; ctx.fillStyle = "#8b93a0"; ctx.font = "10px sans-serif";
+      ctx.fillText(sk.cdt.toFixed(1) + "s", x + cw - 7, y + ch - 11);
+    }
+  }
+  // 格挡提示
+  if (player.state === "block") {
+    ctx.fillStyle = player.blockT <= 0.18 ? "#ffffff" : "#99a"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(player.blockT <= 0.18 ? "◈ 完美格挡窗口" : "◈ 格挡中", 30, 148);
+  }
+  // 剑意暴击提示
+  if (player.nextCrit) { ctx.fillStyle = "#ffee55"; ctx.font = "bold 15px sans-serif"; ctx.textAlign = "left"; ctx.fillText("剑意 · 下一击必暴击", 30, 150); }
+}
+function drawBanner(){
+  ctx.fillStyle = "rgba(0,0,0,0.45)"; ctx.fillRect(0, H * 0.36, W, 110);
+  ctx.fillStyle = "#f0e6d2"; ctx.font = "bold 44px serif"; ctx.textAlign = "center";
+  ctx.fillText(game.bannerText, W / 2, H * 0.36 + 70);
+}
+function drawTouchControls(){
+  ctx.save();
+  ctx.globalAlpha = 0.28;
+  // 方向区
+  ctx.fillStyle = "#334";
+  ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(W * 0.38, H); ctx.lineTo(W * 0.38, H - 130); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#99a"; ctx.font = "14px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("◁ 移动 ▷", W * 0.15, H - 40);
+  for (const b of touchButtons) {
+    ctx.fillStyle = b.pressed ? "#5a6a7a" : "#333e4a";
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#667"; ctx.stroke();
+    ctx.fillStyle = "#dfe4ea"; ctx.font = "bold 22px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(b.label, b.x, b.y);
+    ctx.textBaseline = "alphabetic";
+  }
+  ctx.restore();
+}
+
+// ---- 界面 ----
+function drawTitle(){
+  game.uiButtons = [];
+  ctx.fillStyle = "#0b0d10"; ctx.fillRect(0, 0, W, H);
+  drawBackground();
+  // 标题剑客剪影（压暗成水印，不抢文字）
+  ctx.save();
+  ctx.globalAlpha = 0.20;
+  ctx.translate(W / 2, 0);
+  drawStick(0, GROUND + 6, 1, "#e8e8e8", 1.15, { lean: 0.12, armF: [0.72, 1.05], armB: [0.95, 1.3], wrist: -0.45, legs: [[-0.13, 0.02], [0.17, 0]], weapon: "sword" });
+  ctx.restore();
+  ctx.fillStyle = "#f0e6d2"; ctx.font = "bold 76px serif"; ctx.textAlign = "center";
+  ctx.fillText("孤 剑 试 炼", W / 2, 170);
+  ctx.fillStyle = "#889"; ctx.font = "18px serif";
+  ctx.fillText("月夜江湖，一路向前 —— 剑不停，路不尽", W / 2, 215);
+  ctx.fillStyle = "#c9a0ff"; ctx.font = "15px sans-serif";
+  ctx.fillText("关卡模式 · 当前第 " + SAVE.trialLevel + " 关 · 最高 " + SAVE.bestTrial + " 关（6 道关口 + 山门 BOSS · 约 5 分钟）", W / 2, 250);
+  // 操作说明（硬核用户也需要读规则）
+  ctx.fillStyle = "#667"; ctx.font = "14px sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = "#8a92a0"; ctx.font = "13px sans-serif";
+  ctx.fillText("向前探索：←→ / A D 一路向前，走到「关口」前方才会涌出敌人；清场后牌坊转绿、通路解开", W / 2, H - 218);
+  ctx.fillStyle = "#667"; ctx.font = "14px sans-serif";
+  ctx.fillText("关卡尽头是山门：斩落关底 BOSS 后山门开启，踏入即传送到下一关（进度自动存档）", W / 2, H - 194);
+  ctx.fillText("战斗提示：盾卫的盾有耐久（轻击磨盾 · 重击 2.5 倍破盾）——破盾后长踉跄且永久失去格挡", W / 2, H - 170);
+  ctx.fillText("键盘：←→ 移动 · J 斩/射/突刺（长按蓄力） · L 闪避 · K 跳 · S 格挡（起手 = 完美格挡） · Q 换武器", W / 2, H - 146);
+  ctx.fillText("U / I / O 武器技能 · P/Esc 暂停 · B 局中存档 · M 静音（江湖琴箫主题曲 + 打击音效，程序化合成）", W / 2, H - 122);
+  ctx.fillText("灵狐随你升级变强 · 精英/BOSS 掉落永久宝物（血珀/锐牙/魂晶）拾取即存档", W / 2, H - 98);
+  ctx.fillText("触屏：左侧滑动移动 · 右侧八键（斩闪跳 + 壹贰叁技 + 格 + 换） · 右上角 ⏸ 暂停", W / 2, H - 74);
+  uiBtn(W / 2 - 200, 300, 190, 64, "开始试炼", () => startRun());
+  uiBtn(W / 2 + 10, 300, 190, 64, "锻 造", () => { game.state = "forge"; });
+  drawUIButtons();
+}
+function drawForge(){
+  game.uiButtons = [];
+  ctx.fillStyle = "#0e1116"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#f0e6d2"; ctx.font = "bold 42px serif"; ctx.textAlign = "center";
+  ctx.fillText("锻 造", W / 2, 90);
+  ctx.fillStyle = "#9fd6ff"; ctx.font = "bold 20px sans-serif";
+  ctx.fillText("玄铁 " + SAVE.xt + " · 精魄 " + SAVE.jp + " · 残页 " + SAVE.cy, W / 2, 130);
+
+  // 三武器分体锻造（玄铁）：每级该武器 +12% 伤害，外观品阶进化（凡铁→青锋→赤金→寒光→紫电→神兵）
+  const WNAMES = { sword: "刀 · 斩铁", bow: "弓 · 贯月", spear: "枪 · 破军" };
+  let y = 170;
+  for (const wkey of WEAPON_ORDER) {
+    const lv = SAVE.wLv[wkey] || 0;
+    const cost = Math.round(80 * Math.pow(1.6, lv));
+    const tier = clamp(lv, 0, 5);
+    const nextName = lv >= 5 ? "神兵·圆满" : TIER_NAMES[clamp(lv + 1, 0, 5)];
+    const rowTitle = WNAMES[wkey] + "  +" + lv + "（" + TIER_NAMES[tier] + " → " + nextName + "）";
+    ctx.fillStyle = "#222831"; ctx.fillRect(W / 2 - 320, y, 640, 64);
+    // 武器小图标色：品阶色
+    ctx.fillStyle = TIER_COLOR[tier]; ctx.fillRect(W / 2 - 340, y + 10, 8, 44);
+    ctx.fillStyle = lv >= 5 ? "#ffe66e" : "#f0e6d2"; ctx.font = "bold 19px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(rowTitle, W / 2 - 300, y + 27);
+    ctx.fillStyle = "#9fd6ff"; ctx.font = "16px sans-serif";
+    ctx.fillText(lv >= 5 ? "已臻化境（伤害 " + Math.round((weaponMult(wkey) - 1) * 100) + "%）" : "玄铁 " + cost + " · 该武器伤害 +" + Math.round((Math.pow(1.12, lv + 1) - weaponMult(wkey)) * 100) + "%", W / 2 - 300, y + 50);
+    if (lv < 5) uiBtn(W / 2 + 120, y + 12, 170, 40, "锻造", () => {
+      const c = Math.round(80 * Math.pow(1.6, SAVE.wLv[wkey]));
+      if (SAVE.xt < c) return toast("玄铁不足");
+      SAVE.xt -= c; SAVE.wLv[wkey]++; persist();
+      toast(WNAMES[wkey].split(" ")[0] + "锻成 " + TIER_NAMES[clamp(SAVE.wLv[wkey], 0, 5)] + " +" + SAVE.wLv[wkey]);
+    }, SAVE.xt >= cost);
+    y += 74;
+  }
+  // 淬炼（精魄）
+  const rows = [
+    { title: "淬炼·气血（上限 +10）", cost: "精魄 20", can: SAVE.jp >= 20, cb: () => {
+      if (SAVE.jp < 20) return toast("精魄不足");
+      SAVE.jp -= 20; SAVE.quenchHp++; persist(); toast("气血提升至 " + playerMaxHp());
+    } },
+    { title: "淬炼·锋锐（全武器伤害 +5%）", cost: "精魄 20", can: SAVE.jp >= 20, cb: () => {
+      if (SAVE.jp < 20) return toast("精魄不足");
+      SAVE.jp -= 20; SAVE.quenchAtk++; persist(); toast("锋锐提升");
+    } },
+  ];
+  for (const r of rows) {
+    ctx.fillStyle = "#222831"; ctx.fillRect(W / 2 - 320, y, 640, 60);
+    ctx.fillStyle = r.can ? "#f0e6d2" : "#556"; ctx.font = "bold 19px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(r.title, W / 2 - 300, y + 25);
+    ctx.fillStyle = "#c9a0ff"; ctx.font = "16px sans-serif";
+    ctx.fillText(r.cost, W / 2 - 300, y + 47);
+    uiBtn(W / 2 + 120, y + 10, 170, 40, "淬炼", r.cb, r.can);
+    y += 68;
+  }
+  // 秘纹（GDD §5.1 残页 sink）：横排三格
+  ctx.fillStyle = "#f0e6d2"; ctx.font = "bold 22px serif"; ctx.textAlign = "center";
+  ctx.fillText("秘纹（残页 10 张合成 · 永久生效）", W / 2, y + 24);
+  y += 40;
+  const relics = [
+    { id: "swift", title: "疾风剑意", desc: "攻速 +15%" },
+    { id: "vampire", title: "嗜血剑意", desc: "命中回血 8%" },
+    { id: "critUp", title: "会心剑意", desc: "暴击率 +15%" },
+  ];
+  const rw = 205, gap = 12;
+  relics.forEach((r, i) => {
+    const x = W / 2 - (rw * 3 + gap * 2) / 2 + i * (rw + gap);
+    const owned = !!SAVE.relics[r.id];
+    ctx.fillStyle = "#222831"; ctx.fillRect(x, y, rw, 78);
+    ctx.strokeStyle = owned ? "#ffd700" : "#3a3f47"; ctx.lineWidth = 1.5; ctx.strokeRect(x, y, rw, 78);
+    ctx.fillStyle = owned ? "#ffd700" : "#889"; ctx.font = "bold 17px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(r.title + (owned ? " · 已掌握" : ""), x + rw / 2, y + 26);
+    ctx.fillStyle = "#99a"; ctx.font = "13px sans-serif";
+    ctx.fillText(r.desc, x + rw / 2, y + 46);
+    if (!owned) uiBtn(x + rw / 2 - 62, y + 52, 124, 24, "合成", () => {
+      if (SAVE.cy >= 10) { SAVE.cy -= 10; SAVE.relics[r.id] = true; persist(); toast("秘纹掌握"); } else toast("残页不足");
+    }, SAVE.cy >= 10);
+  });
+  y += 92;
+  if (game.forgeMsgT > 0) { ctx.fillStyle = "#ffee55"; ctx.font = "bold 20px sans-serif"; ctx.textAlign = "center"; ctx.fillText(game.forgeMsg, W / 2, Math.min(H - 24, y + 14)); }
+  uiBtn(W - 150, 24, 122, 46, "返 回", () => { game.state = "title"; });
+  drawUIButtons();
+}
+function toast(msg){ game.forgeMsg = msg; game.forgeMsgT = 2; }
+function drawUIButtons(){
+  for (const b of game.uiButtons) {
+    ctx.fillStyle = b.enabled ? "#2f3b47" : "#1a2028";
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.strokeStyle = b.enabled ? "#8899aa" : "#333"; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    ctx.fillStyle = b.enabled ? "#f0e6d2" : "#445";
+    ctx.font = "bold 22px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2);
+    ctx.textBaseline = "alphabetic";
+  }
+}
+
+function drawPause(){
+  // v0.5：暂停覆盖层——时间冻结，菜单可点/可按
+  ctx.fillStyle = "rgba(6,8,12,0.80)"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#f0e6d2"; ctx.font = "bold 56px serif"; ctx.textAlign = "center";
+  ctx.fillText("暂 停", W / 2, 176);
+  ctx.fillStyle = "#8a92a0"; ctx.font = "16px sans-serif";
+  ctx.fillText("P / Esc 继续 · B 保存进度 · M 静音 · S 防护（格挡） · Q 换武器", W / 2, 222);
+  ctx.fillStyle = "#c9d4e0"; ctx.font = "15px sans-serif";
+  ctx.fillText("第 " + game.trial + " 关 · 关口 " + Math.min(game.wave, game.waveTotal) + "/" + game.waveTotal +
+    " · 前行 " + Math.round(clamp(player.x / Math.max(1, level.bossGateX), 0, 1) * 100) + "%" +
+    " · 人物 Lv." + SAVE.pLv + " · 气 " + Math.max(0, Math.ceil(player.hp)) + "/" + playerMaxHp() +
+    (AudioSys.muted ? " · 已静音" : ""), W / 2, 252);
+  game.uiButtons = [];
+  uiBtn(W / 2 - 105, 296, 210, 54, "继 续", () => togglePause());
+  uiBtn(W / 2 - 105, 366, 210, 54, "保存进度（B）", () => bankProgress());
+  uiBtn(W / 2 - 105, 436, 210, 54, AudioSys.muted ? "声音：关（M）" : "声音：开（M）", () => { AudioSys.toggleMute(); });
+  uiBtn(W / 2 - 105, 506, 210, 54, "返回主菜单", () => { game.paused = false; game.state = "title"; });
+  drawUIButtons();
+}
+function drawDeath(){
+  ctx.fillStyle = "rgba(10,4,4,0.82)"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#d64545"; ctx.font = "bold 64px serif"; ctx.textAlign = "center";
+  ctx.fillText("败", W / 2, 200);
+  ctx.fillStyle = "#f0e6d2"; ctx.font = "20px serif";
+  ctx.fillText("武道未成，素材尽存——每一次倒下都是学费", W / 2, 250);
+  // 败因分析（GDD P5 / §9 B·E 信号）
+  const s = player.stats;
+  const pr = s.threats > 0 ? Math.round(s.perfect / s.threats * 100) : 0;
+  const lines = [
+    "击杀 " + s.kills + " · 受击 " + s.hitsTaken + " 次 · 挥刀 " + s.attacks + " 次",
+    "完美闪避 " + s.perfect + " 次 / 受威胁 " + s.threats + " 次（触发率 " + pr + "%）",
+    "贪刀受击（攻击中被反击）" + s.deathWhileAttacking + " 次",
+    "本局入账：玄铁 " + game.roundXt + " · 精魄 " + game.roundJp + " · 残页 " + game.roundCy + " · 经验 " + game.roundXp,
+  ];
+  ctx.fillStyle = "#99a"; ctx.font = "16px sans-serif";
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, 320 + i * 34));
+  game.uiButtons = [];
+  uiBtn(W / 2 - 210, 500, 195, 60, "再战此关", () => startRun());
+  uiBtn(W / 2 + 15, 500, 195, 60, "去锻造", () => { game.state = "forge"; });
+  drawUIButtons();
+}
+function drawVictory(){
+  ctx.fillStyle = "rgba(6,10,16,0.85)"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#ffd700"; ctx.font = "bold 64px serif"; ctx.textAlign = "center";
+  ctx.fillText("关 破", W / 2, 200);
+  ctx.fillStyle = "#f0e6d2"; ctx.font = "20px serif";
+  ctx.fillText(bossLook(game.trial).name + "授首。第 " + (SAVE.trialLevel) + " 关已解锁", W / 2, 250);
+  const s = player.stats;
+  const pr = s.threats > 0 ? Math.round(s.perfect / s.threats * 100) : 0;
+  ctx.fillStyle = "#99a"; ctx.font = "16px sans-serif";
+  ctx.fillText("完美闪避率 " + pr + "% · 受击 " + s.hitsTaken + " 次", W / 2, 310);
+  ctx.fillText("本局入账：玄铁 " + game.roundXt + " · 精魄 " + game.roundJp + " · 残页 " + game.roundCy + " · 经验 " + game.roundXp + " · 人物 Lv." + SAVE.pLv, W / 2, 344);
+  // v0.4：过关存档 + 升级物品提示
+  const pulse = 0.7 + 0.3 * Math.sin(nowSec * 5);
+  ctx.fillStyle = "#7fe89a"; ctx.font = "bold 18px sans-serif";
+  ctx.fillText("✓ 进度已存档（等级 · 素材 · 升级物品）", W / 2, 378);
+  if ((SAVE.pickHp || 0) + (SAVE.pickAtk || 0) > 0) {
+    ctx.fillStyle = "rgba(255,204,102," + pulse + ")"; ctx.font = "15px sans-serif";
+    ctx.fillText("已获升级物品 " + (SAVE.gemsGot || 0) + " 件 · 血珀×" + (SAVE.pickHp || 0) + " · 锐牙×" + (SAVE.pickAtk || 0), W / 2, 402);
+  }
+  // v0.6：山门已开（通关传送门）
+  ctx.fillStyle = "rgba(255,233,168," + (0.6 + 0.4 * pulse) + ")"; ctx.font = "bold 17px serif";
+  ctx.fillText("山门已开 —— 踏入即传送到第 " + SAVE.trialLevel + " 关", W / 2, 428);
+  game.uiButtons = [];
+  uiBtn(W / 2 - 210, 472, 195, 60, "踏入山门", () => startTransit());
+  uiBtn(W / 2 + 15, 472, 195, 60, "去锻造", () => { game.state = "forge"; });
+  ctx.fillStyle = "#6a7480"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("（或按 空格 / K 直接踏入山门）", W / 2, 556);
+  drawUIButtons();
+}
+
+// ---------- 主循环 ----------
+// v0.8 帧率治理：渲染分辨率随实测帧耗时动态调档——连续掉帧降档保帧率，长期稳定升档保清晰
+let ftEMA = 1 / 60, govN = 0;
+function frame(ts){
+  const gap = (ts - lastTs) / 1000;
+  const dtReal = Math.min(0.033, gap || 0.016);
+  lastTs = ts;
+  if (gap > 0 && gap < 0.25) {          // 后台切回的首帧不采样
+    ftEMA = ftEMA * 0.94 + Math.min(gap, 0.05) * 0.06;
+    govN++;
+    if (govN > 90 && ftEMA > 0.022 && dprStep < DPR_STEPS.length - 1) { setRenderDpr(dprStep + 1); govN = 0; }   // <46fps 持续 1.5s → 降一档
+    else if (govN > 420 && ftEMA < 0.015 && dprStep > 0) { setRenderDpr(dprStep - 1); govN = 0; }                 // 稳定 <15ms 达 7s → 升一档
+  } else govN = 0;
+  update(dtReal);
+  render();
+  pressedThisFrame.clear();
+  jumpBtnPressed = false; dodgeBtn = false;
+  skillReq = [false, false, false]; switchReq = false;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

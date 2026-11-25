@@ -1,0 +1,2865 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>星球清道夫 · 净土计划</title>
+<style>
+:root{
+  --mint:#6ef2c0; --mint-dim:#3fae90; --gold:#ffd166; --blue:#7cd8ff;
+  --red:#ff8b7a; --purple:#b8a4ff; --ink:#e9f7f2; --sub:#9db9bd;
+  --panel:rgba(9,26,36,.78); --line:rgba(120,235,205,.16);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#040c15;
+  color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+  user-select:none;-webkit-user-select:none;touch-action:none}
+#game{position:fixed;inset:0;display:block;width:100%;height:100%}
+#ui{position:fixed;inset:0;pointer-events:none;z-index:5}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  box-shadow:0 10px 34px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.05);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.hidden{display:none!important}
+button{font-family:inherit;cursor:pointer;color:inherit;border:0;outline:none}
+button:disabled{cursor:not-allowed}
+
+/* ---------- 顶部 ---------- */
+.topbar{position:absolute;top:14px;left:14px;right:14px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.stat-card{pointer-events:auto;padding:12px 15px 13px;min-width:236px}
+.stat-row{display:flex;align-items:baseline;gap:7px}
+.coin-icon{color:var(--gold);font-size:19px;text-shadow:0 0 14px rgba(255,209,102,.6)}
+.stat-row b{font-size:25px;font-weight:800;letter-spacing:.5px;color:var(--gold);font-variant-numeric:tabular-nums}
+.unit{font-size:12px;color:var(--sub)}
+.mini-row{font-size:11px;color:var(--sub);margin-top:3px}
+.mini-row b{color:var(--ink);font-weight:700}
+.clean-line{display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:11px}
+.clean-line b{color:var(--mint);font-size:12px;font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:6px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:5px}
+.bar i{display:block;height:100%;width:0%;border-radius:6px;background:linear-gradient(90deg,#39c9a0,#8effd7);
+  box-shadow:0 0 12px rgba(110,242,192,.6);transition:width .25s ease}
+.bar.gold i{background:linear-gradient(90deg,#e8a53c,#ffe09a);box-shadow:0 0 12px rgba(255,209,102,.5)}
+/* ---------- 污染强度 ---------- */
+.threat-line{display:flex;justify-content:space-between;align-items:center;margin-top:9px;font-size:10px;color:#ffb0a0;font-weight:700}
+.threat-line b{color:var(--red);font-variant-numeric:tabular-nums}
+.bar.threat{height:5px;margin-top:4px}
+.bar.threat i{background:linear-gradient(90deg,#ffb36b,#ff6b6b);box-shadow:0 0 10px rgba(255,110,110,.5)}
+.threat-detail{font-size:8.5px;color:#7d9ba0;margin-top:5px;line-height:1.5}
+.shield-tag{color:#a9b8ff}
+/* ---------- 昼夜 / 日期 ---------- */
+.day-card{pointer-events:auto;position:absolute;top:14px;left:50%;transform:translateX(-50%);width:250px;padding:10px 13px 11px;text-align:center}
+.day-top{display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:800;letter-spacing:1px}
+#dayIcon{font-size:17px}
+.day-sub{font-size:9.5px;color:var(--sub);margin-top:4px;display:flex;justify-content:space-between}
+.day-sub b{color:var(--gold)}
+.bar.day-bar{height:5px;margin-top:6px}
+.bar.day-bar i{background:linear-gradient(90deg,#ffb36b,#ffe6a8 35%,#7cd8ff 70%,#8b82e8);box-shadow:0 0 10px rgba(255,200,130,.45)}
+.day-bonus{margin-top:6px;font-size:9.5px;font-weight:700;color:var(--mint)}
+.day-bonus.night{color:#a9b8ff}
+.day-reward{margin-top:5px;padding-top:5px;border-top:1px dashed rgba(255,209,102,.22);
+  font-size:9px;font-weight:700;color:var(--gold);letter-spacing:.2px}
+.day-reward.due{color:#ffe6a8;animation:pulseWarn 1.3s ease-in-out infinite}
+
+/* ---------- 每日任务 ---------- */
+.daily-card{pointer-events:auto;position:absolute;right:14px;top:222px;width:236px;padding:11px 12px 12px;
+  max-height:48vh;overflow-y:auto;scrollbar-width:thin}
+.daily-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;letter-spacing:.5px;cursor:pointer}
+.daily-head span.hint{font-size:9px;color:#6f8b90;font-weight:400}
+.daily-task{padding:8px 8px 9px;border-radius:11px;background:rgba(255,255,255,.04);margin-top:8px;
+  border:1px solid transparent;transition:.18s}
+.daily-task.done{border-color:rgba(110,242,192,.45);background:rgba(110,242,192,.09)}
+.daily-task.claimed{opacity:.62}
+.dt-top{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:11px;font-weight:700}
+.dt-name{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dt-num{font-size:10px;color:var(--mint);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dt-desc{font-size:9px;color:var(--sub);margin-top:3px}
+.dt-foot{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.dt-reward{font-size:9.5px;color:var(--gold);font-weight:700}
+/* 任务状态标签（奖励自动发放，不再是领取按钮） */
+.dt-state{padding:3px 9px;border-radius:7px;font-size:9.5px;font-weight:800;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.1);color:#6f8b90;white-space:nowrap}
+.dt-state.paid{background:rgba(110,242,192,.16);border-color:rgba(110,242,192,.42);color:var(--mint)}
+.daily-bonus{font-size:9px;color:var(--purple);text-align:center;margin-top:9px;line-height:1.5}
+.daily-card.collapsed #dailyList{display:none}
+.upgrade-card::-webkit-scrollbar,.daily-card::-webkit-scrollbar,.bottom-left::-webkit-scrollbar{width:5px}
+.upgrade-card::-webkit-scrollbar-thumb,.daily-card::-webkit-scrollbar-thumb,.bottom-left::-webkit-scrollbar-thumb{
+  background:rgba(110,242,192,.28);border-radius:5px}
+.upgrade-card::-webkit-scrollbar-track,.daily-card::-webkit-scrollbar-track,.bottom-left::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- 工具工坊 ---------- */
+.up-divider{display:flex;justify-content:space-between;align-items:center;margin:12px 4px 4px;padding-top:10px;
+  border-top:1px solid rgba(255,255,255,.08);font-size:11px;font-weight:800;letter-spacing:.5px}
+.up-divider span{font-size:9px;color:#6f8b90;font-weight:400}
+.up-row.locked{opacity:.62}
+.up-row.locked .buy{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:#8fa5a8}
+.wshop-ic{background:rgba(184,164,255,.1)!important;border-color:rgba(184,164,255,.2)!important}
+
+.right-top{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.minimap-wrap{pointer-events:auto;padding:7px;position:relative;border-radius:16px}
+#minimap{display:block;width:132px;height:132px}
+.mm-label{text-align:center;font-size:9px;letter-spacing:2px;color:var(--sub);margin-top:2px}
+.tool-btns{display:flex;gap:6px;pointer-events:auto}
+.icon-btn{width:32px;height:32px;border-radius:10px;background:var(--panel);border:1px solid var(--line);
+  font-size:15px;color:var(--sub);transition:.18s}
+.icon-btn:hover{color:var(--mint);border-color:rgba(110,242,192,.5);transform:translateY(-1px)}
+.icon-btn.off{color:#5d7479;text-decoration:line-through}
+.icon-btn.on{color:var(--mint);border-color:rgba(110,242,192,.45);background:rgba(110,242,192,.1)}
+
+/* ---------- 星球电台 / 背景音乐面板 ---------- */
+.music-pop{position:absolute;right:14px;top:222px;width:236px;z-index:12;pointer-events:auto;
+  padding:11px 12px 12px;max-height:58vh;overflow-y:auto;scrollbar-width:thin}
+.music-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;letter-spacing:.5px}
+.music-head .hint{font-size:9px;color:#6f8b90;font-weight:400}
+.music-head-right{display:flex;align-items:center;gap:6px}
+.music-close{padding:2px 7px;border-radius:7px;background:rgba(255,255,255,.07);font-size:11px;color:var(--sub)}
+.music-close:hover{color:var(--mint)}
+.music-now{display:flex;align-items:center;gap:9px;margin-top:9px;padding:8px 9px;border-radius:11px;min-width:0;
+  background:rgba(124,216,255,.07);border:1px solid rgba(124,216,255,.16)}
+.music-now .mn-ic{font-size:22px;flex:0 0 auto}
+.music-now div{min-width:0;flex:1}
+.music-now b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.music-now small{display:block;font-size:9px;color:var(--sub);margin-top:2px;line-height:1.4}
+.music-tracks{display:flex;flex-direction:column;gap:5px;margin-top:9px}
+.music-track{display:flex;align-items:center;gap:8px;width:100%;min-width:0;padding:7px 8px;border-radius:10px;text-align:left;
+  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);transition:.16s}
+.music-track:hover{background:rgba(110,242,192,.11);border-color:rgba(110,242,192,.35)}
+.music-track.active{background:rgba(110,242,192,.16);border-color:rgba(110,242,192,.55);color:var(--mint)}
+.music-track .mt-ic{font-size:16px;flex:0 0 auto}
+.music-track .mt-txt{flex:1;min-width:0}
+.music-track b{display:block;font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.music-track small{display:block;font-size:8.5px;color:var(--sub);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.music-track .mt-no{font-size:9px;font-weight:800;opacity:.6;flex:0 0 auto}
+.music-ctrl{display:flex;gap:5px;margin-top:9px}
+.music-ctrl button{flex:1;min-width:0;padding:6px 3px;border-radius:9px;font-size:10px;font-weight:800;white-space:nowrap;
+  background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.1);color:var(--sub);transition:.16s}
+.music-ctrl button:hover{border-color:rgba(110,242,192,.5);color:var(--mint)}
+.music-ctrl button.primary{flex:1.5;background:rgba(110,242,192,.16);border-color:rgba(110,242,192,.4);color:var(--mint)}
+.music-ctrl button.primary.off{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:#6f8b90}
+.music-vol{display:flex;align-items:center;gap:7px;margin-top:10px;font-size:9.5px;color:var(--sub)}
+.music-vol input{flex:1;min-width:0;height:4px;accent-color:#6ef2c0}
+.music-vol b{font-size:9.5px;color:var(--mint);font-variant-numeric:tabular-nums;min-width:30px;text-align:right}
+.music-foot{font-size:8.5px;color:#668287;text-align:center;margin-top:9px;line-height:1.5}
+.music-mute{font-size:9px;color:var(--gold);text-align:center;margin-top:6px;line-height:1.4}
+
+/* ---------- 底部左 ---------- */
+.bottom-left{position:absolute;left:14px;bottom:14px;width:326px;display:flex;flex-direction:column;gap:9px}
+.tool-card{pointer-events:auto;padding:11px 14px}
+.tool-head{display:flex;align-items:center;gap:10px}
+#toolIcon{font-size:23px;width:36px;height:36px;display:grid;place-items:center;border-radius:11px;
+  background:linear-gradient(145deg,rgba(110,242,192,.2),rgba(110,242,192,.04));border:1px solid rgba(110,242,192,.25)}
+.tool-name{font-size:14px;font-weight:800;letter-spacing:.5px}
+.tool-sub{font-size:10px;color:var(--mint);margin-top:2px}
+.tool-stats{display:flex;justify-content:space-between;margin-top:11px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07)}
+.tool-stats div{display:flex;flex-direction:column;gap:2px;align-items:center;flex:1}
+.tool-stats span{font-size:10px;color:var(--sub)}
+.tool-stats b{font-size:14px;font-variant-numeric:tabular-nums;color:var(--blue)}
+.upgrade-card{pointer-events:auto;padding:11px 12px 12px;max-height:56vh;overflow-y:auto;scrollbar-width:thin}
+.up-head{display:flex;justify-content:space-between;align-items:center;margin:0 2px 9px;font-size:12px;font-weight:800;letter-spacing:1px}
+.up-head .hint{font-size:9px;font-weight:400;color:#6f8b90;letter-spacing:0}
+.up-close{display:none;padding:3px 8px;border-radius:7px;background:rgba(255,255,255,.08);font-size:11px;color:var(--sub)}
+.up-row{display:flex;align-items:center;gap:9px;padding:7px 6px;border-radius:11px;transition:.18s}
+.up-row:hover{background:rgba(255,255,255,.045)}
+.up-ic{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;font-size:15px;border-radius:9px;
+  background:rgba(124,216,255,.09);border:1px solid rgba(124,216,255,.14)}
+.up-mid{flex:1;min-width:0}
+.up-name{font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px}
+.up-lv{font-size:9px;color:var(--mint);background:rgba(110,242,192,.12);padding:1px 5px;border-radius:5px;font-weight:700}
+.up-desc{font-size:9.5px;color:var(--sub);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.buy{display:flex;align-items:center;gap:3px;padding:6px 8px;border-radius:9px;font-size:11px;font-weight:800;
+  background:rgba(255,209,102,.1);border:1px solid rgba(255,209,102,.25);color:var(--gold);min-width:60px;justify-content:center;transition:.16s}
+.buy .key{font-size:8px;opacity:.55;font-weight:400;margin-right:1px}
+.buy.afford:hover{background:rgba(255,209,102,.22);transform:scale(1.05)}
+.buy:disabled{opacity:.38;filter:grayscale(.5)}
+.buy.maxed{color:var(--mint);border-color:rgba(110,242,192,.3);background:rgba(110,242,192,.1)}
+
+/* ---------- 底部右 ---------- */
+.bottom-right{position:absolute;right:14px;bottom:14px;width:258px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.bag-card{pointer-events:auto;width:100%;padding:11px 13px}
+.bag-title{display:flex;justify-content:space-between;font-size:12px;font-weight:700}
+.bag-title b{color:var(--gold);font-variant-numeric:tabular-nums}
+.bag-foot{display:flex;justify-content:space-between;font-size:9.5px;color:var(--sub);margin-top:8px}
+.bag-foot b{color:var(--gold)}
+/* 直接回收（主工具 Lv.25 解锁） */
+.remote-btn{pointer-events:auto;display:flex;align-items:center;gap:9px;width:100%;margin-top:9px;
+  padding:8px 10px;border-radius:11px;text-align:left;transition:.16s;
+  background:linear-gradient(100deg,rgba(110,242,192,.18),rgba(124,216,255,.12));
+  border:1px solid rgba(110,242,192,.42);color:var(--mint)}
+.remote-btn:hover:not(:disabled){background:linear-gradient(100deg,rgba(110,242,192,.32),rgba(124,216,255,.22));transform:translateY(-1px)}
+.remote-btn:disabled{opacity:.55}
+.remote-btn.locked{background:rgba(255,255,255,.04);border-color:var(--line);color:#7f9a9e}
+.remote-ic{font-size:17px;line-height:1;flex:0 0 auto}
+.remote-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.remote-main b{font-size:11.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.remote-main small{font-size:9px;font-weight:500;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.remote-btn.locked .remote-main small{color:#6f8b90}
+.remote-key{flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:1px;padding:3px 6px;border-radius:6px;
+  background:rgba(110,242,192,.14);border:1px solid rgba(110,242,192,.28);color:var(--mint)}
+.remote-btn.locked .remote-key{display:none}
+body.touch .remote-key{display:none}
+.challenge{pointer-events:auto;width:100%;padding:10px 12px;border-color:rgba(184,164,255,.35)}
+.challenge .ch-top{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--purple)}
+.challenge .bar i{background:linear-gradient(90deg,#8f74e8,#d9c8ff)}
+.challenge .ch-foot{font-size:9px;color:var(--sub);margin-top:4px}
+#buffList{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}
+.buff{pointer-events:auto;font-size:10px;padding:4px 8px;border-radius:20px;background:rgba(110,242,192,.12);
+  border:1px solid rgba(110,242,192,.3);color:var(--mint);white-space:nowrap}
+.buff.bad{background:rgba(255,139,122,.12);border-color:rgba(255,139,122,.32);color:var(--red)}
+
+.tip{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);font-size:11px;color:#7d9ba0;
+  background:rgba(5,18,26,.55);padding:6px 14px;border-radius:20px;white-space:nowrap;letter-spacing:.3px}
+.mobile-btn,#joystick{display:none}
+
+/* ---------- 提示 / 横幅 ---------- */
+#toastWrap{position:absolute;bottom:52px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
+.toast{padding:8px 16px;border-radius:11px;font-size:12px;font-weight:700;background:rgba(9,26,36,.92);
+  border:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.4);animation:toastIn .3s ease both;
+  max-width:min(440px,86vw);text-align:center;line-height:1.45}
+.toast.good{color:var(--mint);border-color:rgba(110,242,192,.4)}
+.toast.bad{color:var(--red);border-color:rgba(255,139,122,.4)}
+.toast.gold{color:var(--gold);border-color:rgba(255,209,102,.4)}
+@keyframes toastIn{from{opacity:0;transform:translateY(-12px) scale(.94)}to{opacity:1;transform:none}}
+#waveBanner{position:absolute;top:33%;left:50%;transform:translateX(-50%);text-align:center;
+  font-size:34px;font-weight:900;letter-spacing:4px;color:#fff;text-shadow:0 0 28px rgba(110,242,192,.9),0 4px 20px #000;
+  animation:bannerIn .5s ease both}
+#waveBanner p{font-size:13px;font-weight:500;letter-spacing:1px;color:var(--mint);margin:8px 0 0;text-shadow:0 2px 8px #000}
+@keyframes bannerIn{from{opacity:0;transform:translateX(-50%) scale(.85)}to{opacity:1;transform:translateX(-50%) scale(1)}}
+#dayRewardBanner{position:absolute;top:56%;left:50%;transform:translateX(-50%);text-align:center;
+  box-sizing:border-box;width:min(540px,calc(100% - 32px));padding:15px 20px 17px;border-radius:18px;
+  background:rgba(30,22,8,.84);border:1px solid rgba(255,209,102,.45);
+  box-shadow:0 14px 42px rgba(0,0,0,.55),0 0 30px rgba(255,209,102,.18);
+  font-size:26px;font-weight:900;letter-spacing:3px;color:#ffd166;
+  text-shadow:0 0 20px rgba(255,209,102,.55),0 2px 8px #000;
+  animation:rewardPop .4s ease both}
+/* 只缩放、不改 opacity：避免动画未推进时横幅不可见 */
+@keyframes rewardPop{from{transform:translateX(-50%) scale(.9)}to{transform:translateX(-50%) scale(1)}}
+#dayRewardBanner p{font-size:12.5px;font-weight:600;letter-spacing:.3px;line-height:1.6;color:#fff3cf;
+  margin:8px 0 0;text-shadow:0 2px 8px #000;word-break:break-word}
+#bagFullWarn{position:absolute;top:14%;left:50%;transform:translateX(-50%);padding:9px 18px;border-radius:12px;
+  background:rgba(60,20,20,.85);border:1px solid rgba(255,139,122,.5);color:#ffb3a6;font-size:12px;font-weight:700;
+  animation:pulseWarn 1.3s ease-in-out infinite}
+@keyframes pulseWarn{50%{opacity:.6}}
+
+/* ---------- 奇遇弹窗 ---------- */
+.modal{position:fixed;inset:0;z-index:20;display:grid;grid-template-columns:minmax(0,1fr);
+  place-items:center;background:rgba(2,9,15,.66);
+  -webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);padding:16px}
+.event-card{position:relative;width:min(430px,calc(100vw - 32px));min-width:0;max-width:100%;
+  padding:24px 24px 18px;text-align:center;overflow:hidden;
+  border-color:rgba(184,164,255,.32);box-shadow:0 24px 70px rgba(0,0,0,.6),0 0 60px rgba(140,110,255,.12);
+  animation:cardIn .38s cubic-bezier(.2,1.2,.4,1) both}
+@keyframes cardIn{from{opacity:0;transform:translateY(22px) scale(.92)}to{opacity:1;transform:none}}
+.event-glow{position:absolute;top:-110px;left:50%;transform:translateX(-50%);width:280px;height:220px;
+  background:radial-gradient(circle,rgba(150,120,255,.28),transparent 70%);pointer-events:none}
+.event-kicker{position:relative;font-size:10px;letter-spacing:4px;color:var(--purple);font-weight:800}
+.event-icon{position:relative;font-size:52px;margin:10px 0 4px;filter:drop-shadow(0 6px 18px rgba(0,0,0,.5))}
+.event-card h2{position:relative;margin:4px 0 8px;font-size:21px;letter-spacing:1px}
+.event-card p{position:relative;margin:0 auto 18px;font-size:12.5px;line-height:1.75;color:#b6ced0;max-width:min(340px,100%)}
+#eventOptions{position:relative;display:flex;flex-direction:column;gap:8px}
+.opt{width:100%;padding:11px 14px;border-radius:12px;text-align:left;font-size:12.5px;font-weight:700;
+  background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.1);transition:.18s;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.opt:hover{background:rgba(110,242,192,.13);border-color:rgba(110,242,192,.5);transform:translateX(3px)}
+.opt span.tag{font-size:9.5px;font-weight:600;color:var(--mint);background:rgba(110,242,192,.12);padding:3px 8px;border-radius:20px;white-space:nowrap}
+.opt.risky span.tag{color:var(--red);background:rgba(255,139,122,.12)}
+.event-foot{position:relative;margin-top:14px;font-size:9.5px;color:#668287;letter-spacing:1px}
+/* ---------- 解密奇遇 ---------- */
+.event-card{max-height:94vh;overflow-y:auto;overflow-x:hidden}
+.event-card.puzzle{border-color:rgba(255,139,122,.36);box-shadow:0 24px 70px rgba(0,0,0,.6),0 0 60px rgba(255,120,110,.15)}
+.event-card.puzzle .event-glow{background:radial-gradient(circle,rgba(255,140,120,.24),transparent 70%)}
+.event-card.puzzle .event-kicker{color:#ffb0a0}
+.event-card.puzzle h2{font-size:19px}
+.event-card.puzzle p{margin-bottom:12px}
+.puzzle-box{position:relative;margin:0 0 12px;padding:10px 11px;border-radius:13px;text-align:left;
+  background:rgba(255,139,122,.07);border:1px solid rgba(255,139,122,.22)}
+.puzzle-meta{display:flex;flex-wrap:wrap;gap:4px;justify-content:space-between;font-size:9.5px;font-weight:800;color:#ffb0a0;letter-spacing:1px}
+.puzzle-timer{height:5px;border-radius:5px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:7px}
+.puzzle-timer i{display:block;height:100%;background:linear-gradient(90deg,#ffd166,#ff6b6b);transition:width .1s linear}
+.puzzle-board{margin-top:9px;padding:11px 9px;border-radius:10px;background:rgba(2,10,16,.6);
+  border:1px solid rgba(184,164,255,.22);font-size:17px;font-weight:800;letter-spacing:2px;line-height:1.6;
+  color:#d3c3ff;word-break:break-word;overflow-wrap:anywhere;min-height:44px;text-align:center}
+.puzzle-board .dim{color:#6f8b90;font-size:11px;letter-spacing:0;font-weight:600}
+.puzzle-actions{display:flex;gap:8px;margin-top:9px}
+.pz-btn{flex:1;padding:7px 6px;border-radius:9px;font-size:10px;font-weight:700;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--sub);transition:.16s}
+.pz-btn:not(:disabled):hover{border-color:var(--mint);color:var(--mint)}
+.pz-btn:disabled{opacity:.4}
+.opt.puzzle-opt{justify-content:flex-start;font-size:13px}
+.opt.puzzle-opt .pz-idx{width:22px;height:22px;flex:0 0 22px;display:grid;place-items:center;border-radius:7px;
+  background:rgba(184,164,255,.18);color:#d3c3ff;font-size:11px;font-weight:800;margin-right:4px}
+.opt.eliminated{opacity:.3;text-decoration:line-through;pointer-events:none}
+.opt.locked{opacity:.45;pointer-events:none}
+#damageFlash{position:fixed;inset:0;z-index:25;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse at center,transparent 28%,rgba(255,50,40,.6) 100%)}
+#damageFlash.on{animation:dmgFlash .75s ease-out}
+@keyframes dmgFlash{0%{opacity:0}16%{opacity:1}100%{opacity:0}}
+/* ---------- 开始界面 ---------- */
+.start-screen{position:fixed;inset:0;z-index:30;display:grid;grid-template-columns:minmax(0,1fr);
+  place-items:center;padding:18px;
+  background:radial-gradient(ellipse at 50% 45%,rgba(9,40,52,.72),rgba(2,8,14,.94));
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.start-card{width:min(480px,94vw);min-width:0;max-width:100%;max-height:94vh;
+  overflow-x:hidden;overflow-y:auto;
+  padding:30px 30px 24px;text-align:center;position:relative}
+.start-card:before{content:"";position:absolute;top:-140px;left:50%;transform:translateX(-50%);width:340px;height:260px;
+  background:radial-gradient(circle,rgba(80,220,190,.2),transparent 70%);pointer-events:none}
+.logo-orbit{font-size:54px;position:relative;animation:floaty 3.5s ease-in-out infinite}
+@keyframes floaty{50%{transform:translateY(-8px) rotate(6deg)}}
+.start-card h1{position:relative;margin:6px 0 4px;font-size:32px;letter-spacing:6px;font-weight:900;
+  background:linear-gradient(100deg,#8effd7,#7cd8ff 60%,#c5b0ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.slogan{position:relative;font-size:11.5px;color:var(--sub);letter-spacing:1px;margin:0 0 20px}
+.rules{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:9px;text-align:left;margin-bottom:20px}
+.rules>div{display:flex;gap:8px;padding:8px;border-radius:12px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}
+.rules>div.wide{grid-column:1/-1}
+.rules span{font-size:18px;line-height:1}
+.rules p{margin:0;font-size:10px;line-height:1.5;color:#9db9bd}
+.rules b{font-size:12px;color:var(--ink);display:block;margin-bottom:2px}
+#startBtn{position:relative;width:100%;padding:14px;border-radius:13px;font-size:15px;font-weight:800;letter-spacing:3px;
+  color:#04241c;background:linear-gradient(100deg,#6ef2c0,#8ce0ff);box-shadow:0 10px 30px rgba(110,242,192,.28);transition:.2s}
+#startBtn:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(110,242,192,.45)}
+.start-foot{position:relative;margin-top:13px;font-size:9.5px;color:#668287;letter-spacing:.5px}
+
+/* ---------- 触屏 ---------- */
+body.touch .mobile-btn{display:block;position:absolute;right:14px;bottom:150px;pointer-events:auto;
+  padding:12px 18px;border-radius:14px;font-size:13px;font-weight:800;background:rgba(110,242,192,.16);
+  border:1px solid rgba(110,242,192,.45);color:var(--mint)}
+body.touch #joystick{display:block;position:absolute;left:22px;bottom:26px;width:112px;height:112px;border-radius:50%;
+  pointer-events:auto;background:rgba(9,26,36,.5);border:1px solid var(--line);touch-action:none}
+body.touch #stick{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,rgba(140,255,220,.85),rgba(60,180,150,.5));
+  box-shadow:0 4px 16px rgba(0,0,0,.45);pointer-events:none}
+body.touch .bottom-left{left:10px;right:10px;width:auto;bottom:150px;max-height:52vh;overflow-y:auto;
+  display:none}
+body.touch .bottom-left.open{display:flex}
+body.touch .bottom-left.open ~ .mobile-btn{display:none}
+body.touch .up-close{display:block}
+body.touch .tool-card{display:none}
+body.touch .upgrade-card{max-height:none}
+body.touch .bottom-right{right:10px;bottom:10px;width:min(240px,52vw)}
+body.touch .tip{display:none}
+body.touch #toastWrap{bottom:196px}
+body.touch .toast{font-size:11px;padding:6px 12px}
+body.touch .stat-card{min-width:0;padding:9px 11px}
+body.touch .stat-row b{font-size:20px}
+body.touch #minimap{width:96px;height:96px}
+body.touch .minimap-wrap{padding:5px}
+body.touch .topbar{top:8px;left:8px;right:8px}
+body.touch .day-card{top:182px;left:8px;transform:none;width:158px;padding:7px 9px 8px}
+body.touch .day-top{font-size:11px;gap:4px}
+body.touch .day-card .day-sub{font-size:8.5px}
+body.touch .daily-card{top:172px;right:8px;width:min(178px,46vw);max-height:34vh;padding:8px 9px}
+body.touch .daily-head span.hint{font-size:8.5px}
+body.touch .dt-desc{display:none}
+body.touch .auto-note{display:none}
+body.touch .upgrade-card{max-height:none}
+body.touch .music-pop{top:172px;right:8px;width:min(230px,62vw);max-height:48vh;padding:8px 9px}
+body.touch .music-track small,body.touch .music-now small,body.touch .music-foot{display:none}
+body.touch .icon-btn{width:28px;height:28px;font-size:13px}
+@media (max-width:720px){
+  .tip{display:none}
+  .bottom-left{left:10px;right:10px;width:auto;bottom:150px;max-height:52vh;overflow-y:auto;display:none}
+  .bottom-left.open{display:flex}
+  .bottom-left.open ~ .mobile-btn{display:none}
+  .tool-card{display:none}
+  .upgrade-card{max-height:none}
+  .up-close{display:block}
+  .mobile-btn{display:block;position:absolute;right:14px;bottom:150px;pointer-events:auto;
+    padding:12px 18px;border-radius:14px;font-size:13px;font-weight:800;background:rgba(110,242,192,.16);
+    border:1px solid rgba(110,242,192,.45);color:var(--mint)}
+  .bottom-right{right:10px;bottom:10px;width:min(240px,52vw)}
+  .remote-key{display:none}
+  .stat-card{min-width:0;padding:9px 11px}
+  .stat-row b{font-size:20px}
+  #minimap{width:96px;height:96px}
+  .minimap-wrap{padding:5px}
+  .topbar{top:8px;left:8px;right:8px}
+  .day-card{top:182px;left:8px;transform:none;width:158px;padding:7px 9px 8px}
+  .day-top{font-size:11px;gap:4px}
+  .day-card .day-sub{font-size:8.5px}
+  .day-reward{font-size:8px;letter-spacing:0}
+  #dayRewardBanner{font-size:20px;width:calc(100% - 24px);padding:12px 12px 14px}
+  #dayRewardBanner p{font-size:11px}
+  .daily-card{top:172px;right:8px;width:min(178px,46vw);max-height:34vh;padding:8px 9px}
+  .dt-desc{display:none}
+  .music-pop{top:172px;right:8px;width:min(230px,62vw);max-height:48vh;padding:8px 9px}
+  .music-track small,.music-now small,.music-foot{display:none}
+  .icon-btn{width:28px;height:28px;font-size:13px}
+  #toastWrap{bottom:196px}
+  .toast{font-size:11px;padding:6px 12px}
+  .event-card{padding:18px 14px 14px}
+  .event-card h2{font-size:18px}
+  .puzzle-board{font-size:15px;letter-spacing:1px}
+  .opt{padding:10px 11px;font-size:12px}
+}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui">
+  <div class="topbar">
+    <div class="stat-card panel">
+      <div class="stat-row"><span class="coin-icon">◈</span><b id="coins">0</b><span class="unit">金币</span></div>
+      <div class="mini-row">第 <b id="wave">1</b> 波污染 · 累计清扫 <b id="totalCleaned">0</b> 件</div>
+      <div class="clean-line"><span>星球清洁度</span><b id="cleanPct">0%</b></div>
+      <div class="bar"><i id="cleanBar"></i></div>
+      <div class="threat-line"><span>☣ 污染强度 <span class="shield-tag" id="shieldTag"></span></span><b id="threatLv">Lv.1 · 常规</b></div>
+      <div class="bar threat"><i id="threatBar"></i></div>
+      <div class="threat-detail" id="threatDetail">垃圾耐久 ×1.0 · 无抗性 · 回收价 ×1.0</div>
+    </div>
+    <div class="right-top">
+      <div class="panel minimap-wrap"><canvas id="minimap" width="132" height="132"></canvas><div class="mm-label">星球扫描</div></div>
+      <div class="tool-btns">
+        <button id="btnMute" class="icon-btn" title="音效开关">♪</button>
+        <button id="btnMusic" class="icon-btn on" title="背景音乐：自由切歌">♫</button>
+        <button id="btnHelp" class="icon-btn" title="玩法说明">?</button>
+        <button id="btnReset" class="icon-btn" title="重置存档">↺</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="day-card panel" id="dayCard">
+    <div class="day-top"><span id="dayIcon">☀️</span><span id="dayName">第 1 天 · 白昼</span></div>
+    <div class="day-sub"><span id="dayPhase">日照 100%</span><span>次日还有 <b id="dayLeft">100</b>s</span></div>
+    <div class="bar day-bar"><i id="dayBar"></i></div>
+    <div class="day-bonus" id="dayBonus">☀️ 日间常规作业</div>
+    <div class="day-reward" id="dayRewardInfo">🎁 清扫日奖励：还有 7 天</div>
+  </div>
+
+  <div class="daily-card panel" id="dailyCard">
+    <div class="daily-head" id="dailyHead"><span>📋 每日任务</span><span class="hint" id="dailyHint">黎明刷新</span></div>
+    <div id="dailyList"></div>
+    <div class="daily-bonus">✨ 三单全清：额外 +200 ◈ 与免费工具补给<span class="auto-note"> · 奖励达成即自动发放</span></div>
+  </div>
+
+  <div class="music-pop panel hidden" id="musicPop">
+    <div class="music-head"><span>♫ 星球电台</span><span class="music-head-right"><span class="hint" id="musicHint">1/3</span><button id="btnMusicClose" class="music-close" title="收起">✕</button></span></div>
+    <div class="music-now"><span class="mn-ic" id="musicNowIcon">🌅</span><div><b id="musicNowName">星际晨曦</b><small id="musicNowDesc">舒缓 · 氛围</small></div></div>
+    <div class="music-tracks" id="musicTracks"></div>
+    <div class="music-ctrl">
+      <button id="btnMusicPrev" title="上一首（B）">⏮</button>
+      <button id="musicToggle" class="primary" title="播放 / 暂停（K）">⏸ 暂停</button>
+      <button id="btnMusicNext" title="下一首（N）">⏭</button>
+      <button id="btnMusicShuffle" title="随机一首">🔀</button>
+    </div>
+    <div class="music-vol"><span>音量</span><input id="musicVol" type="range" min="0" max="100" value="60" aria-label="背景音乐音量"><b id="musicVolVal">60%</b></div>
+    <div class="music-mute" id="musicMuteNote"></div>
+    <div class="music-foot">B 上一首 · N 下一首 · K 播放/暂停 · M 全局静音</div>
+  </div>
+
+  <div class="bottom-left" id="leftPanel">
+    <div class="panel tool-card">
+      <div class="tool-head">
+        <span id="toolIcon">🛠️</span>
+        <div><div class="tool-name" id="toolName">简易拾取夹</div><div class="tool-sub" id="toolLv">Lv.0 · 初始装备</div></div>
+      </div>
+      <div class="tool-stats">
+        <div><span>清扫功率</span><b id="powerVal">11</b></div>
+        <div><span>作用半径</span><b id="rangeVal">58</b></div>
+        <div><span>并行机械臂</span><b id="armsVal">1</b></div>
+      </div>
+    </div>
+    <div class="panel upgrade-card">
+      <div class="up-head"><span>⚙ 装备升级</span><span class="hint">按 1-5 快速购买</span><button id="btnCloseUp" class="up-close">✕</button></div>
+      <div id="upList"></div>
+      <div class="up-divider">🔧 工具工坊 <span>最高 Lv.6 · 永久生效</span></div>
+      <div id="toolList"></div>
+    </div>
+  </div>
+
+  <div class="bottom-right">
+    <div id="buffList"></div>
+    <div id="challengeBox" class="panel challenge hidden">
+      <div class="ch-top"><span id="chLabel">限时委托</span><b id="chCount">0/0</b></div>
+      <div class="bar"><i id="chBar"></i></div>
+      <div class="ch-foot" id="chFoot">剩余 0 秒</div>
+    </div>
+    <div class="panel bag-card">
+      <div class="bag-title"><span>♻ 回收舱</span><b id="bagCount">0 / 14</b></div>
+      <div class="bar gold"><i id="bagBar"></i></div>
+      <div class="bag-foot"><span>舱内价值 <b id="bagValue">0</b> ◈</span><span id="bagHint">回中央回收站结算</span></div>
+      <button id="btnRemote" class="remote-btn locked" disabled>
+        <span class="remote-ic" id="remoteIc">🔒</span>
+        <span class="remote-main"><b id="remoteLabel">直接回收</b><small id="remoteSub">需清扫工具 Lv.25</small></span>
+        <span class="remote-key">R</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="tip">WASD 移动 · 靠近垃圾自动清扫 · 回站结算 · Lv.25 按 R 直送(-15%) · 解谜 45s 失败随机装备降级</div>
+  <button id="btnUpgrade" class="mobile-btn">⚙ 升级</button>
+  <div id="joystick"><div id="stick"></div></div>
+  <div id="toastWrap"></div>
+  <div id="waveBanner" class="hidden"><div>🌍 星球焕新</div><p id="waveBannerText"></p></div>
+  <div id="dayRewardBanner" class="hidden"><div>🎁 清扫日奖励</div><p id="dayRewardText"></p></div>
+  <div id="bagFullWarn" class="hidden">回收舱已满！返回中央回收站卸货</div>
+</div>
+
+<div id="eventModal" class="modal hidden">
+  <div class="event-card panel">
+    <div class="event-glow"></div>
+    <div class="event-kicker">✦ 星球奇遇 ✦</div>
+    <div class="event-icon" id="eventIcon">🍾</div>
+    <h2 id="eventTitle">漂流瓶</h2>
+    <p id="eventText"></p>
+    <div id="puzzleBox" class="puzzle-box hidden">
+      <div class="puzzle-meta"><span id="puzzleTag">🧩 解码协议 · 难度 1</span><span id="puzzleTime">45s</span></div>
+      <div class="puzzle-timer"><i id="puzzleTimeBar"></i></div>
+      <div class="puzzle-board" id="puzzleBoard"></div>
+      <div class="puzzle-actions">
+        <button id="puzzleHint" class="pz-btn">💡 提示（奖励减半）</button>
+        <button id="puzzleSkip" class="pz-btn">🛰 付费绕行</button>
+      </div>
+    </div>
+    <div id="eventOptions"></div>
+    <div class="event-foot" id="eventFoot">奇遇期间清扫暂停 · 做出你的选择</div>
+  </div>
+</div>
+
+<div id="damageFlash"></div>
+
+<div id="startScreen" class="start-screen">
+  <div class="start-card panel">
+    <div class="logo-orbit">🌍</div>
+    <h1>星球清道夫</h1>
+    <p class="slogan">净土计划 · 把被垃圾淹没的星球一点点擦亮</p>
+    <div class="rules">
+      <div><span>🧹</span><p><b>移动清扫</b>走向垃圾自动作业，工具功率越高清得越快</p></div>
+      <div><span>♻️</span><p><b>回收换钱</b>回站结算金币；工具 Lv.25 解锁远程直送（手续费 15%）</p></div>
+      <div><span>⚙️</span><p><b>升级装备</b>主工具最高 Lv.50，工坊工具最高 Lv.6，效率滚雪球</p></div>
+      <div><span>✨</span><p><b>星球奇遇</b>随机事件带来增益、限时委托与意外之财</p></div>
+      <div><span>🌗</span><p><b>昼夜更替</b>一天四时段，夜晚有收益补贴与探照灯</p></div>
+      <div><span>📋</span><p><b>每日委托</b>每天刷新三条任务，达成即自动发放金币与工具补给</p></div>
+      <div><span>☣️</span><p><b>波次加压</b>污染波数越高，垃圾越硬、抗性越强</p></div>
+      <div><span>🧩</span><p><b>解码奇遇</b>45 秒破解污染密码，答错随机一件装备降级</p></div>
+      <div><span>📈</span><p><b>回收溢价</b>每清完一波污染，垃圾回收价随机提升 10%~20%</p></div>
+      <div><span>🎁</span><p><b>清扫日奖</b>每隔 5-10 天随机一天，送工坊道具／装备升级／金币红包</p></div>
+      <div class="wide"><span>♫</span><p><b>星球电台</b>三首原创背景音乐，点右上角 ♫ 或按 B / N 自由切歌</p></div>
+    </div>
+    <button id="startBtn">开始清扫</button>
+    <div class="start-foot" id="startFoot">键盘 / 鼠标 / 触屏 · 一天 120 秒 · 黎明刷新任务 · 完成即自动发奖 · 进度自动保存</div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* ============================================================
+   星球清道夫 · 净土计划
+   单文件 HTML5 Canvas 小游戏，无外部依赖，可离线运行
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const TAU = Math.PI * 2;
+const rand = (a,b) => a + Math.random()*(b-a);
+const randInt = (a,b) => a + Math.floor(Math.random()*(b-a+1));  // 含两端的整数
+const clamp = (v,a,b) => v<a?a:(v>b?b:v);
+const fmt = n => Math.round(n).toLocaleString('zh-CN');
+
+const canvas = $('game'), ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1, T = 0;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W*DPR); canvas.height = Math.round(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ---------------- 世界常量 ---------------- */
+const R = 1150;                 // 星球半径
+const BASE_RADIUS = 108;        // 回收站卸货半径
+const REMOTE_UNLOCK_LV = 25;    // 直接回收解锁所需的主工具等级
+const REMOTE_FEE = 0.15;        // 直接回收手续费：扣除回收舱内价值的 15%
+const VALUE_INC_MIN = .10, VALUE_INC_MAX = .20;              // 每清完一波污染，垃圾回收价随机 +10%~20%
+const DAY_REWARD_MIN = 5, DAY_REWARD_MAX = 10;               // 清扫日奖励：每隔随机 5~10 天发放一次
+const DAY_REWARD_COIN_MIN = 311, DAY_REWARD_COIN_MAX = 1888; // 金币红包区间（含两端）
+const nextRewardGap = () => randInt(DAY_REWARD_MIN, DAY_REWARD_MAX);
+const TRASH = {
+  bottle : {name:'塑料瓶',   value:3,  hp:9,  size:15, w:20, color:'#8fdcf5'},
+  bag    : {name:'塑料袋',   value:3,  hp:8,  size:19, w:16, color:'#dbe9ef'},
+  can    : {name:'易拉罐',   value:5,  hp:13, size:15, w:16, color:'#f2a65a'},
+  paper  : {name:'废纸箱',   value:4,  hp:12, size:20, w:15, color:'#d9b079'},
+  glass  : {name:'玻璃瓶',   value:7,  hp:20, size:16, w:12, color:'#8ef0c8'},
+  battery: {name:'废电池',   value:11, hp:28, size:16, w:8,  color:'#ff8a7a'},
+  tire   : {name:'旧轮胎',   value:16, hp:52, size:25, w:7,  color:'#59657a'},
+  ewaste : {name:'电子废料', value:26, hp:72, size:23, w:6,  color:'#b8a4ff'},
+  relic  : {name:'星尘遗物', value:60, hp:40, size:23, w:0,  color:'#ffd166', rare:true}
+};
+const TYPES = Object.keys(TRASH);
+const NORMAL_TYPES = TYPES.filter(k => !TRASH[k].rare);
+const TOTAL_W = NORMAL_TYPES.reduce((s,k)=>s+TRASH[k].w,0);
+/* ---------------- 污染波次难度曲线 ---------------- */
+// 波数越高：垃圾更硬、伤害被抗性削减、脱战回血、结晶精英增多、大件占比上升、污染渗漏
+function waveDiff(w){
+  const n = Math.max(1, w|0);
+  return {
+    wave : n,
+    hp   : Math.min(14, Math.pow(1.24, n-1)),          // 垃圾耐久倍率
+    armor: Math.min(.34, Math.max(0, (n-2)*.035)),     // 污染抗性：减免清扫伤害
+    regen: Math.min(.10, Math.max(0, (n-3)*.009)),     // 脱战后每秒回复最大耐久的比例
+    elite: Math.min(.30, Math.max(0, (n-2)*.035)),     // 结晶精英生成概率
+    heavy: Math.min(.55, .06 + (n-1)*.045),            // 大件/高危垃圾占比
+    count: Math.min(420, 180 + n*40),                  // 下一波污染物数量
+    leak : n>=3 ? Math.min(8, 2+Math.floor((n-3)/2)) : 0, // 本波污染渗漏次数
+    value: 1 + (n-1)*.18          // 旧存档兜底用的线性回收价；实际生效值改用 state.valueMul（每波随机 +10~20%）
+  };
+}
+function pickType(){
+  const d = waveDiff(state.wave);
+  if(Math.random()<d.heavy){
+    const heavy = ['battery','tire','ewaste'];
+    return heavy[(Math.random()*heavy.length)|0];
+  }
+  let r = Math.random()*TOTAL_W;
+  for(const k of NORMAL_TYPES){ r -= TRASH[k].w; if(r<=0) return k; }
+  return 'bottle';
+}
+function randPoint(){
+  const a = Math.random()*TAU, d = Math.sqrt(Math.random())*(R-70);
+  return {x:Math.cos(a)*d, y:Math.sin(a)*d};
+}
+function inWorld(p){
+  const d = Math.hypot(p.x,p.y), lim = R-56;
+  if(d>lim){ p.x = p.x/d*lim; p.y = p.y/d*lim; }
+  return p;
+}
+
+/* ---------------- 升级系统 ---------------- */
+const TOOL_FORMS = [
+  {min:0,  name:'简易拾取夹',   icon:'🛠️', color:'#8fd8c0'},
+  {min:3,  name:'伸缩抓取器',   icon:'🪝', color:'#7cd8ff'},
+  {min:6,  name:'磁力扫帚',     icon:'🧹', color:'#8ecbff'},
+  {min:10, name:'涡轮吸尘器',   icon:'🌀', color:'#b8a4ff'},
+  {min:15, name:'等离子分解枪', icon:'⚡', color:'#ffd166'},
+  {min:21, name:'星球生态仪',   icon:'🌐', color:'#8effd7'},
+  {min:27, name:'量子清扫阵列', icon:'🌌', color:'#c1a8ff'},
+  {min:33, name:'恒星回收者',   icon:'☀️', color:'#ffb86b'},
+  {min:39, name:'盖亚之手',     icon:'🌳', color:'#9dff9b'},
+  {min:42, name:'星环净化器',   icon:'🪐', color:'#ff9de2'},
+  {min:46, name:'奇点归零器',   icon:'⚫', color:'#cbd5ff'},
+  {min:50, name:'创世生态核',   icon:'💠', color:'#a6ffea'}
+];
+function form(lv){
+  let f = TOOL_FORMS[0];
+  for(const x of TOOL_FORMS) if(lv>=x.min) f = x;
+  return f;
+}
+const toolPower  = lv => 11 * Math.pow(1.27, lv);
+const toolRange  = lv => 58 + lv*7.5;
+const armCount   = () => 1 + state.up.arms;
+const moveSpeed  = () => (185 + state.up.speed*24) * buffMul('speed');
+const bagCap     = () => 14 + state.up.bag*7;
+const luckBonus  = () => 1 + state.up.luck*0.09;
+
+const UPGRADES = [
+  {key:'tool',  name:'清扫工具', icon:'🧹', base:32, growth:1.48, max:50,
+   desc:lv=>`功率 ${fmt(toolPower(lv))}/s · 半径 ${Math.round(toolRange(lv))} · ${form(lv).name}`},
+  {key:'arms',  name:'并行机械臂', icon:'🦾', base:70, growth:1.78, max:8,
+   desc:lv=>`同时清扫 ${1+lv} 件垃圾`},
+  {key:'speed', name:'推进器',   icon:'🚀', base:40, growth:1.50, max:36,
+   desc:lv=>`移动速度 ${185+lv*24}`},
+  {key:'bag',   name:'回收舱扩容', icon:'📦', base:36, growth:1.45, max:50,
+   desc:lv=>`容量 ${14+lv*7} 件`},
+  {key:'luck',  name:'幸运星',   icon:'🍀', base:55, growth:1.60, max:36,
+   desc:lv=>`收益 +${lv*9}% · 奇遇更频繁`}
+];
+// 前 14 级保持原指数曲线，之后增速放缓，让新增的高等级真正可得
+const COST_SOFT_FROM = 14, COST_TAIL = 1.16;
+const cost = (u,lv) => Math.round(
+  u.base * Math.pow(u.growth, Math.min(lv, COST_SOFT_FROM)) *
+  Math.pow(COST_TAIL, Math.max(0, lv-COST_SOFT_FROM))
+);
+const upMax = key => { const u = UPGRADES.find(x=>x.key===key); return u ? u.max : 0; };
+
+/* ---------------- 昼夜日历 ---------------- */
+const DAY_LEN = 120;   // 一个游戏日 = 120 秒
+const PHASES = [
+  {key:'dawn',  name:'黎明', icon:'🌅', from:0,  to:12,  tint:'rgba(255,172,140,.075)', dark:.26, bonus:1.10},
+  {key:'day',   name:'白昼', icon:'☀️', from:12, to:72,  tint:'rgba(255,236,180,.025)', dark:0,   bonus:1},
+  {key:'dusk',  name:'黄昏', icon:'🌇', from:72, to:88,  tint:'rgba(255,138,72,.14)',  dark:.18, bonus:1.10},
+  {key:'night', name:'夜晚', icon:'🌙', from:88, to:120, tint:'rgba(24,44,100,.10)',   dark:.54, bonus:1.35}
+];
+function currentPhase(){
+  for(const p of PHASES) if(state.clock>=p.from && state.clock<p.to) return p;
+  return PHASES[0];
+}
+function gameClockText(){
+  const h = (state.clock/DAY_LEN*24 + 6) % 24;
+  const hh = Math.floor(h), mm = Math.floor((h-hh)*60);
+  return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');
+}
+function pickupMul(){
+  return currentPhase().bonus * (1+state.tools.radar*0.08) * state.valueMul;
+}
+function settleMul(){ return luckBonus()*buffMul('value'); }
+function nightMode(){ return currentPhase().dark>0.4; }
+
+/* ---------------- 每日任务池 ---------------- */
+const DAILY_POOL = [
+  {type:'clean',   icon:'🧹', name:'晨间清扫', base:18,  step:4,  reward:70,  desc:g=>'清理 '+g+' 件垃圾'},
+  {type:'big',     icon:'🛞', name:'大件处理', base:3,   step:1,  reward:90,  desc:g=>'清理 '+g+' 件大件 / 稀有垃圾'},
+  {type:'coins',   icon:'◈', name:'回收指标', base:120, step:35, reward:85,  desc:g=>'累计结算 '+g+' 金币'},
+  {type:'upgrade', icon:'⚙️', name:'装备迭代', base:2,   step:1,  reward:75,  desc:g=>'购买 '+g+' 次升级或工具'},
+  {type:'event',   icon:'✨', name:'星球见闻', base:1,   step:1,  reward:80,  desc:g=>'经历 '+g+' 次奇遇'},
+  {type:'night',   icon:'🌙', name:'夜班值守', base:6,   step:2,  reward:100, desc:g=>'夜间清理 '+g+' 件垃圾'},
+  {type:'full',    icon:'📦', name:'满舱运输', base:1,   step:1,  reward:95,  desc:g=>'完成 '+g+' 趟满舱结算'},
+  {type:'puzzle',  icon:'🧩', name:'协议破解', base:1,   step:.25,reward:110, desc:g=>'破解 '+g+' 道污染密码'}
+];
+
+/* ---------------- 工具工坊 ---------------- */
+const droneInterval = lv => Math.max(.4, 4.5 - lv*0.7);
+const TOOLS = [
+  {key:'magnet', icon:'🧲', name:'磁力吸附器', need:2,  base:120, max:6, desc:lv=>`半径 +${lv*18} · 吸附附近垃圾`},
+  {key:'spray',  icon:'💧', name:'分解喷雾',   need:4,  base:140, max:6, desc:lv=>`大件伤害 ×${(1+lv*0.6).toFixed(1)}`},
+  {key:'radar',  icon:'🔍', name:'探测雷达',   need:6,  base:160, max:6, desc:lv=>`收益 +${lv*8}% · 标记稀有垃圾`},
+  {key:'fan',    icon:'💨', name:'涡流风扇',   need:8,  base:210, max:6, desc:lv=>`溅射伤害 ${lv*30}%`},
+  {key:'seed',   icon:'🌱', name:'生态播种机', need:12, base:280, max:6, desc:lv=>`每 12 件连锁净化 +${lv*20} ◈`},
+  {key:'drone',  icon:'🤖', name:'拾荒无人机', need:16, base:360, max:6, desc:lv=>`每 ${droneInterval(lv).toFixed(1)}s 自动清扫`}
+];
+const toolCost = (u,lv) => Math.round(u.base * Math.pow(1.9, lv));
+const effectiveRange = () => toolRange(state.up.tool) + state.tools.magnet*18;
+
+
+/* ---------------- 星球电台：三首程序化循环曲谱 ----------------
+   全部由 WebAudio 实时合成，不依赖任何外部音频文件。
+   每首 4 小节 × 16 步循环；chords 为绝对 MIDI 音符，
+   lead.seq 是每小节 16 个十六分音符位上的和弦音索引（null = 休止）。 */
+const TRACKS = [
+  {
+    id:'dawn', icon:'🌅', name:'星际晨曦', mood:'舒缓 · 空灵氛围',
+    desc:'慢速大七和声与稀疏琶音，适合黎明开工',
+    bpm:72, bars:4,
+    chords:[[60,64,67,71],[57,60,64,67],[53,57,60,64],[55,59,62,67]],
+    pad:{wave:'sine',vol:0.036,atk:0.70,dur:3.10,cutoff:1900},
+    bass:{wave:'triangle',vol:0.046,dur:0.75,pattern:[0,8],cutoff:520},
+    lead:{wave:'sine',vol:0.034,dur:0.85,cutoff:3000,
+      seq:[0,null,null,null,2,null,null,null,1,null,null,null,3,null,null,null]},
+    echo:{delay:0.32,mix:0.42},
+    kick:[], snare:[], hat:[6,14], kickVol:0, snareVol:0, hatVol:0.010, swing:0
+  },
+  {
+    id:'sweep', icon:'🧹', name:'清扫节拍', mood:'轻快 · 机械律动',
+    desc:'明亮合成器配四拍鼓点，清扫效率拉满',
+    bpm:112, bars:4,
+    chords:[[60,64,67],[55,59,62],[57,60,64],[53,57,60]],
+    pad:{wave:'triangle',vol:0.026,atk:0.05,dur:1.85,cutoff:2200},
+    bass:{wave:'square',vol:0.040,dur:0.24,pattern:[0,3,6,8,11,14],cutoff:420},
+    lead:{wave:'triangle',vol:0.038,dur:0.26,cutoff:3400,
+      seq:[0,null,1,null,2,null,1,null,0,null,2,null,1,null,2,null]},
+    echo:{delay:0.16,mix:0.22},
+    kick:[0,8], snare:[4,12], hat:[0,2,4,6,8,10,12,14],
+    kickVol:0.075, snareVol:0.032, hatVol:0.016, swing:0
+  },
+  {
+    id:'night', icon:'🌌', name:'深空夜巡', mood:'神秘 · 低速巡航',
+    desc:'小调低音与切分铃音，夜班与深空的专属 BGM',
+    bpm:88, bars:4,
+    chords:[[62,65,69],[58,62,65],[53,57,60],[60,64,67]],
+    pad:{wave:'sawtooth',vol:0.022,atk:0.50,dur:2.55,cutoff:820},
+    bass:{wave:'triangle',vol:0.050,dur:0.60,pattern:[0,6,10],cutoff:400},
+    lead:{wave:'sine',vol:0.038,dur:0.55,cutoff:2600,
+      seq:[0,null,null,2,null,1,null,null,null,3,null,null,2,null,null,null]},
+    echo:{delay:0.28,mix:0.50},
+    kick:[0,10], snare:[], hat:[3,7,11,15],
+    kickVol:0.060, snareVol:0, hatVol:0.014, swing:0.12
+  }
+];
+// track / on / vol 会写入存档，step / nextTime / timer / gain 仅运行时使用
+const music = {track:0, on:true, vol:0.6, step:0, nextTime:0, timer:null, gain:null};
+
+/* ---------------- 游戏状态 ---------------- */
+const state = {
+  running:false, paused:false, eventOpen:false,
+  coins:0, totalCleaned:0, wave:1, waveTotal:0, cleanedThisWave:0, waveAnim:0,
+  up:{tool:0, arms:0, speed:0, bag:0, luck:0},
+  tools:{magnet:0, spray:0, radar:0, fan:0, seed:0, drone:0},
+  bag:{count:0, value:0},
+  valueMul:1, valueIncNext:0, lastValueInc:0,
+  day:1, clock:20, daily:null, dailySig:'',
+  dayRewardAt:0, dayRewardCount:0,
+  seedCounter:0, droneTimer:2, droneBeam:null,
+  remoteBeam:null, remoteSig:'',
+  buffs:[], challenge:null,
+  eventTimer:24, lastEvent:-1, eventCount:0, puzzleStreak:0,
+  puzzleShield:0, puzzleWins:0, puzzleFails:0,
+  leakLeft:0, leakTimer:18,
+  muted:false, lastSave:0, sfxAt:0
+};
+const player = {x:0, y:BASE_RADIUS+70, vx:0, vy:0, face:0, beams:[]};
+const cam = {x:player.x, y:player.y};
+let trash = [], parts = [], floats = [], clusters = [], landBlobs = [], stars = [], worldCanvas = null;
+
+/* ---------------- 存档 ---------------- */
+const SAVE_KEY = 'planet-cleaner-save-v1';
+function save(){
+  try{
+    const data = {
+      v:1, coins:state.coins, totalCleaned:state.totalCleaned, wave:state.wave,
+      waveTotal:state.waveTotal, cleanedThisWave:state.cleanedThisWave,
+      up:state.up, tools:state.tools, muted:state.muted, eventCount:state.eventCount,
+      music:{track:music.track, on:music.on, vol:Math.round(music.vol*100)/100},
+      day:state.day, clock:Math.round(state.clock*10)/10, daily:state.daily,
+      valueMul:state.valueMul, dayRewardAt:state.dayRewardAt, dayRewardCount:state.dayRewardCount,
+      puzzleShield:state.puzzleShield, puzzleWins:state.puzzleWins, puzzleFails:state.puzzleFails,
+      leakLeft:state.leakLeft, leakTimer:Math.round(state.leakTimer*10)/10,
+      px:Math.round(player.x), py:Math.round(player.y),
+      trash:trash.map(t=>[Math.round(t.x),Math.round(t.y),TYPES.indexOf(t.type),Math.ceil(t.hp),Math.ceil(t.maxHp),t.done?1:0,t.elite?1:0])
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  }catch(e){ /* 隐私模式下忽略 */ }
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return false;
+    const d = JSON.parse(raw);
+    if(!d || d.v!==1 || !Array.isArray(d.trash)) return false;
+    state.coins = d.coins||0; state.totalCleaned = d.totalCleaned||0;
+    state.wave = d.wave||1; state.waveTotal = d.waveTotal||d.trash.length;
+    state.cleanedThisWave = d.cleanedThisWave||0;
+    state.muted = !!d.muted; state.eventCount = d.eventCount||0;
+    // 先回到默认电台设置，再套用存档；旧存档没有音乐字段时即为第 1 首 / 开启 / 60%
+    music.track = 0; music.on = true; music.vol = 0.6;
+    if(d.music){
+      music.track = clamp(parseInt(d.music.track,10)||0, 0, TRACKS.length-1);
+      music.on = d.music.on !== false;
+      const mv = Number(d.music.vol);
+      music.vol = (isFinite(mv) && mv>=0 && mv<=1) ? mv : 0.6;
+    }
+    state.day = d.day||1; state.clock = clamp(d.clock||0,0,DAY_LEN-0.1);
+    // 旧存档没有随机回收价字段：按原线性曲线折算，保证价值不突变
+    state.valueMul = (typeof d.valueMul==='number' && isFinite(d.valueMul) && d.valueMul>0)
+      ? d.valueMul : waveDiff(state.wave).value;
+    state.dayRewardAt = d.dayRewardAt||0;
+    state.dayRewardCount = d.dayRewardCount||0;
+    state.puzzleShield = d.puzzleShield||0; state.puzzleWins = d.puzzleWins||0; state.puzzleFails = d.puzzleFails||0;
+    state.leakLeft = (d.leakLeft==null ? waveDiff(state.wave).leak : d.leakLeft);
+    state.leakTimer = (d.leakTimer==null ? 18 : d.leakTimer);
+    Object.keys(state.up).forEach(k=>{ state.up[k] = clamp((d.up && d.up[k]) || 0, 0, upMax(k)); });
+    if(d.tools) Object.keys(state.tools).forEach(k=>{
+      const u = TOOLS.find(x=>x.key===k);
+      state.tools[k] = clamp(d.tools[k]||0, 0, u?u.max:0);
+    });
+    state.daily = (d.daily && d.daily.day===state.day && Array.isArray(d.daily.tasks) && d.daily.tasks.length===3) ? d.daily : null;
+    // 旧档任务字段规整：避免缺失计数/奖励导致自动结算异常
+    if(state.daily) state.daily.tasks.forEach(t=>{
+      t.goal = Math.max(1, t.goal||1);
+      t.reward = Math.max(0, t.reward||0);
+      t.count = clamp(t.count||0, 0, t.goal);
+      t.claimed = !!t.claimed;
+    });
+    if(state.daily) state.daily.allBonus = !!state.daily.allBonus;
+    player.x = d.px||0; player.y = d.py||180;
+    trash = d.trash.map(a=>makeTrash(a[0],a[1],TYPES[a[2]]||'bottle',a[4]||TRASH[TYPES[a[2]]||'bottle'].hp,a[3],!!a[5],!!a[6]));
+    $('startFoot').textContent = '已读取上次进度 · 一天 120 秒 · 第 '+state.wave+' 波污染';
+    return true;
+  }catch(e){ return false; }
+}
+
+/* ---------------- 垃圾 ---------------- */
+function makeTrash(x,y,type,maxHp,hp,done,elite){
+  const def = TRASH[type];
+  const m = maxHp || Math.round(def.hp * rand(.8,1.25) * waveDiff(state.wave).hp * (elite?1.8:1));
+  return {x,y,type,maxHp:m,hp:(hp==null?m:Math.min(hp,m)),done:!!done,
+    elite:!!elite, lastHit:-99,
+    size:def.size*rand(.86,1.16), rot:rand(0,TAU), bob:rand(0,TAU), pulse:0};
+}
+function spawnTrash(n, near, spread){
+  const eliteChance = waveDiff(state.wave).elite;
+  for(let i=0;i<n;i++){
+    let p;
+    if(near){
+      const a = Math.random()*TAU, d = Math.sqrt(Math.random())*(spread||300);
+      p = inWorld({x:near.x+Math.cos(a)*d, y:near.y+Math.sin(a)*d});
+    }else if(Math.random()<0.34 && clusters.length){
+      const c = clusters[(Math.random()*clusters.length)|0];
+      p = inWorld({x:c.x+rand(-95,95), y:c.y+rand(-95,95)});
+    }else p = randPoint();
+    if(Math.hypot(p.x,p.y) < 155) p = randPoint();
+    trash.push(makeTrash(p.x,p.y,pickType(),null,null,false,Math.random()<eliteChance));
+  }
+}
+function spawnRelics(n, near){
+  for(let i=0;i<n;i++){
+    const a = Math.random()*TAU, d = rand(90,340);
+    const p = inWorld({x:near.x+Math.cos(a)*d, y:near.y+Math.sin(a)*d});
+    trash.push(makeTrash(p.x,p.y,'relic'));
+  }
+}
+function newWorld(){
+  clusters = [];
+  for(let i=0;i<30;i++) clusters.push(randPoint());
+  trash = [];
+  spawnTrash(470);
+  state.waveTotal = trash.length;
+  state.cleanedThisWave = 0;
+  state.leakLeft = waveDiff(state.wave).leak;
+  state.leakTimer = 16;
+}
+
+/* ---------------- 增益 / 挑战 ---------------- */
+function addBuff(type, mult, dur, label, icon){
+  state.buffs = state.buffs.filter(b=>!(b.type===type && b.label===label));
+  state.buffs.push({type,mult,until:T+dur,label,icon:icon||'✨',bad:mult<1});
+}
+function buffMul(type){
+  let m = 1;
+  for(const b of state.buffs) if(b.type===type && b.until>T) m *= b.mult;
+  return m;
+}
+function grant(n, msg){ state.coins += n; toast((msg||'获得')+' +'+n+' ◈','gold'); sfx('coin'); }
+function spend(n){ const p = Math.min(n,state.coins); state.coins -= p; return p; }
+function randomUpgrade(){
+  const avail = UPGRADES.filter(u=>state.up[u.key] < u.max);
+  if(!avail.length){ grant(150,'全部满级，改发'); return; }
+  const u = avail[(Math.random()*avail.length)|0];
+  const before = state.up[u.key];
+  state.up[u.key]++;
+  toast('免费升级：'+u.name+' Lv.'+state.up[u.key],'good'); sfx('upgrade');
+  if(u.key==='tool') remoteUnlockNotice(before, state.up.tool);
+}
+function instantClean(n){
+  let c = 0;
+  for(const t of trash){
+    if(t.done) continue;
+    t.done = true; state.totalCleaned++; state.cleanedThisWave++;
+    floatText('+'+(TRASH[t.type].value*2), t.x, t.y-10, '#ffd166');
+    burst(t.x,t.y,'#8effd7',6); c++;
+    if(c>=n) break;
+  }
+  if(c){ state.coins += c*4; bumpDaily('clean',c); }
+  checkWave();
+}
+
+/* ---------------- 日历 / 每日任务 ---------------- */
+function newDailyTasks(quiet){
+  const pool = DAILY_POOL.slice(), picked = [];
+  for(let i=0;i<3 && pool.length;i++) picked.push(pool.splice((Math.random()*pool.length)|0,1)[0]);
+  state.daily = {
+    day:state.day,
+    tasks:picked.map(p=>{
+      const goal = Math.max(1, Math.round(p.base + (state.day-1)*p.step));
+      return {type:p.type, icon:p.icon, name:p.name, goal, count:0,
+              reward:Math.round(p.reward + state.day*8 + (goal-p.base)*3),
+              desc:p.desc(goal), claimed:false};  // claimed：奖励是否已自动发放（沿用旧档字段名）
+    }),
+    allBonus:false
+  };
+  state.dailySig = '';
+  if(!quiet) toast('📋 第 '+state.day+' 天的每日任务已刷新','good');
+}
+/* ---------------- 清扫日奖励 ---------------- */
+// 每隔随机 5~10 天发放一次，三类奖励等概率随机：工坊道具 / 装备 +1~3 级 / 311~1888 金币红包
+let dayRewardTimer = 0;
+function ensureDayRewardSchedule(){
+  if(!state.dayRewardAt || state.dayRewardAt < state.day)
+    state.dayRewardAt = state.day + nextRewardGap();
+}
+function grantDayReward(){
+  state.dayRewardCount++;
+  const kind = (Math.random()*3)|0;
+  let title = '', desc = '';
+  if(kind===0){
+    // ① 随机获得一件工具工坊道具（优先未拥有的新工具；全满级则折金币）
+    const free = TOOLS.filter(u=>state.tools[u.key] < u.max);
+    const fresh = free.filter(u=>state.tools[u.key]===0);
+    const pool = fresh.length ? fresh : free;
+    if(pool.length){
+      const u = pool[(Math.random()*pool.length)|0];
+      const before = state.tools[u.key];
+      state.tools[u.key]++;
+      title = u.icon+' '+u.name+' Lv.'+state.tools[u.key];
+      desc = (before===0?'解锁了新工具 · ':'工具等级 +1 · ')+u.desc(state.tools[u.key]);
+    }else{
+      const c = randInt(DAY_REWARD_COIN_MIN, DAY_REWARD_COIN_MAX);
+      state.coins += c;
+      title = '🧧 '+fmt(c)+' 金币红包';
+      desc = '工坊已全部满级，补给折算成金币';
+    }
+  }else if(kind===1){
+    // ② 随机装备 +1~3 级（超出上限的级数顺延到其它装备，全满则折现金币）
+    const n = randInt(1,3);
+    let left = n, guard = 0;
+    const hits = [];
+    while(left>0 && guard++<16){
+      const pool = [];
+      for(const u of UPGRADES) if(state.up[u.key] < u.max) pool.push({kind:'up',   u, max:u.max});
+      for(const u of TOOLS)   if(state.tools[u.key] < u.max) pool.push({kind:'tool', u, max:u.max});
+      if(!pool.length) break;
+      const e = pool[(Math.random()*pool.length)|0];
+      const before = e.kind==='up' ? state.up[e.u.key] : state.tools[e.u.key];
+      const add = Math.min(left, e.max-before);
+      if(e.kind==='up'){
+        state.up[e.u.key] += add;
+        if(e.u.key==='tool') remoteUnlockNotice(before, state.up.tool);
+      }else state.tools[e.u.key] += add;
+      left -= add;
+      hits.push(e.u.icon+e.u.name+' +'+add);
+    }
+    const got = n-left;
+    if(got>0){ title = '⚙️ '+hits.join('、'); desc = '随机装备共 +'+got+' 级'; }
+    if(left>0){
+      const c = left*260;
+      state.coins += c;
+      title = title ? title+' +'+fmt(c)+' ◈' : '🧧 '+fmt(c)+' 金币';
+      desc += (desc?' · ':'')+'装备已满级，'+left+' 级折现 +'+fmt(c)+' ◈';
+    }
+    if(!title) title = '🧧 装备满级折现';
+  }else{
+    // ③ 金币红包
+    const c = randInt(DAY_REWARD_COIN_MIN, DAY_REWARD_COIN_MAX);
+    state.coins += c;
+    title = '🧧 '+fmt(c)+' 金币红包';
+    desc = '来自星球生态理事会的感谢';
+  }
+  state.dayRewardAt = state.day + nextRewardGap();
+  // 展示：金色横幅 + 提示 + 飘字 + 粒子
+  $('dayRewardText').textContent = title+' · '+desc;
+  const banner = $('dayRewardBanner');
+  banner.classList.remove('hidden');
+  banner.style.animation = 'none'; void banner.offsetWidth; banner.style.animation = '';
+  clearTimeout(dayRewardTimer);
+  dayRewardTimer = setTimeout(()=>banner.classList.add('hidden'), 4400);
+  toast('🎁 第 '+state.day+' 天清扫日奖励：'+title,'gold');
+  floatText('🎁 清扫日奖励', player.x, player.y-58, '#ffd166');
+  for(let i=0;i<26;i++){
+    const a=Math.random()*TAU, s=rand(60,200);
+    parts.push({x:player.x,y:player.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-50,
+      color:'#ffd166',life:rand(.5,1.1),max:1.1,size:rand(1.6,3.6)});
+  }
+  sfx('win');
+  updateHUD();
+  save();
+}
+function nextDay(){
+  state.day++;
+  newDailyTasks();
+  addBuff('value',1.15,25,'晨间补给','🌅');
+  grant(40+state.day*10,'日出津贴');
+  if(state.day >= state.dayRewardAt) grantDayReward();
+  sfx('win'); save();
+}
+/* ---------------- 每日任务：达成即自动发放，无需手动领取 ---------------- */
+// 单条任务结算：标记已发放并入账（claimed 沿用旧存档字段名，保证兼容）
+function settleDailyTask(t){
+  if(!t || t.claimed || t.count<t.goal) return false;
+  t.claimed = true;
+  state.coins += t.reward;
+  return true;
+}
+// 三条全部达成时，自动补发全清大奖与一次免费工具补给
+function grantDailyAllBonus(quiet){
+  const d = state.daily;
+  if(!d || d.allBonus || !d.tasks.every(x=>x.claimed)) return false;
+  d.allBonus = true;
+  let extra = 200, tail = '额外 +200 ◈';
+  const avail = TOOLS.filter(u=>state.tools[u.key]<u.max);
+  if(avail.length){
+    const u = avail[(Math.random()*avail.length)|0];
+    state.tools[u.key]++;
+    tail += ' + '+u.name+' Lv.'+state.tools[u.key]+' 免费补给';
+  }else{ extra += 250; tail += ' + 工坊满级折现 +250 ◈'; }
+  state.coins += extra;
+  if(!quiet){ toast('✨ 三单全清 · 自动发放 '+tail,'good'); sfx('win'); }
+  return true;
+}
+function bumpDaily(type,n){
+  if(!state.daily) return;
+  const finished = [];
+  for(const t of state.daily.tasks){
+    if(t.claimed || t.type!==type || t.count>=t.goal) continue;
+    t.count = Math.min(t.goal, t.count+n);
+    if(t.count>=t.goal && settleDailyTask(t)) finished.push(t);
+  }
+  if(!finished.length) return;
+  const sum = finished.reduce((a,t)=>a+t.reward,0);
+  toast('📋 '+(finished.length===1?finished[0].name:finished.length+' 项任务')+' 达成 · 奖励自动发放 +'+fmt(sum)+' ◈','gold');
+  floatText('+'+fmt(sum)+' ◈', player.x, player.y-46, '#ffd166');
+  sfx('coin');
+  grantDailyAllBonus();
+  state.dailySig = '';
+  save();
+}
+function renderDaily(){
+  if(!state.daily) return;
+  const d = state.daily;
+  const sig = d.day+'|'+d.allBonus+'|'+d.tasks.map(t=>t.count+'/'+t.goal+'/'+(t.claimed?1:0)).join(',');
+  if(sig===state.dailySig) return;
+  state.dailySig = sig;
+  if(!isCompact()) $('dailyHint').textContent = '第 '+d.day+' 天 · 自动发奖';
+  $('dailyList').innerHTML = d.tasks.map((t,i)=>{
+    const done = t.count>=t.goal;
+    return '<div class="daily-task'+(done?' done':'')+(t.claimed?' claimed':'')+'">'+
+      '<div class="dt-top"><span class="dt-name">'+t.icon+' '+t.name+'</span><span class="dt-num">'+Math.min(t.count,t.goal)+'/'+t.goal+'</span></div>'+
+      '<div class="dt-desc">'+t.desc+'</div>'+
+      '<div class="bar"><i style="width:'+clamp(t.count/t.goal*100,0,100)+'%"></i></div>'+
+      '<div class="dt-foot"><span class="dt-reward">'+(t.claimed?'已发放 +':'')+t.reward+' ◈</span>'+
+      '<span class="dt-state'+(t.claimed?' paid':'')+'" data-idx="'+i+'">'+
+      (t.claimed?(isCompact()?'✓ 已发':'✓ 已发放'):'进行中')+'</span></div></div>';
+  }).join('');
+}
+
+/* ---------------- 工具工坊效果 ---------------- */
+function buyTool(key){
+  if(!state.running || state.eventOpen) return;
+  const u = TOOLS.find(x=>x.key===key), lv = state.tools[key];
+  if(state.up.tool < u.need && lv===0){ toast('需要清扫工具 Lv.'+u.need+' 才能解锁','bad'); return; }
+  if(lv>=u.max){ toast('这件工具已满级','bad'); return; }
+  const c = toolCost(u,lv);
+  if(state.coins<c){ toast('金币不足，还差 '+fmt(c-state.coins)+' ◈','bad'); return; }
+  state.coins -= c; state.tools[key]++;
+  sfx('upgrade');
+  toast('🔧 '+u.name+' 升至 Lv.'+state.tools[key],'good');
+  bumpDaily('upgrade',1);
+  for(let i=0;i<16;i++){
+    const a=Math.random()*TAU, s=rand(40,150);
+    parts.push({x:player.x,y:player.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,color:'#c1a8ff',life:.8,max:.8,size:rand(1.5,3)});
+  }
+  save();
+}
+function seedPurge(){
+  const lv = state.tools.seed, t = trash.find(x=>!x.done);
+  if(!t) return;
+  t.done = true; state.totalCleaned++; state.cleanedThisWave++;
+  state.coins += lv*20;
+  floatText('🌱 +'+(lv*20), t.x, t.y-12, '#9dff9b');
+  burst(t.x,t.y,'#9dff9b',10);
+  bumpDaily('clean',1);
+  checkWave();
+}
+function updateTools(dt, power, active, full){
+  const diff = waveDiff(state.wave);
+  const armorF = 1 - diff.armor/buffMul('pierce');
+  // 磁力吸附器：把附近的垃圾缓慢拉向自己
+  const mg = state.tools.magnet;
+  if(mg>0){
+    const pull = (8+mg*7)*dt, lim2 = (effectiveRange()+70)*(effectiveRange()+70);
+    for(const t of trash){
+      if(t.done) continue;
+      const dx=player.x-t.x, dy=player.y-t.y, d2=dx*dx+dy*dy;
+      if(d2<lim2 && d2>900){
+        const d=Math.sqrt(d2);
+        t.x += dx/d*pull; t.y += dy/d*pull;
+      }
+    }
+  }
+  // 涡流风扇：对主目标周围的其它垃圾造成溅射伤害
+  if(state.tools.fan>0 && active.length && !full){
+    const splash = power*dt*0.3*state.tools.fan*armorF;
+    for(const t of trash){
+      if(t.done) continue;
+      for(const c of active){
+        if(c.t===t) break;
+        const dx=t.x-c.t.x, dy=t.y-c.t.y;
+        if(dx*dx+dy*dy<6400){
+          t.hp -= splash; t.pulse = Math.max(t.pulse,.5);
+          if(t.hp<=0) collect(t);
+          break;
+        }
+      }
+    }
+  }
+  // 拾荒无人机：每隔一段时间自动清扫附近一件垃圾
+  const dr = state.tools.drone;
+  if(dr>0 && !full){
+    state.droneTimer -= dt;
+    if(state.droneTimer<=0){
+      state.droneTimer = droneInterval(dr);
+      const lim2 = effectiveRange()*effectiveRange();
+      let best=null, bd=Infinity;
+      for(const t of trash){
+        if(t.done) continue;
+        const dx=t.x-player.x, dy=t.y-player.y, d2=dx*dx+dy*dy;
+        if(d2<lim2 && d2<bd){ bd=d2; best=t; }
+      }
+      if(best){
+        best.hp -= toolPower(state.up.tool)*1.6*armorF*(best.elite?.7:1);
+        best.lastHit = T; best.pulse = 1;
+        state.droneBeam = {x:best.x, y:best.y, life:.35};
+        if(best.hp<=0) collect(best);
+      }
+    }
+  }
+  if(state.droneBeam){ state.droneBeam.life-=dt; if(state.droneBeam.life<=0) state.droneBeam=null; }
+}
+
+/* ---------------- 音效（WebAudio 合成，无外部文件） ---------------- */
+let AC = null;
+function initAudio(){
+  if(AC){ if(AC.state==='suspended') AC.resume(); return; }
+  try{ AC = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ AC = null; }
+}
+function tone(freq, dur, type, vol, delay, slide){
+  if(!AC || state.muted) return;
+  const t0 = AC.currentTime + (delay||0);
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type||'sine'; o.frequency.setValueAtTime(freq,t0);
+  if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(40,slide),t0+dur);
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(vol||0.08,t0+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(g); g.connect(AC.destination); o.start(t0); o.stop(t0+dur+0.02);
+}
+function sfx(kind){
+  if(state.muted || !AC) return;
+  if(kind==='pick'){
+    if(T - state.sfxAt < 0.075) return;
+    state.sfxAt = T;
+    tone(rand(660,820),0.09,'sine',0.045,0,1200);
+  }else if(kind==='coin'){
+    tone(523,0.13,'triangle',0.07); tone(784,0.16,'triangle',0.055,0.07); tone(1046,0.2,'sine',0.045,0.14);
+  }else if(kind==='deposit'){
+    [523,659,784,1046].forEach((f,i)=>tone(f,0.22,'triangle',0.06,i*0.06));
+  }else if(kind==='upgrade'){
+    [440,660,880].forEach((f,i)=>tone(f,0.2,'sine',0.06,i*0.075));
+  }else if(kind==='event'){
+    tone(880,0.35,'sine',0.05); tone(1320,0.4,'sine',0.035,0.12);
+  }else if(kind==='win'){
+    [523,659,784,1046,1318].forEach((f,i)=>tone(f,0.32,'triangle',0.06,i*0.09));
+  }else if(kind==='bad'){
+    tone(220,0.25,'sawtooth',0.035,0,120);
+  }
+}
+
+/* ---------------- 提示 ---------------- */
+function toast(msg, kind){
+  const d = document.createElement('div');
+  d.className = 'toast '+(kind||'');
+  d.textContent = msg;
+  $('toastWrap').appendChild(d);
+  setTimeout(()=>{ d.style.transition='.3s'; d.style.opacity='0'; d.style.transform='translateY(-8px)';
+    setTimeout(()=>d.remove(),320); }, 2200);
+}
+function floatText(text,x,y,color){ floats.push({text,x,y,color,life:1.15,max:1.15}); }
+function burst(x,y,color,n){
+  for(let i=0;i<n;i++){
+    const a = Math.random()*TAU, s = rand(30,115);
+    parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-30,color,life:rand(.35,.8),max:.8,size:rand(1.5,3.6)});
+  }
+}
+
+/* ---------------- 背景音乐：WebAudio 实时编曲 + 循环调度 ----------------
+   音乐走独立的 music.gain 通道，与音效（直连 destination）互不干扰；
+   调度器用 lookahead 提前 140ms 排布音符，切歌/暂停只改增益与步进，不产生爆音。 */
+function mtof(m){ return 440 * Math.pow(2, (m-69)/12); }
+let musicNoise = null;
+function getMusicNoise(){
+  if(!AC) return null;
+  if(!musicNoise){
+    const len = Math.floor(AC.sampleRate*0.5);
+    musicNoise = AC.createBuffer(1, len, AC.sampleRate);
+    const a = musicNoise.getChannelData(0);
+    for(let i=0;i<len;i++) a[i] = Math.random()*2-1;
+  }
+  return musicNoise;
+}
+function musicNote(midi, t, dur, o){
+  if(!AC || !music.gain) return;
+  const osc = AC.createOscillator(), g = AC.createGain();
+  osc.type = o.wave||'sine';
+  osc.frequency.setValueAtTime(mtof(midi), t);
+  if(o.detune) osc.detune.setValueAtTime(o.detune, t);
+  const peak = Math.max(0.0002, o.vol||0.03);
+  const atk = Math.min(o.atk==null?0.012:o.atk, dur*0.6);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t+atk);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  let tail = osc;
+  if(o.cutoff){
+    const f = AC.createBiquadFilter(); f.type='lowpass'; f.frequency.setValueAtTime(o.cutoff,t);
+    osc.connect(f); tail = f;
+  }
+  tail.connect(g); g.connect(music.gain);
+  osc.start(t); osc.stop(t+dur+0.03);
+}
+function musicKick(t, vol){
+  if(!AC || !music.gain || !vol) return;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type='sine'; o.frequency.setValueAtTime(150,t);
+  o.frequency.exponentialRampToValueAtTime(46,t+0.13);
+  g.gain.setValueAtTime(vol,t);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
+  o.connect(g); g.connect(music.gain); o.start(t); o.stop(t+0.2);
+}
+function musicNoiseHit(t, dur, vol, cutoff){
+  if(!AC || !music.gain || !vol) return;
+  const buf = getMusicNoise(); if(!buf) return;
+  const src = AC.createBufferSource(); src.buffer = buf;
+  const f = AC.createBiquadFilter(); f.type='highpass'; f.frequency.value = cutoff;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(vol,t);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  src.connect(f); f.connect(g); g.connect(music.gain);
+  src.start(t); src.stop(t+dur);
+}
+function scheduleStep(tr, step, t, sd){
+  const bar = (step/16)|0, s = step%16;
+  const chord = tr.chords[bar % tr.chords.length];
+  // 每小节起始：铺一层柔和和声垫
+  if(s===0) chord.forEach((m,i)=>musicNote(m, t, tr.pad.dur, {
+    wave:tr.pad.wave, vol:tr.pad.vol/(1+i*0.14), atk:tr.pad.atk,
+    cutoff:tr.pad.cutoff, detune:(i%2?5:-5)
+  }));
+  // 低音
+  if(tr.bass.pattern.indexOf(s)>=0)
+    musicNote(chord[0]-12, t, tr.bass.dur,
+      {wave:tr.bass.wave, vol:tr.bass.vol, atk:0.008, cutoff:tr.bass.cutoff});
+  // 主旋律 / 琶音（附一层空间回声）
+  const li = tr.lead.seq[s];
+  if(li!=null){
+    const m = chord[li % chord.length] + 12;
+    musicNote(m, t, tr.lead.dur, {wave:tr.lead.wave, vol:tr.lead.vol, atk:0.02, cutoff:tr.lead.cutoff});
+    if(tr.echo) musicNote(m, t+tr.echo.delay, tr.lead.dur*0.85,
+      {wave:tr.lead.wave, vol:tr.lead.vol*tr.echo.mix, atk:0.03, cutoff:tr.lead.cutoff});
+  }
+  // 节奏组
+  if(tr.kick.indexOf(s)>=0) musicKick(t, tr.kickVol);
+  if(tr.snare.indexOf(s)>=0) musicNoiseHit(t, 0.13, tr.snareVol, 1400);
+  if(tr.hat.indexOf(s)>=0) musicNoiseHit(t, 0.045, tr.hatVol, 7500);
+}
+function musicTick(){
+  if(!AC) return;
+  // 暂停 / 全局静音 / 切到后台时不排新音符，并避免回来后补发一堆过时音符
+  if(!music.on || state.muted || document.hidden){
+    if(music.nextTime < AC.currentTime) music.nextTime = AC.currentTime + 0.06;
+    return;
+  }
+  const tr = TRACKS[music.track], sd = 60/tr.bpm/4;
+  if(music.nextTime < AC.currentTime) music.nextTime = AC.currentTime + 0.03;
+  let guard = 0;
+  while(music.nextTime < AC.currentTime + 0.14 && guard++ < 32){
+    const swing = (tr.swing && music.step%2) ? sd*tr.swing : 0;
+    scheduleStep(tr, music.step, music.nextTime+swing, sd);
+    music.nextTime += sd;
+    music.step = (music.step+1) % (tr.bars*16);
+  }
+}
+function applyMusicGain(){
+  if(!AC || !music.gain) return;
+  const target = (music.on && !state.muted) ? music.vol : 0;
+  music.gain.gain.cancelScheduledValues(AC.currentTime);
+  music.gain.gain.setTargetAtTime(target, AC.currentTime, 0.05);
+}
+function startMusic(){
+  initAudio();
+  if(!AC) return;
+  if(!music.gain){
+    music.gain = AC.createGain(); music.gain.gain.value = 0;
+    music.gain.connect(AC.destination);
+  }
+  applyMusicGain();
+  music.nextTime = AC.currentTime + 0.08;
+  if(!music.timer) music.timer = setInterval(musicTick, 45);
+  updateMusicUI();
+}
+function setTrack(i, quiet){
+  i = ((i|0) % TRACKS.length + TRACKS.length) % TRACKS.length;
+  music.track = i; music.step = 0;
+  if(AC) music.nextTime = AC.currentTime + 0.06;
+  if(!AC) startMusic(); else applyMusicGain();
+  if(!quiet) toast('♫ 已切换到：'+TRACKS[i].icon+' '+TRACKS[i].name,'good');
+  updateMusicUI(); save();
+}
+function stepTrack(d){ setTrack(music.track + d); }
+// 在面板里直接点选曲目：若当前暂停则顺带恢复播放，选了就能立刻听到
+function pickTrack(i){
+  if(!music.on){
+    music.on = true;
+    if(!AC) startMusic();
+    else { applyMusicGain(); music.nextTime = AC.currentTime + 0.06; }
+  }
+  setTrack(i);
+}
+function shuffleTrack(){
+  if(TRACKS.length<2) return setTrack(0);
+  let i = music.track, guard = 0;
+  while(i===music.track && guard++<12) i = (Math.random()*TRACKS.length)|0;
+  setTrack(i===music.track ? (music.track+1)%TRACKS.length : i);
+}
+function toggleMusic(){
+  music.on = !music.on;
+  if(music.on && !AC) startMusic();
+  else { applyMusicGain(); if(music.on && AC) music.nextTime = AC.currentTime + 0.06; }
+  toast(music.on?'♫ 背景音乐已开启':'♫ 背景音乐已暂停', music.on?'good':'');
+  updateMusicUI(); save();
+}
+function setMusicVol(v, persist){
+  music.vol = clamp(Number(v)||0, 0, 1);
+  applyMusicGain(); updateMusicUI();
+  if(persist) save();
+}
+function updateMusicUI(){
+  if(!$('musicPop')) return;
+  const tr = TRACKS[music.track];
+  $('musicNowIcon').textContent = tr.icon;
+  $('musicNowName').textContent = tr.name;
+  $('musicNowDesc').textContent = tr.mood+' · '+tr.desc;
+  $('musicHint').textContent = (music.on?'▶ ':'⏸ ')+(music.track+1)+'/'+TRACKS.length;
+  const tg = $('musicToggle');
+  tg.textContent = music.on?'⏸ 暂停':'▶ 播放';
+  tg.classList.toggle('off', !music.on);
+  const list = $('musicTracks');
+  for(let i=0;i<list.children.length;i++) list.children[i].classList.toggle('active', i===music.track);
+  $('musicVol').value = Math.round(music.vol*100);
+  $('musicVolVal').textContent = Math.round(music.vol*100)+'%';
+  $('btnMusic').classList.toggle('on', music.on);
+  $('btnMusic').classList.toggle('off', !music.on);
+  $('btnMusic').title = '背景音乐：'+tr.name+(music.on?'（播放中）':'（已暂停）')+' · 点按打开电台';
+  $('musicMuteNote').textContent = state.muted ? '⚠ 全局静音中，按 M 恢复声音' : '';
+}
+
+/* ---------------- 清扫 / 回收 ---------------- */
+function collect(t){
+  t.done = true;
+  const v = Math.max(1, Math.round(TRASH[t.type].value * pickupMul()));
+  state.bag.count++; state.bag.value += v;
+  state.totalCleaned++; state.cleanedThisWave++;
+  floatText('+'+v, t.x, t.y-12, TRASH[t.type].rare ? '#ffd166' : '#8effd7');
+  burst(t.x,t.y,TRASH[t.type].color,TRASH[t.type].rare?14:7);
+  sfx('pick');
+  state.eventTimer -= 0.22;
+  if(state.challenge) state.challenge.count++;
+  bumpDaily('clean',1);
+  if(t.type==='tire' || t.type==='ewaste' || t.type==='relic') bumpDaily('big',1);
+  if(nightMode()) bumpDaily('night',1);
+  if(state.tools.seed>0){
+    state.seedCounter++;
+    if(state.seedCounter>=12){ state.seedCounter=0; seedPurge(); }
+  }
+  checkWave();
+}
+function checkWave(){
+  if(state.waveAnim>0 || state.waveTotal<=0) return;
+  if(state.cleanedThisWave >= state.waveTotal){
+    state.waveAnim = 3.4;
+    const bonus = 80 + state.wave*45;
+    state.coins += bonus;
+    const nd = waveDiff(state.wave+1);
+    // 本波清扫完毕：预先抽好下一波的回收价涨幅（10%~20%），换波时生效
+    state.valueIncNext = VALUE_INC_MIN + Math.random()*(VALUE_INC_MAX-VALUE_INC_MIN);
+    $('waveBannerText').textContent = '奖励 '+bonus+' 金币 · 下一波耐久 ×'+nd.hp.toFixed(1)+
+      ' / 抗性 '+Math.round(nd.armor*100)+'% · 回收价 +'+Math.round(state.valueIncNext*100)+'%';
+    $('waveBanner').classList.remove('hidden');
+    setTimeout(()=>$('waveBanner').classList.add('hidden'), 2600);
+    toast('🌍 星球焕新！奖励 '+bonus+' 金币','good');
+    sfx('win'); save();
+  }
+}
+/* ---------------- 清扫 / 回收 ---------------- */
+const remoteUnlocked = () => state.up.tool >= REMOTE_UNLOCK_LV;
+const remoteFeeOf = raw => Math.ceil(raw*REMOTE_FEE);
+function remoteUnlockNotice(before, after){
+  if(before < REMOTE_UNLOCK_LV && after >= REMOTE_UNLOCK_LV)
+    toast('⚡ 直接回收已解锁！按 R 远程直送回收站（手续费 15%）','good');
+  else if(before >= REMOTE_UNLOCK_LV && after < REMOTE_UNLOCK_LV)
+    toast('⚡ 清扫工具跌破 Lv.25，直接回收已锁定','bad');
+}
+function deposit(mode){
+  const raw = state.bag.value;
+  if(state.bag.count<=0 || raw<=0) return;
+  const remote = mode==='remote';
+  const fee = remote ? remoteFeeOf(raw) : 0;     // 扣除回收舱内价值的 15%
+  const full = state.bag.count >= bagCap();
+  const gain = Math.round((raw-fee) * settleMul() * (full?1.15:1));
+  state.coins += gain;
+  floatText('+'+gain+' ◈', player.x, player.y-46, '#ffd166');
+  if(remote){
+    state.remoteBeam = {x:player.x, y:player.y, life:.9, max:.9};
+    floatText('-'+fee+' ◈ 手续费', player.x, player.y-72, '#ff8b7a');
+  }
+  for(let i=0;i<18;i++){
+    const a = Math.random()*TAU, s = rand(50,170);
+    parts.push({x:player.x,y:player.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-60,
+      color:remote?'#8ce0ff':'#ffd166',life:rand(.5,1),max:1,size:rand(2,4)});
+  }
+  state.bag.count = 0; state.bag.value = 0;
+  toast(remote
+    ? '⚡ 远程直送 +'+gain+' 金币 · 手续费 -'+fee+' ◈（舱内价值 15%）'+(full?' · 满舱 +15%':'')
+    : '结算 +'+gain+' 金币'+(full?'（满舱奖励 +15%）':''), 'gold');
+  bumpDaily('coins',gain);
+  if(full) bumpDaily('full',1);
+  sfx('deposit'); save();
+  updateHUD();
+}
+function remoteDeposit(){
+  if(!state.running || state.eventOpen || state.paused) return;
+  if(!remoteUnlocked()){ toast('⚡ 直接回收需清扫工具达到 Lv.25','bad'); return; }
+  if(state.bag.count<=0){ toast('回收舱是空的，先清扫几件垃圾吧','bad'); return; }
+  deposit('remote');
+}
+
+/* ---------------- 奇遇事件 ---------------- */
+const EVENTS = [
+  {
+    icon:'🍾', title:'漂流瓶里的旧信', text:'一只玻璃瓶搁浅在垃圾堆旁，里面卷着一张泛黄的星图。瓶身上还贴着「给未来的清道夫」。',
+    opts:[
+      {label:'拆开信封', tag:'+60 金币', fn:()=>grant(60,'信里夹着')},
+      {label:'把星图装进工具箱', tag:'35秒 功率×1.6', fn:()=>{addBuff('power',1.6,35,'星图加持','🗺');toast('星图加持！清扫功率提升','good');}}
+    ]
+  },
+  {
+    icon:'🤝', title:'路过的环保志愿者', text:'一队志愿者背着工具包朝你挥手：「一起干吧，这片区域太大了。」',
+    opts:[
+      {label:'邀请同行', tag:'50秒 全效率+35%', fn:()=>{addBuff('power',1.35,50,'志愿者','🤝');addBuff('speed',1.35,50,'志愿者同行','🤝');toast('队伍集结！清扫与移动加速','good');}},
+      {label:'婉拒，独自加油', tag:'+35 金币 · 代清 4 件', fn:()=>{grant(35,'志愿者留下');instantClean(4);}}
+    ]
+  },
+  {
+    icon:'🧰', title:'流浪机械师', text:'他敲了敲你的工具：「给我点材料，我能让这家伙脱胎换骨。」',
+    opts:[
+      {label:'付费改装（90 金币）', tag:'工具随机升级', risky:true, fn:()=>{
+        if(state.coins>=90){ spend(90); randomUpgrade(); } else { toast('金币不足，改装只好作罢','bad'); sfx('bad'); }
+      }},
+      {label:'只做免费调校', tag:'25秒 功率×1.5', fn:()=>{addBuff('power',1.5,25,'临时调校','🧰');toast('工具嗡嗡作响，功率提升','good');}}
+    ]
+  },
+  {
+    icon:'🔋', title:'泄漏的废电池', text:'一节鼓胀的电池正在渗液，周围的土壤泛着不自然的荧光。',
+    opts:[
+      {label:'徒手封堵', tag:'-25 金币 · 40秒 收益+35%', fn:()=>{spend(25);addBuff('value',1.35,40,'有害物补偿','💰');toast('处置得当，回收站给了补偿价','good');}},
+      {label:'绕道而行', tag:'18秒 移速-25%', risky:true, fn:()=>{addBuff('speed',0.75,18,'绕路','🐢');toast('泥泞难行，移动变慢','bad');sfx('bad');}}
+    ]
+  },
+  {
+    icon:'🐢', title:'海龟的求救', text:'一只小海龟被塑料袋缠住了。它望向你，远处还有更多漂浮的垃圾。',
+    opts:[
+      {label:'展开救援', tag:'50秒清 14 件 → +200 金币', fn:()=>{
+        state.challenge = {label:'🐢 海龟救援',goal:14,count:0,until:T+50,reward:200};
+        toast('限时委托已接取！','good');
+      }},
+      {label:'送去保护站', tag:'+30 金币', fn:()=>grant(30,'保护站答谢')}
+    ]
+  },
+  {
+    icon:'🌧️', title:'酸雨云飘过', text:'灰紫色的云压低了天空。雨水会腐蚀设备，却也会让废料更容易被分离计价。',
+    opts:[
+      {label:'继续作业', tag:'35秒 收益×1.5 · 移速×0.8', fn:()=>{addBuff('value',1.5,35,'酸雨溢价','💰');addBuff('speed',0.8,35,'酸雨阻滞','🌧');toast('收益上涨，但脚下打滑','gold');}},
+      {label:'回基地躲避', tag:'+40 金币', fn:()=>grant(40,'整理物资时捡到')}
+    ]
+  },
+  {
+    icon:'🧪', title:'废弃实验室', text:'半埋在土里的实验舱还亮着一盏灯，控制台上有个闪烁的按钮。',
+    opts:[
+      {label:'按下按钮', tag:'50% 免费升级 / 亏损', risky:true, fn:()=>{
+        if(Math.random()<0.5){ randomUpgrade(); } else { spend(40); toast('装置短路，损失 40 金币','bad'); sfx('bad'); }
+      }},
+      {label:'拆解变卖', tag:'+75 金币', fn:()=>grant(75,'零件变卖')}
+    ]
+  },
+  {
+    icon:'🕊️', title:'候鸟群掠过', text:'鸟群盘旋落在一片从没清扫过的高地，阳光照出几点耀眼的金色反光。',
+    opts:[
+      {label:'跟随鸟群', tag:'附近出现 10 件星尘遗物', fn:()=>{
+        spawnRelics(10,player); state.waveTotal += 10;
+        toast('高价值遗物出现了！','gold');
+      }},
+      {label:'留在原地继续清扫', tag:'+45 金币', fn:()=>grant(45,'拾到')}
+    ]
+  },
+  {
+    icon:'📖', title:'一本旧相册', text:'照片里的星球还是蓝绿色的。夹在最后一页的，是一枚褪色的四叶草书签。',
+    opts:[
+      {label:'珍藏回忆', tag:'幸运星 +1 级', fn:()=>{
+        if(state.up.luck<upMax('luck')){ state.up.luck++; toast('幸运星提升至 Lv.'+state.up.luck,'good'); sfx('upgrade'); }
+        else grant(120,'满级补偿');
+      }},
+      {label:'交给回收站', tag:'+95 金币', fn:()=>grant(95,'档案收购')}
+    ]
+  },
+  {
+    icon:'☄️', title:'太空垃圾雨', text:'雷达警报：一批轨道残骸正坠落在这片区域，其中混着价值不菲的合金碎片。',
+    opts:[
+      {label:'迎接挑战', tag:'+26 普通垃圾 / +8 遗物', fn:()=>{
+        spawnTrash(26,player,420); spawnRelics(8,player);
+        state.waveTotal += 34; toast('污染物增加，但宝藏也不少','gold');
+      }},
+      {label:'呼叫清扫卫星（70 金币）', tag:'30秒 功率×1.4', fn:()=>{
+        if(state.coins>=70){ spend(70); addBuff('power',1.4,30,'卫星支援','🛰'); toast('轨道支援已到位','good'); }
+        else { toast('金币不足，卫星没有响应','bad'); sfx('bad'); }
+      }}
+    ]
+  },
+  {
+    icon:'🍀', title:'垃圾堆里的四叶草', text:'在一堆废纸箱中间，居然有一小簇绿意顽强地钻了出来。',
+    opts:[
+      {label:'收进口袋', tag:'60秒 收益×2', fn:()=>{addBuff('value',2,60,'四叶草好运','🍀');toast('好运降临：结算收益翻倍！','gold');}},
+      {label:'种回土里', tag:'代清 8 件垃圾', fn:()=>{instantClean(8);toast('绿意蔓延，附近焕然一新','good');}}
+    ]
+  },
+  {
+    icon:'🤖', title:'迷路的小机器人', text:'一台断了天线的小机器人亦步亦趋跟着你，手臂还能灵活地伸缩。',
+    opts:[
+      {label:'收留它', tag:'并行机械臂 +1', fn:()=>{
+        if(state.up.arms<upMax('arms')){ state.up.arms++; toast('新伙伴加入！并行臂 Lv.'+state.up.arms,'good'); sfx('upgrade'); }
+        else grant(140,'零件折现');
+      }},
+      {label:'指引它回基地', tag:'+60 金币', fn:()=>grant(60,'基地答谢')}
+    ]
+  }
+];
+/* ---------------- 解密奇遇 ---------------- */
+const PUZZLE_TIME = 45;   // 所有解密奇遇统一 45 秒
+const PUZZLE_LEVEL = {
+  1:{time:PUZZLE_TIME, dropMin:1, dropMax:2, reward:140, tag:'Ⅰ 级协议'},
+  2:{time:PUZZLE_TIME, dropMin:2, dropMax:3, reward:250, tag:'Ⅱ 级协议'},
+  3:{time:PUZZLE_TIME, dropMin:3, dropMax:5, reward:400, tag:'Ⅲ 级协议'}
+};
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0, t=a[i]; a[i]=a[j]; a[j]=t; }
+  return a;
+}
+function mkPuzzle(o){
+  const seen = new Set(), wrong = [], correct = String(o.correct);
+  for(const v of o.wrong){
+    const s = String(v);
+    if(s!==correct && !seen.has(s)){ seen.add(s); wrong.push(s); }
+    if(wrong.length===3) break;
+  }
+  let k = 0;
+  while(wrong.length<3){
+    k++;
+    const s = /^-?\d+$/.test(correct) ? String(Number(correct)+7+k*3) : '以上都不对'+(k>1?' '+k:'');
+    if(s!==correct && !seen.has(s)){ seen.add(s); wrong.push(s); }
+  }
+  const options = shuffle([correct, ...wrong]);
+  return {icon:o.icon, title:o.title, text:o.text, clue:o.clue, correct,
+    options, answer:options.indexOf(correct), diff:o.diff, memory:!!o.memory,
+    time:PUZZLE_LEVEL[o.diff].time,
+    dropMin:PUZZLE_LEVEL[o.diff].dropMin, dropMax:PUZZLE_LEVEL[o.diff].dropMax,
+    reward:PUZZLE_LEVEL[o.diff].reward, tag:PUZZLE_LEVEL[o.diff].tag};
+}
+// ① 数列规律
+function genSeq(){
+  const mode = (Math.random()*3)|0;
+  const arr = []; let next, wrong = [];
+  if(mode===0){
+    const a = 2+((Math.random()*8)|0), d = 2+((Math.random()*6)|0);
+    for(let i=0;i<5;i++) arr.push(a+i*d);
+    next = a+5*d; wrong = [next+d, next-d, next+1, next+2*d, next-2];
+  }else if(mode===1){
+    const a = 1+((Math.random()*4)|0), r = Math.random()<.5?2:3;
+    for(let i=0;i<5;i++) arr.push(a*Math.pow(r,i));
+    next = a*Math.pow(r,5); wrong = [next*r, Math.round(next/r), next+r, next-r, next+a];
+  }else{
+    let x = 1+((Math.random()*4)|0), y = 3+((Math.random()*6)|0);
+    arr.push(x,y);
+    for(let i=0;i<3;i++){ const s=x+y; arr.push(s); x=y; y=s; }
+    next = x+y; wrong = [next+y, next-x, next+1, next*2-y, next+3];
+  }
+  return mkPuzzle({icon:'🔢',title:'污染计数器的规律',diff:mode===1?2:1,memory:false,
+    text:'回收站的旧计数器滚动着一组数字，第六格被油污糊住了。填对它才能解锁净化舱门。',
+    clue:arr.join(' · ')+' · <span class="dim">?</span>',correct:next,wrong});
+}
+// ② 密码规则
+function genCode(){
+  const k = 2+((Math.random()*3)|0), b = 1+((Math.random()*9)|0);
+  const f = n => n*k+b;
+  const q = 12, ans = f(q);
+  return mkPuzzle({icon:'🔐',title:'回收舱的四位密码',diff:1,
+    text:'舱门面板刻着一条加密规则：「输入 × '+k+' + '+b+'」。下面三组已验证，请算出最后一组该填的数字。',
+    clue:'3 → '+f(3)+'　 5 → '+f(5)+'　 8 → '+f(8)+'<br><span class="dim">'+q+' → ?</span>',
+    correct:ans, wrong:[ans+k, ans-k, ans+b, ans-b, f(q)+f(3)]});
+}
+// ③ 图形记忆
+function genMemory(){
+  const syms = ['◆','●','▲','★','✦','■','⬟','✚','◈','✧'];
+  const pool = shuffle(syms.slice()).slice(0,6), seq = pool.slice(0,4), s = seq.join(' ');
+  const sw = seq.slice(), i = (Math.random()*3)|0, t = sw[i]; sw[i]=sw[i+1]; sw[i+1]=t;
+  const sd = seq.slice(); sd[3] = pool[4];
+  return mkPuzzle({icon:'🧠',title:'闪烁的信号灯',diff:2,memory:true,
+    text:'控制台会闪出四枚符号，2.8 秒后熄灭。记住它们的顺序，从四个序列里选出原样的一组。',
+    clue:s, correct:s, wrong:[sw.join(' '),seq.slice().reverse().join(' '),sd.join(' '),pool[5]+' '+seq.slice(1).join(' ')]});
+}
+// ④ 逻辑推理：天平
+function genWeight(){
+  const names = ['⚙ 齿轮箱','🔋 电池组','🛞 旧轮胎','📦 废纸箱'];
+  const o = shuffle([0,1,2,3]), heavy = names[o[3]];
+  const clues = [names[o[1]]+' 比 '+names[o[0]]+' 重', names[o[2]]+' 比 '+names[o[1]]+' 重',
+                 names[o[3]]+' 比 '+names[o[2]]+' 重', names[o[0]]+' 比 '+names[o[2]]+' 轻'];
+  return mkPuzzle({icon:'⚖️',title:'失衡的回收天平',diff:2,
+    text:'天平只留下四条称重记录。控制阀会锁死「最重」的那件污染物，选错就会触发过载。',
+    clue:shuffle(clues).join('<br>'),correct:heavy,wrong:names.filter(x=>x!==heavy)});
+}
+// ⑤ 星图坐标
+function genGrid(){
+  const dirs = [['↑',0,-1],['↓',0,1],['←',-1,0],['→',1,0]];
+  let x=0,y=0,moves=[],guard=0;
+  do{
+    x=0;y=0;moves=[];
+    for(let i=0;i<4;i++){
+      const d = dirs[(Math.random()*4)|0], n = 1+((Math.random()*5)|0);
+      moves.push(d[0]+n); x+=d[1]*n; y+=d[2]*n;
+    }
+  }while((x===0||y===0) && guard++<24);
+  const c = '('+x+', '+y+')';
+  return mkPuzzle({icon:'🗺️',title:'星图导航锁',diff:2,
+    text:'导航日志记着四段位移。从 (0, 0) 出发，算出终点坐标才能重新校准清扫路线。',
+    clue:moves.join('　'),correct:c,
+    wrong:['('+(-x)+', '+y+')','('+x+', '+(-y)+')','('+(x+1)+', '+(y-2)+')','('+y+', '+x+')','('+(x-2)+', '+(y+1)+')']});
+}
+// ⑥ 符号代数
+function genCipher(){
+  const A = 2+((Math.random()*5)|0), B = 1+((Math.random()*6)|0);
+  const c1 = 2*A+B, c2 = A+2*B, ans = 3*A+2*B;
+  return mkPuzzle({icon:'🧬',title:'污染样本的配平式',diff:3,
+    text:'净化程序用符号代表试剂份数。每组的数值等于所有试剂份数之和，请算出最后一组的读数。',
+    clue:'🔵 🔵 🟨 = '+c1+'<br>🔵 🟨 🟨 = '+c2+'<br><span class="dim">🔵 🔵 🔵 🟨 🟨 = ?</span>',
+    correct:ans, wrong:[ans+A, ans-A, ans+B, ans-B, c1+c2, c1+c2-A]});
+}
+// ⑦ 异常编码
+function genOdd(){
+  const primes = [2,3,5,7,11,13,17,19,23,29,31,37];
+  const mode = (Math.random()*2)|0;
+  if(mode===0){
+    const p = shuffle(primes.slice()).slice(0,3), c = [9,15,21,25,27,33][(Math.random()*6)|0];
+    return mkPuzzle({icon:'🔍',title:'异常污染编码',diff:3,
+      text:'四组编码中有三组是质数码，只有一组是伪装的合数。找出它，否则净化程序会误删整批数据。',
+      clue:shuffle([...p,c]).join(' · '),correct:c,wrong:[...p,4,49]});
+  }
+  const m = shuffle([6,12,18,24,30,36,42]).slice(0,3), c = [8,14,22,26,34][(Math.random()*5)|0];
+  return mkPuzzle({icon:'🔍',title:'异常污染编码',diff:3,
+    text:'四组编码中有三组能被 6 整除，只有一组混入了杂质。挑出那个「不合群」的数字。',
+    clue:shuffle([...m,c]).join(' · '),correct:c,wrong:[...m,48,54]});
+}
+function buildPuzzle(){
+  const gens = [genSeq,genCode,genMemory,genWeight,genGrid,genCipher,genOdd];
+  return gens[(Math.random()*gens.length)|0]();
+}
+function puzzleChance(){
+  if(state.puzzleStreak>=2) return 0;
+  return clamp(.24 + Math.min(.14,state.wave*.02) - state.up.luck*.004, .16, .40);
+}
+
+let puzzle = null, puzzleTicker = null, puzzleReveal = null;
+function openPuzzle(){
+  const p = buildPuzzle();
+  // 失败扣级数：在难度档位内随机取一个值，再受波数与幸运星影响
+  let drop = p.dropMin + ((Math.random()*(p.dropMax-p.dropMin+1))|0);
+  drop += (state.wave>=6?1:0) - (state.up.luck>=5?1:0);
+  p.drop = clamp(drop, 1, 8);
+  p.reward += state.wave*20;
+  p.skipCost = 55 + state.wave*14 + p.diff*20;
+  p.deadline = Date.now() + p.time*1000;
+  p.hintUsed = false; p.locked = !!p.memory; p.answered = false;
+  puzzle = p;
+  $('eventModal').querySelector('.event-card').classList.add('puzzle');
+  $('eventIcon').textContent = p.icon;
+  $('eventTitle').textContent = p.title;
+  $('eventText').textContent = p.text;
+  $('puzzleBox').classList.remove('hidden');
+  $('puzzleTag').textContent = '🧩 '+p.tag+' · 失败：随机 1 件装备 -'+p.drop+' 级';
+  $('puzzleBoard').innerHTML = p.clue;
+  $('eventFoot').textContent = '答错 → 随机装备降级 · 超时再 -1 级 · 成功 → 金币、护盾与增益';
+  $('puzzleHint').disabled = false;
+  $('puzzleHint').textContent = '💡 提示（奖励减半）';
+  $('puzzleSkip').textContent = '🛰 绕行 '+p.skipCost+' ◈';
+  $('puzzleSkip').disabled = state.coins < p.skipCost;
+  $('puzzleTime').textContent = p.time+'s';
+  $('puzzleTimeBar').style.width = '100%';
+  const box = $('eventOptions'); box.innerHTML = '';
+  p.options.forEach((txt,i)=>{
+    const b = document.createElement('button');
+    b.className = 'opt puzzle-opt'+(p.locked?' locked':'');
+    b.innerHTML = '<span class="pz-idx">'+'ABCD'[i]+'</span><span>'+txt+'</span>';
+    b.addEventListener('click',()=>answerPuzzle(i));
+    box.appendChild(b);
+  });
+  $('eventModal').classList.remove('hidden');
+  puzzleTicker = setInterval(tickPuzzle,100);
+  if(p.memory){
+    puzzleReveal = setTimeout(()=>{
+      if(!puzzle || puzzle!==p || p.answered) return;
+      $('puzzleBoard').innerHTML = '<span class="dim">序列已隐藏 · 请凭记忆选择</span>';
+      p.locked = false;
+      Array.prototype.forEach.call($('eventOptions').children,b=>b.classList.remove('locked'));
+    },2800);
+  }
+  sfx('event');
+}
+function tickPuzzle(){
+  if(!puzzle || puzzle.answered) return;
+  if(document.hidden){ puzzle.deadline += 100; return; }  // 切到后台不偷走解题时间
+  const left = Math.max(0,(puzzle.deadline-Date.now())/1000);
+  $('puzzleTime').textContent = Math.ceil(left)+'s';
+  $('puzzleTimeBar').style.width = clamp(left/puzzle.time*100,0,100)+'%';
+  if(left<=0) finishPuzzle(false,'timeout');
+}
+function answerPuzzle(i){
+  if(!puzzle || puzzle.answered || puzzle.locked) return;
+  const p = puzzle;
+  p.answered = true;
+  const btns = $('eventOptions').children;
+  const ok = i===p.answer;
+  if(btns[i]) btns[i].style.borderColor = ok?'rgba(110,242,192,.85)':'rgba(255,139,122,.85)';
+  if(!ok && btns[p.answer]) btns[p.answer].style.borderColor='rgba(110,242,192,.7)';
+  setTimeout(()=>finishPuzzle(ok,ok?'correct':'wrong'),430);
+}
+function flashDamage(){
+  const el = $('damageFlash');
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+}
+// 参与随机降级的装备池：5 条升级线 + 工具工坊 6 件，只挑有等级的
+function equipmentPool(){
+  const pool = [];
+  for(const u of UPGRADES){
+    const lv = state.up[u.key];
+    if(lv>0) pool.push({kind:'up', key:u.key, name:u.name, icon:u.icon, lv});
+  }
+  for(const u of TOOLS){
+    const lv = state.tools[u.key];
+    if(lv>0) pool.push({kind:'tool', key:u.key, name:u.name, icon:u.icon, lv});
+  }
+  return pool;
+}
+function downgrade(n, why){
+  if(state.puzzleShield>0){
+    state.puzzleShield--;
+    toast('🛡 防护协议抵消了本次降级！','good');
+    floatText('🛡 抵消',player.x,player.y-52,'#a9b8ff');
+    return;
+  }
+  let left = n, guard = 0;
+  const hits = [];
+  const toolBefore = state.up.tool;
+  while(left>0 && guard++<16){
+    const pool = equipmentPool();
+    if(!pool.length) break;
+    // 等概率随机挑一件装备；级数不够时，剩余扣级再随机落到另一件上
+    const target = pool[(Math.random()*pool.length)|0];
+    const d = Math.min(target.lv, left);
+    if(target.kind==='up') state.up[target.key] -= d;
+    else state.tools[target.key] -= d;
+    hits.push({name:target.name, icon:target.icon, key:target.key, kind:target.kind,
+               before:target.lv, after:target.lv-d, drop:d});
+    left -= d;
+  }
+  const applied = n-left;
+  let msg = '🧩 解码失败：';
+  if(hits.length===1){
+    const h = hits[0];
+    msg += h.icon+' '+h.name+' Lv.'+h.before+' → Lv.'+h.after+'（-'+h.drop+' 级）';
+    if(h.kind==='up' && h.key==='tool')
+      msg += ' · '+form(h.before).name+' → '+form(h.after).name;
+  }else if(hits.length>1){
+    msg += '随机装备共 -'+applied+' 级：'+hits.map(h=>h.icon+h.name+' -'+h.drop).join('、');
+    const tf = hits.find(h=>h.kind==='up' && h.key==='tool');
+    if(tf) msg += ' · 主工具 '+form(tf.before).name+' → '+form(tf.after).name;
+  }
+  if(left>0){
+    const fine = 60+state.wave*20;
+    spend(fine);
+    msg += (hits.length?'；':'')+'装备已见底，改扣 '+fine+' 金币';
+  }
+  toast(msg+(why==='timeout'?' · 超时额外 -1 级':''),'bad');
+  remoteUnlockNotice(toolBefore, state.up.tool);
+  floatText('▼ -'+applied+' 级',player.x,player.y-58,'#ff8b7a');
+  $('toolIcon').textContent = form(state.up.tool).icon;
+  flashDamage();
+  for(let i=0;i<24;i++){
+    const a=Math.random()*TAU, s=rand(50,180);
+    parts.push({x:player.x,y:player.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,color:'#ff6b6b',life:.8,max:.8,size:rand(1.5,3.5)});
+  }
+  updateHUD();
+}
+function finishPuzzle(ok, why){
+  if(!puzzle) return;
+  const p = puzzle; puzzle = null;
+  clearInterval(puzzleTicker); puzzleTicker = null;
+  clearTimeout(puzzleReveal); puzzleReveal = null;
+  if(ok){
+    state.puzzleWins++; state.puzzleStreak = 0;
+    grant(Math.round(p.reward*(p.hintUsed?.5:1)),'解码成功');
+    state.puzzleShield = Math.min(2,state.puzzleShield+1);
+    toast('🛡 防护协议 ×1（可抵消一次降级）','good');
+    addBuff('power',1.5,60,'协议破解','🧩');
+    addBuff('pierce',1.8,60,'协议破解','🧩');
+    if(p.diff>=2) randomUpgrade();
+    bumpDaily('puzzle',1);
+    toast('🧩 协议破解！功率 ×1.5 · 抗性穿透 60 秒','good');
+    sfx('win');
+  }else if(why==='skip'){
+    state.puzzleStreak = 0;
+    toast('🛰 已绕行解码协议，本次不降级','good');
+  }else{
+    state.puzzleFails++; state.puzzleStreak = 0;
+    const drop = clamp(p.drop + (why==='timeout'?1:0), 1, 9);
+    downgrade(drop, why);
+    sfx('bad');
+  }
+  finishEvent();
+}
+function finishEvent(){
+  clearInterval(puzzleTicker); puzzleTicker = null;
+  clearTimeout(puzzleReveal); puzzleReveal = null;
+  puzzle = null;
+  $('eventModal').classList.add('hidden');
+  $('eventModal').querySelector('.event-card').classList.remove('puzzle');
+  $('puzzleBox').classList.add('hidden');
+  $('eventFoot').textContent = '奇遇期间清扫暂停 · 做出你的选择';
+  state.eventOpen = false; state.paused = false;
+  bumpDaily('event',1);
+  state.eventTimer = Math.max(20, 42 + Math.random()*26 - state.up.luck*1.1);
+  save();
+}
+$('puzzleHint').addEventListener('click',()=>{
+  if(!puzzle || puzzle.hintUsed || puzzle.answered) return;
+  puzzle.hintUsed = true;
+  const wrong = [];
+  Array.prototype.forEach.call($('eventOptions').children,(b,i)=>{ if(i!==puzzle.answer) wrong.push(b); });
+  shuffle(wrong).slice(0,2).forEach(b=>b.classList.add('eliminated'));
+  $('puzzleHint').disabled = true;
+  $('puzzleHint').textContent = '💡 已排除 2 个错误项';
+  toast('💡 提示已使用，成功奖励减半','gold');
+});
+$('puzzleSkip').addEventListener('click',()=>{
+  if(!puzzle || puzzle.answered) return;
+  const c = puzzle.skipCost;
+  if(state.coins<c){ toast('金币不足，无法绕行','bad'); return; }
+  state.coins -= c;
+  puzzle.answered = true;
+  finishPuzzle(false,'skip');
+});
+
+function openEvent(){
+  state.eventOpen = true; state.paused = true; state.eventCount++;
+  if(Math.random()<puzzleChance()){
+    state.puzzleStreak++;
+    openPuzzle();
+    return;
+  }
+  state.puzzleStreak = 0;
+  let i;
+  do{ i = (Math.random()*EVENTS.length)|0; }while(i===state.lastEvent && EVENTS.length>1);
+  state.lastEvent = i;
+  const ev = EVENTS[i];
+  $('eventModal').querySelector('.event-card').classList.remove('puzzle');
+  $('puzzleBox').classList.add('hidden');
+  $('eventFoot').textContent = '奇遇期间清扫暂停 · 做出你的选择';
+  $('eventIcon').textContent = ev.icon;
+  $('eventTitle').textContent = ev.title;
+  $('eventText').textContent = ev.text;
+  const box = $('eventOptions'); box.innerHTML = '';
+  ev.opts.forEach(o=>{
+    const b = document.createElement('button');
+    b.className = 'opt'+(o.risky?' risky':'');
+    b.innerHTML = '<span>'+o.label+'</span><span class="tag">'+o.tag+'</span>';
+    b.addEventListener('click',()=>{ o.fn(); finishEvent(); });
+    box.appendChild(b);
+  });
+  $('eventModal').classList.remove('hidden');
+  sfx('event');
+}
+function closeEvent(){ /* 由选项按钮处理 */ }
+
+/* ---------------- 输入 ---------------- */
+const keys = {};
+const mouse = {down:false,x:0,y:0};
+const joy = {active:false,id:null,dx:0,dy:0};
+window.addEventListener('keydown',e=>{
+  keys[e.code] = true;
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].indexOf(e.code)>=0) e.preventDefault();
+  if(e.code==='KeyM') toggleMute();
+  if(e.code==='KeyU' || e.code==='Escape') toggleUpgradePanel();
+  if(e.code==='KeyP') { if(!state.eventOpen){ state.paused = !state.paused; toast(state.paused?'已暂停':'继续清扫'); } }
+  if(e.code==='KeyR') remoteDeposit();
+  if(e.code==='KeyN' && !e.repeat) stepTrack(1);      // 下一首
+  if(e.code==='KeyB' && !e.repeat) stepTrack(-1);     // 上一首
+  if(e.code==='KeyK' && !e.repeat) toggleMusic();     // 播放 / 暂停
+  if(/^Digit[1-5]$/.test(e.code) && state.running && !state.eventOpen){
+    buyUpgrade(UPGRADES[parseInt(e.code.slice(5),10)-1].key);
+  }
+});
+window.addEventListener('keyup',e=>{ keys[e.code] = false; });
+canvas.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='touch') return;
+  mouse.down = true; mouse.x = e.clientX; mouse.y = e.clientY;
+});
+window.addEventListener('pointermove',e=>{ mouse.x = e.clientX; mouse.y = e.clientY; });
+window.addEventListener('pointerup',()=>{ mouse.down = false; });
+window.addEventListener('blur',()=>{ mouse.down = false; for(const k in keys) keys[k]=false; joy.active=false; });
+
+const joyEl = $('joystick'), stickEl = $('stick');
+function setStick(dx,dy){ stickEl.style.transform = 'translate('+(dx*36)+'px,'+(dy*36)+'px)'; }
+joyEl.addEventListener('pointerdown',e=>{
+  e.preventDefault(); joy.active = true; joy.id = e.pointerId;
+  joyEl.setPointerCapture(e.pointerId);
+  moveStick(e);
+});
+joyEl.addEventListener('pointermove',e=>{ if(joy.active && e.pointerId===joy.id) moveStick(e); });
+function moveStick(e){
+  const r = joyEl.getBoundingClientRect();
+  let dx = (e.clientX-(r.left+r.width/2))/46, dy = (e.clientY-(r.top+r.height/2))/46;
+  const d = Math.hypot(dx,dy);
+  if(d>1){ dx/=d; dy/=d; }
+  joy.dx = dx; joy.dy = dy; setStick(dx,dy);
+}
+function endStick(e){ if(e.pointerId!==joy.id) return; joy.active=false; joy.dx=joy.dy=0; setStick(0,0); }
+joyEl.addEventListener('pointerup',endStick);
+joyEl.addEventListener('pointercancel',endStick);
+
+if(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
+function toggleUpgradePanel(){ $('leftPanel').classList.toggle('open'); }
+function toggleMute(){
+  state.muted = !state.muted;
+  $('btnMute').classList.toggle('off',state.muted);
+  $('btnMute').textContent = state.muted ? '♪̸' : '♪';
+  if(!state.muted) sfx('coin');
+  applyMusicGain();
+  updateMusicUI();
+  save();
+}
+$('btnMute').addEventListener('click',toggleMute);
+$('btnHelp').addEventListener('click',()=>{
+  if(state.eventOpen) return;
+  state.paused = true;
+  $('startBtn').textContent = '继续清扫';
+  $('startScreen').classList.remove('hidden');
+});
+$('btnCloseUp').addEventListener('click',toggleUpgradePanel);
+$('btnReset').addEventListener('click',()=>{
+  if(state.eventOpen) return;
+  if(window.confirm('确定要重置存档吗？金币、升级与清扫进度都会清空。')){
+    try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+    location.reload();
+  }
+});
+$('btnUpgrade').addEventListener('click',toggleUpgradePanel);
+$('btnRemote').addEventListener('click',remoteDeposit);
+$('startBtn').addEventListener('click',()=>{
+  initAudio();
+  startMusic();
+  $('startScreen').classList.add('hidden');
+  state.paused = false;
+  if(!state.running){ state.running = true; toast('开始清扫！靠近垃圾即可自动作业','good'); }
+  else toast('继续清扫','good');
+});
+
+/* ---------------- 星球电台 UI ---------------- */
+TRACKS.forEach((tr,i)=>{
+  const b = document.createElement('button');
+  b.className = 'music-track';
+  b.title = tr.desc;
+  b.innerHTML = '<span class="mt-ic">'+tr.icon+'</span><span class="mt-txt"><b>'+tr.name+
+    '</b><small>'+tr.mood+'</small></span><span class="mt-no">'+(i+1)+'</span>';
+  b.addEventListener('click',()=>pickTrack(i));
+  $('musicTracks').appendChild(b);
+});
+function toggleMusicPanel(force){
+  const p = $('musicPop');
+  const show = force==null ? p.classList.contains('hidden') : !!force;
+  p.classList.toggle('hidden', !show);
+  if(show) updateMusicUI();
+}
+$('btnMusic').addEventListener('click',e=>{ e.stopPropagation(); toggleMusicPanel(); });
+$('btnMusicClose').addEventListener('click',()=>toggleMusicPanel(false));
+$('btnMusicPrev').addEventListener('click',()=>stepTrack(-1));
+$('btnMusicNext').addEventListener('click',()=>stepTrack(1));
+$('btnMusicShuffle').addEventListener('click',shuffleTrack);
+$('musicToggle').addEventListener('click',toggleMusic);
+$('musicVol').addEventListener('input',e=>setMusicVol(e.target.value/100,false));
+$('musicVol').addEventListener('change',e=>setMusicVol(e.target.value/100,true));
+document.addEventListener('pointerdown',e=>{
+  if($('musicPop').classList.contains('hidden')) return;
+  if(e.target.closest && (e.target.closest('#musicPop') || e.target.closest('#btnMusic'))) return;
+  toggleMusicPanel(false);
+});
+
+/* ---------------- 升级 UI ---------------- */
+const upEls = {};
+UPGRADES.forEach((u,i)=>{
+  const row = document.createElement('div');
+  row.className = 'up-row';
+  row.innerHTML = '<div class="up-ic">'+u.icon+'</div><div class="up-mid">'+
+    '<div class="up-name">'+u.name+'<span class="up-lv">Lv.0</span></div>'+
+    '<div class="up-desc"></div></div>'+
+    '<button class="buy"><span class="key">'+(i+1)+'</span><b>0</b>◈</button>';
+  $('upList').appendChild(row);
+  upEls[u.key] = {lv:row.querySelector('.up-lv'),desc:row.querySelector('.up-desc'),
+                  buy:row.querySelector('.buy'),cost:row.querySelector('.buy b')};
+  upEls[u.key].buy.addEventListener('click',()=>buyUpgrade(u.key));
+});
+
+/* ---------------- 工具工坊 / 每日任务 UI ---------------- */
+const toolEls = {};
+TOOLS.forEach(u=>{
+  const row = document.createElement('div');
+  row.className = 'up-row';
+  row.innerHTML = '<div class="up-ic wshop-ic">'+u.icon+'</div><div class="up-mid">'+
+    '<div class="up-name">'+u.name+'<span class="up-lv">Lv.0</span></div>'+
+    '<div class="up-desc"></div></div><button class="buy"><b>0</b>◈</button>';
+  $('toolList').appendChild(row);
+  toolEls[u.key] = {row, lv:row.querySelector('.up-lv'), desc:row.querySelector('.up-desc'),
+                    buy:row.querySelector('.buy'), cost:row.querySelector('.buy b')};
+  toolEls[u.key].buy.addEventListener('click',()=>buyTool(u.key));
+});
+function isCompact(){ return document.body.classList.contains('touch') || window.innerWidth<=720; }
+// 任务奖励由 bumpDaily() 在达成时自动发放，任务卡只作进度展示，不再绑定领取点击
+$('dailyHead').addEventListener('click',()=>{
+  const c = $('dailyCard'); c.classList.toggle('collapsed');
+  if(isCompact()) $('dailyHint').textContent = c.classList.contains('collapsed')?'点按展开':'点按收起';
+});
+if(isCompact()){
+  $('dailyCard').classList.add('collapsed');
+  $('dailyHint').textContent = '点按展开';
+}
+
+function buyUpgrade(key){
+  if(!state.running || state.eventOpen) return;
+  const u = UPGRADES.find(x=>x.key===key), lv = state.up[key];
+  if(lv>=u.max){ toast('这项已经满级了','bad'); return; }
+  const c = cost(u,lv);
+  if(state.coins < c){ toast('金币不足，还差 '+fmt(c-state.coins)+' ◈','bad'); return; }
+  state.coins -= c; state.up[key]++;
+  sfx('upgrade');
+  if(key==='tool'){
+    const prev = form(lv), now = form(state.up.tool);
+    remoteUnlockNotice(lv, state.up.tool);
+    if(prev.name!==now.name){
+      $('toolIcon').textContent = now.icon;
+      toast('🔧 工具进化：'+now.name+'！','good');
+      for(let i=0;i<24;i++){
+        const a = Math.random()*TAU, s = rand(60,200);
+        parts.push({x:player.x,y:player.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,color:now.color,life:1,max:1,size:rand(2,4)});
+      }
+    }
+  }
+  toast(u.name+' 升至 Lv.'+state.up[key],'good');
+  bumpDaily('upgrade',1);
+  save();
+}
+
+/* ---------------- HUD ---------------- */
+function updateHUD(){
+  const f = form(state.up.tool);
+  $('coins').textContent = fmt(state.coins);
+  $('wave').textContent = state.wave;
+  $('totalCleaned').textContent = fmt(state.totalCleaned);
+  const pct = state.waveTotal>0 ? clamp(state.cleanedThisWave/state.waveTotal*100,0,100) : 100;
+  $('cleanPct').textContent = pct.toFixed(1)+'%';
+  $('cleanBar').style.width = pct+'%';
+  const wd = waveDiff(state.wave);
+  $('threatLv').textContent = 'Lv.'+wd.wave+' · ×'+wd.hp.toFixed(1);
+  $('threatBar').style.width = clamp((wd.hp-1)/13*100,3,100)+'%';
+  $('shieldTag').textContent = state.puzzleShield>0 ? '· 🛡×'+state.puzzleShield : '';
+  $('threatDetail').textContent = '耐久 ×'+wd.hp.toFixed(1)+' · 抗性 '+Math.round(wd.armor*100)+
+    '% · 回血 '+Math.round(wd.regen*100)+'%/s · 精英 '+Math.round(wd.elite*100)+
+    '% · 回收价 ×'+state.valueMul.toFixed(2)+(state.lastValueInc?'（上波 +'+Math.round(state.lastValueInc*100)+'%）':'');
+  $('toolName').textContent = f.name;
+  $('toolIcon').textContent = f.icon;
+  const lvTool = state.up.tool;
+  const tier = lvTool>=50?'创世装备':lvTool>=39?'神话装备':lvTool>=21?'传说装备':lvTool>=10?'高阶装备':'清扫装备';
+  $('toolLv').textContent = 'Lv.'+lvTool+' / '+upMax('tool')+' · '+tier;
+  $('powerVal').textContent = fmt(toolPower(state.up.tool)*buffMul('power'));
+  $('rangeVal').textContent = Math.round(effectiveRange());
+  $('armsVal').textContent = armCount();
+  for(const u of UPGRADES){
+    const e = upEls[u.key], lv = state.up[u.key], c = cost(u,lv);
+    e.lv.textContent = 'Lv.'+lv+'/'+u.max;
+    e.desc.textContent = u.desc(lv);
+    if(lv>=u.max){ e.cost.textContent='MAX'; e.buy.disabled=true; e.buy.classList.add('maxed'); e.buy.classList.remove('afford'); }
+    else{ e.cost.textContent=fmt(c); e.buy.disabled = state.coins<c; e.buy.classList.toggle('afford',state.coins>=c); e.buy.classList.remove('maxed'); }
+  }
+  const cap = bagCap();
+  $('bagCount').textContent = state.bag.count+' / '+cap;
+  $('bagValue').textContent = fmt(state.bag.value);
+  $('bagBar').style.width = clamp(state.bag.count/cap*100,0,100)+'%';
+  const full = state.bag.count >= cap;
+  const unlocked = remoteUnlocked(), hasBag = state.bag.count>0;
+  $('bagFullWarn').classList.toggle('hidden',!full || !state.running);
+  const how = isCompact() ? '点按直送' : '按 R';
+  $('bagHint').textContent = full ? (unlocked?'已满 · '+(isCompact()?'回站或点按直送':'回站或按 R 直送'):'已满 · 请回回收站')
+    : (unlocked && hasBag ? (isCompact()?'点按直送 -15%':'按 R 远程直送 -15%') : '回中央回收站结算');
+  // 直接回收按钮（Lv.25 解锁，按舱内价值收 15% 手续费）
+  const raw = state.bag.value, fee = remoteFeeOf(raw);
+  const rGain = Math.max(0, Math.round((raw-fee)*settleMul()*(full?1.15:1)));
+  const rSig = unlocked+'|'+hasBag+'|'+raw+'|'+rGain+'|'+state.up.tool;
+  if(rSig!==state.remoteSig){
+    state.remoteSig = rSig;
+    const b = $('btnRemote');
+    b.classList.toggle('locked',!unlocked);
+    b.disabled = !unlocked || !hasBag;
+    $('remoteIc').textContent = unlocked ? '⚡' : '🔒';
+    if(!unlocked){
+      $('remoteLabel').textContent = '直接回收 · 未解锁';
+      $('remoteSub').textContent = '需清扫工具 Lv.'+REMOTE_UNLOCK_LV+'（当前 Lv.'+state.up.tool+'）';
+    }else if(!hasBag){
+      $('remoteLabel').textContent = '直接回收 · 舱内为空';
+      $('remoteSub').textContent = '手续费 15% · 清扫后'+how+'直送';
+    }else{
+      $('remoteLabel').textContent = '直接回收 +'+fmt(rGain)+' ◈';
+      $('remoteSub').textContent = '手续费 -'+fmt(fee)+' ◈（15%）· '+how;
+    }
+  }
+  // buff 列表
+  const active = state.buffs.filter(b=>b.until>T);
+  $('buffList').innerHTML = active.map(b=>'<div class="buff'+(b.bad?' bad':'')+'">'+b.icon+' '+b.label+' '+Math.ceil(b.until-T)+'s</div>').join('');
+  // 限时委托
+  const ch = state.challenge;
+  $('challengeBox').classList.toggle('hidden',!ch);
+  if(ch){
+    $('chLabel').textContent = ch.label;
+    $('chCount').textContent = Math.min(ch.count,ch.goal)+'/'+ch.goal;
+    $('chBar').style.width = clamp(ch.count/ch.goal*100,0,100)+'%';
+    $('chFoot').textContent = '剩余 '+Math.max(0,Math.ceil(ch.until-T))+' 秒 · 奖励 '+ch.reward+' 金币';
+  }
+  // 昼夜日历
+  const ph = currentPhase();
+  $('dayIcon').textContent = ph.icon;
+  $('dayName').textContent = '第 '+state.day+' 天 · '+ph.name;
+  $('dayPhase').textContent = '⏰ '+gameClockText()+(isCompact()?'':' · '+(ph.key==='night'?'夜班作业中':'日照 '+Math.round((1-ph.dark)*100)+'%'));
+  $('dayLeft').textContent = Math.ceil(DAY_LEN-state.clock);
+  $('dayBar').style.width = clamp(state.clock/DAY_LEN*100,0,100)+'%';
+  $('dayBonus').textContent = ph.bonus>1
+    ? (ph.key==='night'?'🌙 夜班补贴 ×1.35':'✨ 晨昏溢价 ×'+ph.bonus.toFixed(2))
+    : '☀️ 日间常规作业'+(state.tools.radar?' · 雷达 +'+(state.tools.radar*8)+'%':'');
+  $('dayBonus').classList.toggle('night',ph.bonus>1);
+  const dr = Math.max(0, state.dayRewardAt - state.day);
+  const rEl = $('dayRewardInfo');
+  rEl.textContent = dr<=1 ? '🎁 清扫日奖励：明日发放' : '🎁 清扫日奖励：还有 '+dr+' 天';
+  rEl.classList.toggle('due', dr<=1);
+  // 工具工坊
+  for(const u of TOOLS){
+    const e = toolEls[u.key], lv = state.tools[u.key], locked = state.up.tool<u.need && lv===0, c = toolCost(u,lv);
+    e.row.classList.toggle('locked',locked);
+    e.lv.textContent = 'Lv.'+lv+'/'+u.max;
+    e.desc.textContent = locked ? '需清扫工具 Lv.'+u.need : u.desc(lv);
+    if(lv>=u.max){ e.cost.textContent='MAX'; e.buy.disabled=true; e.buy.classList.add('maxed'); e.buy.classList.remove('afford'); }
+    else if(locked){ e.cost.textContent='🔒'; e.buy.disabled=true; e.buy.classList.remove('afford','maxed'); }
+    else{ e.cost.textContent=fmt(c); e.buy.disabled=state.coins<c;
+      e.buy.classList.toggle('afford',state.coins>=c); e.buy.classList.remove('maxed'); }
+  }
+  renderDaily();
+}
+
+/* ---------------- 星球贴图（程序化生成一次） ---------------- */
+function rr(g,x,y,w,h,r){
+  g.beginPath(); g.moveTo(x+r,y);
+  g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
+  g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath();
+}
+function blobPath(g,cx,cy,rx,ry){
+  const n = 12, pts = [];
+  for(let i=0;i<n;i++){
+    const a = i/n*TAU, k = rand(.72,1.24);
+    pts.push([cx+Math.cos(a)*rx*k, cy+Math.sin(a)*ry*k]);
+  }
+  g.beginPath();
+  g.moveTo((pts[0][0]+pts[n-1][0])/2,(pts[0][1]+pts[n-1][1])/2);
+  for(let i=0;i<n;i++){
+    const p = pts[i], q = pts[(i+1)%n];
+    g.quadraticCurveTo(p[0],p[1],(p[0]+q[0])/2,(p[1]+q[1])/2);
+  }
+  g.closePath();
+}
+function buildWorld(){
+  const S = 1400, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  const k = S/(2*R);
+  g.save();
+  g.beginPath(); g.arc(S/2,S/2,S/2,0,TAU); g.clip();
+  // 海洋
+  const sea = g.createRadialGradient(S*.42,S*.38,40,S/2,S/2,S*.62);
+  sea.addColorStop(0,'#1d7180'); sea.addColorStop(.55,'#13536a'); sea.addColorStop(1,'#082c41');
+  g.fillStyle = sea; g.fillRect(0,0,S,S);
+  // 洋流
+  g.strokeStyle = 'rgba(150,230,235,.055)'; g.lineWidth = 9;
+  for(let i=0;i<26;i++){
+    const y = rand(0,S);
+    g.beginPath(); g.moveTo(-30,y);
+    g.bezierCurveTo(S*.3,y+rand(-70,70),S*.7,y+rand(-70,70),S+30,y+rand(-40,40)); g.stroke();
+  }
+  // 陆地
+  landBlobs = [];
+  for(let i=0;i<16;i++){
+    const p = randPoint(), cx = S/2+p.x*k, cy = S/2+p.y*k;
+    const rx = rand(85,235), ry = rand(70,200);
+    landBlobs.push({x:p.x,y:p.y,rx:rx/k,ry:ry/k});
+    blobPath(g,cx,cy,rx,ry);
+    const gr = g.createLinearGradient(cx-rx,cy-ry,cx+rx,cy+ry);
+    gr.addColorStop(0,'#4aa877'); gr.addColorStop(.5,'#318a68'); gr.addColorStop(1,'#1f6b58');
+    g.fillStyle = gr; g.fill();
+    g.strokeStyle = 'rgba(214,231,186,.32)'; g.lineWidth = 7; g.stroke();
+    // 林地斑块
+    for(let j=0;j<26;j++){
+      const a = Math.random()*TAU, d = Math.sqrt(Math.random());
+      const tx = cx+Math.cos(a)*rx*d*.8, ty = cy+Math.sin(a)*ry*d*.8;
+      g.fillStyle = Math.random()<.5?'rgba(16,74,58,.4)':'rgba(140,205,130,.16)';
+      g.beginPath(); g.arc(tx,ty,rand(4,15),0,TAU); g.fill();
+    }
+  }
+  // 沙丘 / 裸地
+  for(let i=0;i<30;i++){
+    const p = randPoint();
+    blobPath(g,S/2+p.x*k,S/2+p.y*k,rand(25,80),rand(18,55));
+    g.fillStyle = 'rgba(196,178,128,.14)'; g.fill();
+  }
+  // 经纬网格
+  g.strokeStyle = 'rgba(190,245,235,.055)'; g.lineWidth = 1;
+  for(let i=-5;i<=5;i++){
+    g.beginPath(); g.moveTo(S/2+i*115,0); g.lineTo(S/2+i*115,S); g.stroke();
+    g.beginPath(); g.moveTo(0,S/2+i*115); g.lineTo(S,S/2+i*115); g.stroke();
+  }
+  // 云带
+  g.save();
+  try{ g.filter = 'blur(16px)'; }catch(e){}
+  for(let i=0;i<11;i++){
+    g.fillStyle = 'rgba(232,250,255,'+rand(.035,.085).toFixed(3)+')';
+    g.beginPath(); g.ellipse(rand(0,S),rand(0,S),rand(90,230),rand(18,45),rand(0,TAU),0,TAU); g.fill();
+  }
+  g.restore();
+  // 颗粒质感
+  for(let i=0;i<2600;i++){
+    g.fillStyle = Math.random()<.5?'rgba(255,255,255,.035)':'rgba(0,20,25,.055)';
+    g.fillRect(Math.random()*S,Math.random()*S,rand(1,3),rand(1,3));
+  }
+  g.restore();
+  // 星球暗角
+  const vg = g.createRadialGradient(S/2,S/2,S*.28,S/2,S/2,S*.5);
+  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(1,14,26,.55)');
+  g.save(); g.beginPath(); g.arc(S/2,S/2,S/2,0,TAU); g.clip();
+  g.fillStyle = vg; g.fillRect(0,0,S,S); g.restore();
+  worldCanvas = c;
+}
+function buildStars(){
+  stars = [];
+  for(let i=0;i<190;i++) stars.push({x:Math.random()*W,y:Math.random()*H,r:rand(.4,1.7),a:rand(.15,.85),p:rand(0,TAU)});
+}
+
+/* ---------------- 绘制 ---------------- */
+function drawBackground(){
+  const bg = ctx.createRadialGradient(W/2,H/2,50,W/2,H/2,Math.max(W,H)*.8);
+  bg.addColorStop(0,'#0a2030'); bg.addColorStop(1,'#030a12');
+  ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
+  const starBoost = 1 + currentPhase().dark*1.35;
+  for(const s of stars){
+    let x = (s.x - cam.x*.045) % W; if(x<0) x += W;
+    let y = (s.y - cam.y*.045) % H; if(y<0) y += H;
+    ctx.globalAlpha = Math.min(1, s.a*(.7+.3*Math.sin(T*1.4+s.p))*starBoost);
+    ctx.fillStyle = '#dff6ff';
+    ctx.beginPath(); ctx.arc(x,y,s.r,0,TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawShape(t){
+  const c = TRASH[t.type].color;
+  switch(t.type){
+    case 'bottle':
+      rr(ctx,-4,-6,8,13,3); ctx.fillStyle=c; ctx.fill();
+      rr(ctx,-2,-10,4,4,1); ctx.fillStyle='#6ec4e8'; ctx.fill();
+      rr(ctx,-3,-11.5,6,2.5,1); ctx.fillStyle='#3b8fb8'; ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.55)'; ctx.fillRect(-2.8,-4,1.5,8);
+      break;
+    case 'bag':
+      ctx.beginPath(); ctx.moveTo(-9,-3); ctx.bezierCurveTo(-11,-10,-4,-11,0,-9);
+      ctx.bezierCurveTo(5,-12,11,-9,9,-2); ctx.lineTo(7,8); ctx.lineTo(-7,8); ctx.closePath();
+      ctx.fillStyle='rgba(230,244,248,.9)'; ctx.fill();
+      ctx.strokeStyle='rgba(120,160,170,.7)'; ctx.lineWidth=1; ctx.stroke();
+      ctx.beginPath(); ctx.arc(-3,-8,3,Math.PI,TAU); ctx.strokeStyle='#b9d2d8'; ctx.lineWidth=1.6; ctx.stroke();
+      break;
+    case 'can':
+      rr(ctx,-5,-9,10,18,2); ctx.fillStyle=c; ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0,-9,5,2,0,0,TAU); ctx.fillStyle='#cfd8dd'; ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.5)'; ctx.fillRect(-5,-2,10,3);
+      ctx.fillStyle='rgba(30,50,60,.35)'; ctx.fillRect(-5,4,10,1.5);
+      break;
+    case 'paper':
+      rr(ctx,-10,-8,20,16,1.5); ctx.fillStyle=c; ctx.fill();
+      ctx.strokeStyle='rgba(110,70,35,.5)'; ctx.lineWidth=1; ctx.stroke();
+      ctx.fillStyle='rgba(240,220,180,.6)'; ctx.fillRect(-2,-8,4,16);
+      ctx.beginPath(); ctx.moveTo(-10,-2); ctx.lineTo(10,-2); ctx.strokeStyle='rgba(120,80,40,.4)'; ctx.stroke();
+      break;
+    case 'glass':
+      rr(ctx,-4,-7,8,14,2); ctx.fillStyle='rgba(142,240,200,.75)'; ctx.fill();
+      rr(ctx,-2.2,-11,4.4,4,1); ctx.fillStyle=c; ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fillRect(-2.8,-5,1.5,9);
+      ctx.fillStyle='#c69a5e'; ctx.fillRect(-2.5,-12,5,2);
+      break;
+    case 'battery':
+      rr(ctx,-5,-9,10,18,2); ctx.fillStyle=c; ctx.fill();
+      ctx.fillStyle='#444'; ctx.fillRect(-2,-11,4,2);
+      ctx.fillStyle='rgba(40,20,20,.5)'; ctx.fillRect(-5,-1,10,5);
+      ctx.beginPath(); ctx.moveTo(1,-6); ctx.lineTo(-2,0); ctx.lineTo(0,0); ctx.lineTo(-1,6);
+      ctx.lineTo(3,-1); ctx.lineTo(1,-1); ctx.closePath(); ctx.fillStyle='#ffe9a8'; ctx.fill();
+      break;
+    case 'tire':
+      ctx.beginPath(); ctx.arc(0,0,9.5,0,TAU); ctx.fillStyle='#3d4757'; ctx.fill();
+      ctx.beginPath(); ctx.arc(0,0,5,0,TAU); ctx.fillStyle='#94aab2'; ctx.fill();
+      ctx.beginPath(); ctx.arc(0,0,2.6,0,TAU); ctx.fillStyle='#4c5e68'; ctx.fill();
+      ctx.strokeStyle='rgba(20,26,34,.7)'; ctx.lineWidth=1.4;
+      for(let i=0;i<8;i++){ const a=i/8*TAU; ctx.beginPath(); ctx.moveTo(Math.cos(a)*9.5,Math.sin(a)*9.5);
+        ctx.lineTo(Math.cos(a)*6.2,Math.sin(a)*6.2); ctx.stroke(); }
+      break;
+    case 'ewaste':
+      rr(ctx,-10,-8,20,16,1.5); ctx.fillStyle='#5b5a9c'; ctx.fill();
+      ctx.strokeStyle='rgba(180,230,200,.55)'; ctx.lineWidth=.9;
+      for(let i=0;i<4;i++){ ctx.beginPath(); ctx.moveTo(-9,-5+i*3.5); ctx.lineTo(9,-5+i*3.5); ctx.stroke(); }
+      rr(ctx,-4,-3.5,8,7,1); ctx.fillStyle='#262c46'; ctx.fill();
+      ctx.fillStyle='#ffd166';
+      for(let i=-2;i<=2;i++){ ctx.fillRect(i*2-0.4,-9,0.8,1.6); ctx.fillRect(i*2-0.4,7.4,0.8,1.6); }
+      break;
+    case 'relic':
+      ctx.shadowColor='#ffd166'; ctx.shadowBlur=16;
+      ctx.beginPath();
+      for(let i=0;i<8;i++){
+        const a=i/8*TAU-Math.PI/2, r=(i%2===0)?10:4.2;
+        const x=Math.cos(a)*r, y=Math.sin(a)*r;
+        i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+      }
+      ctx.closePath(); ctx.fillStyle='#ffd166'; ctx.fill(); ctx.shadowBlur=0;
+      ctx.beginPath(); ctx.arc(0,0,2.5,0,TAU); ctx.fillStyle='#fff6d5'; ctx.fill();
+      break;
+  }
+}
+function drawTrash(t){
+  if(t.done) return;
+  if(t.x < cam.x-W/2-60 || t.x > cam.x+W/2+60 || t.y < cam.y-H/2-60 || t.y > cam.y+H/2+60) return;
+  const s = t.size, d = TRASH[t.type];
+  ctx.fillStyle = 'rgba(0,0,0,.3)';
+  ctx.beginPath(); ctx.ellipse(t.x+3,t.y+s*.42,s*.65,s*.24,0,0,TAU); ctx.fill();
+  if(d.rare){
+    const g = ctx.createRadialGradient(t.x,t.y,2,t.x,t.y,s*1.6);
+    g.addColorStop(0,'rgba(255,209,102,.24)'); g.addColorStop(1,'rgba(255,209,102,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(t.x,t.y,s*1.6,0,TAU); ctx.fill();
+  }
+  if(t.elite){
+    const eg = ctx.createRadialGradient(t.x,t.y,2,t.x,t.y,s*1.75);
+    eg.addColorStop(0,'rgba(190,140,255,.24)'); eg.addColorStop(1,'rgba(190,140,255,0)');
+    ctx.fillStyle=eg; ctx.beginPath(); ctx.arc(t.x,t.y,s*1.75,0,TAU); ctx.fill();
+    ctx.save(); ctx.translate(t.x,t.y); ctx.rotate(T*.45+t.rot*.2);
+    ctx.strokeStyle='rgba(205,165,255,.8)'; ctx.lineWidth=1.6;
+    ctx.beginPath();
+    for(let i=0;i<6;i++){
+      const a=i*TAU/6, hx=Math.cos(a)*s*.95, hy=Math.sin(a)*s*.95;
+      if(i) ctx.lineTo(hx,hy); else ctx.moveTo(hx,hy);
+    }
+    ctx.closePath(); ctx.stroke(); ctx.restore();
+  }
+  ctx.save();
+  ctx.translate(t.x, t.y + Math.sin(T*1.8+t.bob)*1.6);
+  ctx.rotate(t.rot + (t.pulse>0.1?Math.sin(T*30)*t.pulse*.06:0));
+  const k = s/20; ctx.scale(k,k);
+  if(t.pulse>0.1){ ctx.shadowColor = '#8effd7'; ctx.shadowBlur = 12*t.pulse; }
+  drawShape(t);
+  ctx.restore();
+  if(t.hp < t.maxHp){
+    const p = 1 - t.hp/t.maxHp;
+    ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(t.x,t.y,s*.85,0,TAU); ctx.stroke();
+    ctx.strokeStyle = t.elite ? '#d3a8ff' : '#8effd7'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(t.x,t.y,s*.85,-Math.PI/2,-Math.PI/2+TAU*p); ctx.stroke();
+  }
+}
+function drawBase(){
+  const pulse = 1 + Math.sin(T*2)*.05;
+  const near = Math.hypot(player.x,player.y) < BASE_RADIUS+40;
+  // 光晕
+  const g = ctx.createRadialGradient(0,0,20,0,0,BASE_RADIUS*1.9);
+  g.addColorStop(0,'rgba(110,242,192,.22)'); g.addColorStop(.55,'rgba(80,200,190,.08)'); g.addColorStop(1,'rgba(80,200,190,0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,BASE_RADIUS*1.9,0,TAU); ctx.fill();
+  // 旋转外环
+  ctx.save(); ctx.rotate(T*.22);
+  ctx.setLineDash([14,12]); ctx.lineWidth=2; ctx.strokeStyle=near?'rgba(140,255,215,.75)':'rgba(110,242,192,.4)';
+  ctx.beginPath(); ctx.arc(0,0,BASE_RADIUS+18*pulse,0,TAU); ctx.stroke(); ctx.setLineDash([]);
+  ctx.restore();
+  // 平台
+  const pg = ctx.createRadialGradient(-18,-22,8,0,0,BASE_RADIUS);
+  pg.addColorStop(0,'#2b6d70'); pg.addColorStop(1,'#123a48');
+  ctx.fillStyle=pg; ctx.beginPath(); ctx.arc(0,0,BASE_RADIUS,0,TAU); ctx.fill();
+  ctx.strokeStyle='rgba(140,255,215,.55)'; ctx.lineWidth=3; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,BASE_RADIUS-14,0,TAU); ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=1; ctx.stroke();
+  // 回收三箭头
+  ctx.save(); ctx.rotate(-Math.PI/2);
+  for(let i=0;i<3;i++){
+    ctx.rotate(TAU/3);
+    ctx.strokeStyle='#8effd7'; ctx.lineWidth=9; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(0,0,42,0.15,1.5); ctx.stroke();
+    const a=1.5, x=Math.cos(a)*42, y=Math.sin(a)*42;
+    ctx.fillStyle='#8effd7';
+    ctx.beginPath(); ctx.moveTo(x+11,y-2); ctx.lineTo(x-3,y-10); ctx.lineTo(x-3,y+9); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+  ctx.lineCap='butt';
+  // 中心核心
+  const cg = ctx.createRadialGradient(0,0,2,0,0,22);
+  cg.addColorStop(0,'#eafff7'); cg.addColorStop(.4,'#6ef2c0'); cg.addColorStop(1,'rgba(110,242,192,0)');
+  ctx.fillStyle=cg; ctx.beginPath(); ctx.arc(0,0,22+Math.sin(T*3)*2,0,TAU); ctx.fill();
+  ctx.textAlign='center'; ctx.font='700 13px sans-serif';
+  ctx.fillStyle= near?'#eafff7':'rgba(200,240,230,.65)';
+  ctx.fillText('♻ 生态回收站',0,BASE_RADIUS+40);
+  if(near && state.bag.count>0){
+    ctx.font='600 11px sans-serif'; ctx.fillStyle='#ffd166';
+    ctx.fillText('结算 '+fmt(Math.round(state.bag.value*settleMul()))+' ◈',0,BASE_RADIUS+58);
+    if(remoteUnlocked()){
+      ctx.font='600 10px sans-serif'; ctx.fillStyle='#8ce0ff';
+      const rv = Math.max(0, Math.round((state.bag.value-remoteFeeOf(state.bag.value))*settleMul()));
+      ctx.fillText('⚡ 直接回收 '+fmt(rv)+' ◈（-15%）',0,BASE_RADIUS+76);
+    }
+  }
+}
+function drawRemoteBeam(){
+  const b = state.remoteBeam;
+  if(!b) return;
+  const p = clamp(b.life/b.max,0,1);
+  ctx.save();
+  ctx.globalAlpha = p;
+  ctx.strokeStyle='rgba(140,224,255,.8)'; ctx.lineWidth=3;
+  ctx.shadowColor='#8ce0ff'; ctx.shadowBlur=18;
+  ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(0,0); ctx.stroke();
+  ctx.shadowBlur=0;
+  for(let i=0;i<7;i++){
+    const t = (1-p+i/7)%1;
+    ctx.fillStyle='rgba(210,248,255,'+(0.95-t*0.55).toFixed(2)+')';
+    ctx.beginPath(); ctx.arc(b.x*(1-t),b.y*(1-t),3.5,0,TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawPlayer(){
+  const f = form(state.up.tool);
+  const px = player.x, py = player.y;
+  const range = effectiveRange();
+  const ph = currentPhase();
+  // 夜间探照灯
+  if(ph.dark>0.15){
+    const lg = ctx.createRadialGradient(px,py,10,px,py,160);
+    lg.addColorStop(0,'rgba(255,238,190,'+(0.13*ph.dark).toFixed(3)+')');
+    lg.addColorStop(1,'rgba(255,238,190,0)');
+    ctx.fillStyle=lg; ctx.beginPath(); ctx.arc(px,py,160,0,TAU); ctx.fill();
+  }
+  // 清扫范围
+  const rg = ctx.createRadialGradient(px,py,range*.4,px,py,range);
+  rg.addColorStop(0,'rgba(110,242,192,0)'); rg.addColorStop(.85,'rgba(110,242,192,.045)'); rg.addColorStop(1,'rgba(110,242,192,.11)');
+  ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(px,py,range,0,TAU); ctx.fill();
+  ctx.setLineDash([5,9]); ctx.lineWidth=1.2; ctx.strokeStyle='rgba(110,242,192,.22)';
+  ctx.beginPath(); ctx.arc(px,py,range,0,TAU); ctx.stroke(); ctx.setLineDash([]);
+  // 工具光束
+  for(const b of player.beams){
+    const grd = ctx.createLinearGradient(px,py,b.x,b.y);
+    grd.addColorStop(0,f.color); grd.addColorStop(1,'rgba(255,255,255,.25)');
+    ctx.strokeStyle=grd; ctx.lineWidth=2.6; ctx.globalAlpha=.8;
+    ctx.beginPath(); ctx.moveTo(px,py-8);
+    ctx.quadraticCurveTo((px+b.x)/2+rand(-6,6),(py+b.y)/2+rand(-6,6),b.x,b.y);
+    ctx.stroke(); ctx.globalAlpha=1;
+    ctx.fillStyle='#eafff7'; ctx.beginPath(); ctx.arc(b.x,b.y,3.2+Math.sin(T*22)*1,0,TAU); ctx.fill();
+  }
+  // 影子
+  ctx.fillStyle='rgba(0,0,0,.35)';
+  ctx.beginPath(); ctx.ellipse(px+2,py+15,17,6,0,0,TAU); ctx.fill();
+  const bob = Math.sin(T*7)*1.6;
+  ctx.save(); ctx.translate(px,py+bob);
+  // 推进器尾迹
+  const moving = Math.hypot(player.vx,player.vy)>10;
+  if(moving){
+    ctx.fillStyle='rgba(124,216,255,.35)';
+    ctx.beginPath(); ctx.ellipse(0,17,7+Math.sin(T*20)*2,4,0,0,TAU); ctx.fill();
+  }
+  // 轮子
+  ctx.fillStyle='#25424e';
+  rr(ctx,-17,5,9,11,3); ctx.fill(); rr(ctx,8,5,9,11,3); ctx.fill();
+  // 机身
+  const bg = ctx.createLinearGradient(-14,-16,14,16);
+  bg.addColorStop(0,'#e9fbf5'); bg.addColorStop(.55,'#a9d9d3'); bg.addColorStop(1,'#5f9a9c');
+  ctx.fillStyle=bg; rr(ctx,-15,-13,30,27,10); ctx.fill();
+  ctx.fillStyle=f.color; rr(ctx,-15,5,30,9,4); ctx.fill();
+  // 玻璃罩
+  ctx.fillStyle='#173a48'; rr(ctx,-11,-12,22,16,8); ctx.fill();
+  ctx.fillStyle=f.color;
+  ctx.beginPath(); ctx.arc(-4.5,-4,2.4,0,TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(4.5,-4,2.4,0,TAU); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.35)'; rr(ctx,-9,-11,18,4,2); ctx.fill();
+  // 天线 / 工具头
+  ctx.strokeStyle=f.color; ctx.lineWidth=2.2;
+  ctx.beginPath(); ctx.moveTo(0,-13); ctx.lineTo(0,-21); ctx.stroke();
+  ctx.fillStyle=f.color; ctx.beginPath(); ctx.arc(0,-22,3,0,TAU); ctx.fill();
+  ctx.shadowColor=f.color; ctx.shadowBlur=10; ctx.fill(); ctx.shadowBlur=0;
+  ctx.restore();
+  // 拾荒无人机
+  if(state.tools.drone>0){
+    for(let i=0;i<state.tools.drone;i++){
+      const a = T*2.2 + i*TAU/state.tools.drone;
+      const dx = Math.cos(a)*26, dy = Math.sin(a)*14-17;
+      ctx.fillStyle='rgba(193,168,255,.22)';
+      ctx.beginPath(); ctx.arc(px+dx,py+dy,7,0,TAU); ctx.fill();
+      ctx.fillStyle='#d9c8ff';
+      ctx.beginPath(); ctx.arc(px+dx,py+dy,3.2,0,TAU); ctx.fill();
+    }
+    if(state.droneBeam){
+      ctx.strokeStyle='rgba(193,168,255,.8)'; ctx.lineWidth=1.6;
+      ctx.beginPath(); ctx.moveTo(px,py-14); ctx.lineTo(state.droneBeam.x,state.droneBeam.y); ctx.stroke();
+    }
+  }
+  // 名牌
+  ctx.textAlign='center'; ctx.font='600 10px sans-serif';
+  ctx.fillStyle='rgba(230,255,246,.8)';
+  ctx.fillText('Lv.'+state.up.tool+' '+f.name,px,py-32);
+}
+function drawParticles(){
+  for(const p of parts){
+    ctx.globalAlpha = clamp(p.life/p.max,0,1);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,TAU); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  ctx.textAlign='center'; ctx.font='800 14px sans-serif';
+  for(const f of floats){
+    ctx.globalAlpha = clamp(f.life/f.max,0,1);
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillText(f.text,f.x+1,f.y-(f.max-f.life)*34+1);
+    ctx.fillStyle = f.color; ctx.fillText(f.text,f.x,f.y-(f.max-f.life)*34);
+  }
+  ctx.globalAlpha=1;
+}
+function drawMini(){
+  const m = $('minimap'), g = m.getContext('2d');
+  const S = m.width, r = S/2-5, k = r/R;
+  g.clearRect(0,0,S,S);
+  g.save(); g.beginPath(); g.arc(S/2,S/2,r,0,TAU); g.clip();
+  g.fillStyle='#0c2a38'; g.fillRect(0,0,S,S);
+  g.fillStyle='rgba(70,165,125,.35)';
+  for(const b of landBlobs){ g.beginPath(); g.ellipse(S/2+b.x*k,S/2+b.y*k,Math.max(2,b.rx*k),Math.max(2,b.ry*k),0,0,TAU); g.fill(); }
+  const radar = state.tools.radar>0;
+  let step = trash.length>600?3:2;
+  for(let i=0;i<trash.length;i+=step){
+    const t=trash[i]; if(t.done) continue;
+    if(t.elite){
+      g.fillStyle='#d3a8ff'; g.fillRect(S/2+t.x*k-1,S/2+t.y*k-1,2.4,2.4);
+    }else if(radar && (t.type==='relic' || TRASH[t.type].value>=11)){
+      g.fillStyle='#ffd166'; g.fillRect(S/2+t.x*k-1,S/2+t.y*k-1,2.6,2.6);
+    }else{
+      g.fillStyle='rgba(255,196,128,.8)'; g.fillRect(S/2+t.x*k,S/2+t.y*k,1.5,1.5);
+    }
+  }
+  g.strokeStyle='rgba(255,255,255,.22)'; g.lineWidth=1;
+  g.strokeRect(S/2+(cam.x-W/2)*k,S/2+(cam.y-H/2)*k,W*k,H*k);
+  g.fillStyle='#6ef2c0'; g.beginPath(); g.arc(S/2,S/2,4,0,TAU); g.fill();
+  g.fillStyle='#fff'; g.shadowColor='#fff'; g.shadowBlur=7;
+  g.beginPath(); g.arc(S/2+cam.x*k,S/2+cam.y*k,2.6,0,TAU); g.fill(); g.shadowBlur=0;
+  g.restore();
+  g.strokeStyle='rgba(110,242,192,.45)'; g.lineWidth=1.5;
+  g.beginPath(); g.arc(S/2,S/2,r,0,TAU); g.stroke();
+}
+function drawDaylight(){
+  const ph = currentPhase();
+  if(ph.tint){ ctx.fillStyle=ph.tint; ctx.fillRect(0,0,W,H); }
+  if(ph.dark<=0) return;
+  const a = ph.dark;
+  ctx.fillStyle='rgba(3,9,24,'+(a*.40).toFixed(3)+')'; ctx.fillRect(0,0,W,H);
+  const px = W/2+(player.x-cam.x), py = H/2+(player.y-cam.y);
+  const rad = 220+effectiveRange()*.6;
+  const g = ctx.createRadialGradient(px,py,rad*.25,px,py,rad*2.5);
+  g.addColorStop(0,'rgba(3,9,24,0)');
+  g.addColorStop(.55,'rgba(3,9,24,'+(a*.30).toFixed(3)+')');
+  g.addColorStop(1,'rgba(3,9,24,'+(a*.60).toFixed(3)+')');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+}
+function render(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,W,H);
+  drawBackground();
+  ctx.save();
+  ctx.translate(W/2-cam.x, H/2-cam.y);
+  // 大气层
+  const at = ctx.createRadialGradient(0,0,R*.92,0,0,R+110);
+  at.addColorStop(0,'rgba(90,220,255,0)'); at.addColorStop(.45,'rgba(90,220,255,.12)'); at.addColorStop(1,'rgba(90,220,255,0)');
+  ctx.fillStyle=at; ctx.beginPath(); ctx.arc(0,0,R+110,0,TAU); ctx.fill();
+  if(worldCanvas) ctx.drawImage(worldCanvas,-R,-R,2*R,2*R);
+  ctx.strokeStyle='rgba(130,240,230,.4)'; ctx.lineWidth=6;
+  ctx.shadowColor='#5be0d0'; ctx.shadowBlur=28;
+  ctx.beginPath(); ctx.arc(0,0,R,0,TAU); ctx.stroke(); ctx.shadowBlur=0;
+  drawBase();
+  for(const t of trash) drawTrash(t);
+  drawParticles();
+  drawPlayer();
+  drawRemoteBeam();
+  ctx.restore();
+  // 屏幕暗角
+  const vg = ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.35,W/2,H/2,Math.max(W,H)*.78);
+  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,6,12,.4)');
+  ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
+  drawDaylight();
+}
+
+/* ---------------- 更新 ---------------- */
+function update(dt){
+  // 输入 -> 移动
+  let mx=0,my=0;
+  if(keys.KeyW||keys.ArrowUp) my-=1;
+  if(keys.KeyS||keys.ArrowDown) my+=1;
+  if(keys.KeyA||keys.ArrowLeft) mx-=1;
+  if(keys.KeyD||keys.ArrowRight) mx+=1;
+  if(joy.active){ mx += joy.dx; my += joy.dy; }
+  if(mouse.down){
+    const dx = mouse.x-W/2, dy = mouse.y-H/2, d = Math.hypot(dx,dy);
+    if(d>26){ mx += dx/d; my += dy/d; }
+  }
+  const md = Math.hypot(mx,my);
+  if(md>0.02){ mx/=Math.max(1,md); my/=Math.max(1,md); }
+  const spd = moveSpeed();
+  player.vx = mx*spd; player.vy = my*spd;
+  player.x += player.vx*dt; player.y += player.vy*dt;
+  const pd = Math.hypot(player.x,player.y), lim = R-46;
+  if(pd>lim){ player.x = player.x/pd*lim; player.y = player.y/pd*lim; }
+  if(md>0.02) player.face = Math.atan2(my,mx);
+  cam.x += (player.x-cam.x)*Math.min(1,dt*6);
+  cam.y += (player.y-cam.y)*Math.min(1,dt*6);
+  if(state.remoteBeam){ state.remoteBeam.life -= dt; if(state.remoteBeam.life<=0) state.remoteBeam=null; }
+
+  // 昼夜推进
+  state.clock += dt;
+  if(state.clock>=DAY_LEN){ state.clock -= DAY_LEN; nextDay(); }
+
+  // 增益 / 委托状态
+  state.buffs = state.buffs.filter(b=>b.until>T);
+  if(state.challenge){
+    const ch = state.challenge;
+    if(ch.count>=ch.goal){ grant(ch.reward,'委托完成'); state.challenge=null; }
+    else if(T>ch.until){ toast('限时委托超时了…','bad'); sfx('bad'); state.challenge=null; }
+  }
+  // 波次动画
+  if(state.waveAnim>0){
+    state.waveAnim -= dt;
+    if(state.waveAnim<=0){
+      state.wave++;
+      // 每清完一波污染，垃圾回收价随机提升 10%~20%（复利累计，持久化到存档）
+      const inc = state.valueIncNext || (VALUE_INC_MIN + Math.random()*(VALUE_INC_MAX-VALUE_INC_MIN));
+      state.valueMul = Math.round(state.valueMul*(1+inc)*1000)/1000;
+      state.lastValueInc = inc;
+      state.valueIncNext = 0;
+      const nd = waveDiff(state.wave);
+      trash = trash.filter(t=>!t.done);          // 清掉上一波残骸，避免数组无限膨胀
+      spawnTrash(nd.count);
+      state.waveTotal = trash.length;
+      state.cleanedThisWave = 0;
+      state.leakLeft = nd.leak;
+      state.leakTimer = 16;
+      toast('☣ 第 '+state.wave+' 波：耐久 ×'+nd.hp.toFixed(1)+' · 抗性 '+Math.round(nd.armor*100)+
+        '% · 共 '+nd.count+' 件 · ♻ 回收价 +'+Math.round(inc*100)+'% → ×'+state.valueMul.toFixed(2),'bad');
+      sfx('bad'); save();
+    }
+  }else if(state.leakLeft>0){
+    state.leakTimer -= dt;
+    if(state.leakTimer<=0){
+      const n = 2+Math.min(3,Math.floor(state.wave/4));
+      spawnTrash(n);
+      state.waveTotal += n;
+      state.leakLeft--;
+      state.leakTimer = Math.max(12, 24-state.wave*.6);
+      toast('☣ 污染渗漏：'+n+' 件新污染物落入本波','bad');
+      floatText('☣ +'+n,player.x,player.y-52,'#ff8b7a');
+      save();
+    }
+  }
+  // 卸货
+  if(state.bag.count>0 && Math.hypot(player.x,player.y)<BASE_RADIUS) deposit();
+  // 清扫
+  const full = state.bag.count >= bagCap();
+  const range = effectiveRange();
+  const power = toolPower(state.up.tool)*buffMul('power');
+  const arms = armCount();
+  const diff = waveDiff(state.wave);
+  const pierce = buffMul('pierce');
+  const armorF = 1 - diff.armor/pierce;
+  player.beams = [];
+  let active = [];
+  if(!full){
+    const cand = [];
+    for(const t of trash){
+      if(t.done) continue;
+      const dx=t.x-player.x, dy=t.y-player.y, rr2=(range+t.size*.5)*(range+t.size*.5);
+      const d2=dx*dx+dy*dy;
+      if(d2<rr2) cand.push({t,d2});
+    }
+    cand.sort((a,b)=>a.d2-b.d2);
+    active = cand.slice(0,arms);
+    for(const c of active){
+      const t=c.t;
+      const heavy = (t.type==='tire'||t.type==='ewaste') ? (1+state.tools.spray*0.6) : 1;
+      const eliteF = t.elite ? (pierce>1?.85:.62) : 1;
+      t.hp -= power*dt*armorF*heavy*eliteF; t.pulse = 1; t.lastHit = T;
+      player.beams.push({x:t.x,y:t.y});
+      if(Math.random()<dt*16){
+        parts.push({x:t.x+rand(-8,8),y:t.y+rand(-8,8),
+          vx:(player.x-t.x)*rand(.6,1.4),vy:(player.y-t.y)*rand(.6,1.4)-20,
+          color:TRASH[t.type].color,life:.45,max:.45,size:rand(1.2,2.6)});
+      }
+      if(t.hp<=0) collect(t);
+    }
+  }
+  updateTools(dt,power,active,full);
+  // 高波次污染会自我修复：离开清扫范围 0.2 秒后，受损垃圾缓慢回血
+  if(diff.regen>0){
+    for(const t of trash){
+      if(t.done || t.hp>=t.maxHp || T-(t.lastHit||-99)<.2) continue;
+      t.hp = Math.min(t.maxHp, t.hp + t.maxHp*diff.regen*dt);
+    }
+  }
+  for(const t of trash) if(t.pulse>0) t.pulse = Math.max(0,t.pulse-dt*2.6);
+  // 粒子 / 飘字
+  for(const p of parts){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=90*dt; p.life-=dt; }
+  parts = parts.filter(p=>p.life>0);
+  for(const f of floats) f.life-=dt;
+  floats = floats.filter(f=>f.life>0);
+  // 奇遇计时
+  if(!state.eventOpen){
+    state.eventTimer -= dt;
+    if(state.eventTimer<=0) openEvent();
+  }
+  // 自动存档
+  if(T-state.lastSave>7){ state.lastSave=T; save(); }
+}
+
+/* ---------------- 主循环 ---------------- */
+let last = 0, lastHud = 0, lastMap = 0;
+function loop(ts){
+  T = ts/1000;
+  const dt = Math.min(0.05, last ? (ts-last)/1000 : 0.016);
+  last = ts;
+  if(state.running && !state.paused) update(dt);
+  render();
+  if(ts-lastHud>120){ updateHUD(); lastHud=ts; }
+  if(ts-lastMap>220){ drawMini(); lastMap=ts; }
+  requestAnimationFrame(loop);
+}
+
+/* ---------------- 启动 ---------------- */
+buildWorld();
+buildStars();
+if(!load()) newWorld();
+if(!state.daily) newDailyTasks(true);
+// 旧存档兼容：此前需手动领取、已达成却未领的任务，读档后一次性自动补发
+function settlePendingDaily(){
+  if(!state.daily) return 0;
+  const before = state.coins;
+  let n = 0;
+  for(const t of state.daily.tasks) if(settleDailyTask(t)) n++;
+  if(!n) return 0;
+  grantDailyAllBonus(true);
+  state.dailySig = '';
+  save();
+  toast('📋 已自动补发 '+n+' 项未领取的任务奖励 +'+fmt(state.coins-before)+' ◈','good');
+  return n;
+}
+settlePendingDaily();
+// 读档后的兜底：若上一波刚好清空、或计数与实际不符，保证世界始终有垃圾可清
+(function fixWorld(){
+  const remain = trash.filter(t=>!t.done).length;
+  if(remain===0){
+    spawnTrash(240);
+    state.waveTotal = trash.filter(t=>!t.done).length;
+    state.cleanedThisWave = 0;
+    state.leakLeft = waveDiff(state.wave).leak;
+  }else if(state.cleanedThisWave > state.waveTotal || state.waveTotal < remain){
+    state.waveTotal = Math.max(state.waveTotal, state.cleanedThisWave + remain);
+  }
+})();
+// 首次游玩 / 旧存档缺字段：安排下一次清扫日奖励（随机 5~10 天后）
+ensureDayRewardSchedule();
+$('toolIcon').textContent = form(state.up.tool).icon;
+$('btnMute').classList.toggle('off',state.muted);
+if(state.muted) $('btnMute').textContent = '♪̸';
+updateMusicUI();
+updateHUD();
+drawMini();
+window.addEventListener('beforeunload',save);
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
